@@ -8,7 +8,29 @@
 
 O **FieldOps** substitui processos baseados em formulários impressos, planilhas e registros informais por um fluxo digital integrado. A solução conecta o trabalho do técnico de campo à gestão administrativa, preservando evidências, histórico, localização e regras de negócio em um único fluxo rastreável.
 
-### O problema
+### Links Úteis
+* **Documentação Original:** [Notion - Projeto FieldOps](https://glaucotodesco.notion.site/Projeto-FieldOps-3af5d52a81f580c0b92ec261c686abb4)
+* **Design/Protótipo:** [Figma - Design](https://www.figma.com/design/TDZgjSw38R35CxhmAmyt64/Field-Ops?node-id=0-1&p=f&t=CF8K5GbmQBdqvael-0)
+
+---
+
+## Equipe
+
+| Nome | Atuação / Componente |
+|---|---|
+| **Andressa** | Web |
+| **Carol** | Web |
+| **Felipe** | Mobile |
+| **Ian** | Web |
+| **Julia** | Web e Nuvem |
+| **Lucas** | Backend |
+| **Marcela** | Backend e Nuvem |
+| **Natália** | Mobile |
+| **Rodrigo** | Mobile |
+
+---
+
+## O problema
 
 Inspeções técnicas em campo ainda dependem, em muitos cenários, de formulários em papel, arquivos avulsos e mensagens por diferentes canais. Isso gera uma cadeia fragmentada entre planejamento, execução e análise, com problemas como:
 
@@ -22,7 +44,7 @@ Inspeções técnicas em campo ainda dependem, em muitos cenários, de formulár
 
 ## Arquitetura
 
-```
+```text
 ┌─────────────────────────────┐
 │ Aplicativo Mobile           │
 │ Expo + React Native         │
@@ -89,7 +111,7 @@ Componente central da solução. Desenvolvida com **Java + Spring Boot**.
 
 ## Fluxo principal
 
-```
+```text
 Configuração administrativa
         ↓
 Criação do modelo de inspeção
@@ -125,10 +147,10 @@ Aprovação ou solicitação de correção
 
 | Componente | Tecnologias |
 |------------|-------------|
-| Mobile | Expo, React Native, TypeScript, Expo Router, SQLite |
-| Backend | Java, Spring Boot, JPA, PostgreSQL, JWT |
-| Web Admin | Angular, TypeScript |
-| Infraestrutura | PostgreSQL, SQLite, armazenamento de objetos (evidências) |
+| **Mobile** | Expo, React Native, TypeScript, Expo Router, SQLite |
+| **Backend** | Java, Spring Boot, JPA, PostgreSQL, JWT |
+| **Web Admin** | Angular, TypeScript |
+| **Infraestrutura** | PostgreSQL, SQLite, armazenamento de objetos (evidências) |
 
 ---
 
@@ -136,10 +158,10 @@ Aprovação ou solicitação de correção
 
 Este projeto é composto por três repositórios independentes:
 
-```
-fieldops-api/        # API REST — Java + Spring Boot
-fieldops-mobile/     # Aplicativo mobile — Expo + React Native
-fieldops-web/        # Interface administrativa — Angular
+```bash
+fieldops-api/      # API REST — Java + Spring Boot
+fieldops-mobile/   # Aplicativo mobile — Expo + React Native
+fieldops-web/      # Interface administrativa — Angular
 ```
 
 ---
