@@ -16,17 +16,17 @@ O **FieldOps** substitui processos baseados em formulários impressos, planilhas
 
 ## Equipe
 
-| Nome | Atuação / Componente |
-|---|---|
-| **Andressa** | Web |
-| **Carol** | Web |
-| **Felipe** | Mobile |
-| **Ian** | Web |
-| **Julia** | Web e Nuvem |
-| **Lucas** | Backend |
-| **Marcela** | Backend e Nuvem |
-| **Natália** | Mobile |
-| **Rodrigo** | Mobile |
+| Nome | Atuação / Componente | GitHub |
+|---|---|---|
+| **Andressa** | Web | [@DreBartolomeu](https://github.com/DreBartolomeu) |
+| **Carol** | Web | [@almeida-carol](https://github.com/almeida-carol) |
+| **Felipe** | Mobile | [@Cutiur](https://github.com/Cutiur) |
+| **Ian** | Web | [@IanLucasss](https://github.com/IanLucasss) |
+| **Julia** | Web e Nuvem | [@JujubsPaes](https://github.com/JujubsPaes) |
+| **Lucas** | Backend | [@lucasmiguelleite](https://github.com/lucasmiguelleite) |
+| **Marcela** | Backend e Nuvem | [@MarcelaMulato](https://github.com/MarcelaMulato) |
+| **Natália** | Mobile | [@NataliaNogueira1](https://github.com/NataliaNogueira1) |
+| **Rodrigo** | Mobile | [@Rodrigof981](https://github.com/Rodrigof981) |
 
 ---
 
