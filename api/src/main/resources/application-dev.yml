@@ -1,0 +1,18 @@
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    br.com.fieldops: DEBUG
+    org.hibernate.SQL: DEBUG
+
+fieldops:
+  security:
+    jwt:
+      # Dev-only default; production MUST provide JWT_SECRET via environment.
+      secret: dev-secret-dev-secret-dev-secret-dev-secret-32b
+      expiration: 8h

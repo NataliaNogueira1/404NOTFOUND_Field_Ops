@@ -1,0 +1,33 @@
+# Build
+target/
+build/
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+
+# OS
+.DS_Store
+
+# Env / secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Runtime evidence storage
+/evidences/
+
+# Maven wrapper jar (script-only wrapper)
+.mvn/wrapper/maven-wrapper.jar
