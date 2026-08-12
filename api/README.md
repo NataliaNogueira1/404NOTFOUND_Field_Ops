@@ -18,7 +18,7 @@ cp .env.example .env          # then edit DB + JWT values
 ./mvnw spring-boot:run
 ```
 
-The app starts on `http://localhost:8080`; Swagger UI at `http://localhost:8080/swagger-ui.html`.
+The app starts on `http://localhost:8080`; Swagger UI at `http://localhost:8080/swagger-ui`.
 
 ## Database
 
@@ -46,6 +46,26 @@ administrator on startup. Disabled when either value is blank.
 ./mvnw test                # unit + web/integration tests (H2, no Docker)
 ./mvnw verify              # also runs *IT tests (Testcontainers, needs Docker)
 ```
+
+## Health check
+
+The app exposes Spring Boot Actuator: `GET http://localhost:8080/actuator/health` returns `200`
+with `{"status":"UP"}` once the database is reachable.
+
+## Docker
+
+Run PostgreSQL and the API together (builds the app image from `Dockerfile`):
+
+```bash
+cd api
+cp .env.example .env          # set at least JWT_SECRET (>= 32 bytes)
+docker compose up --build
+```
+
+- API: `http://localhost:8080` (prod profile; Flyway runs migrations on startup)
+- Swagger UI: `http://localhost:8080/swagger-ui`
+- Health: `http://localhost:8080/actuator/health`
+- DB: `localhost:5432`, persisted in the `db-data` volume
 
 ## Layout
 
