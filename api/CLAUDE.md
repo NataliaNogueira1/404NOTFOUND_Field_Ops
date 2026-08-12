@@ -5,7 +5,7 @@ Backend of the FieldOps platform.
 - Java 21 · Spring Boot 3.x · Spring Data JPA · PostgreSQL
 - Spring Security · JWT · BCrypt (`PasswordEncoder`)
 - Bean Validation (jakarta.validation) · MapStruct
-- Flyway · springdoc-openapi (OpenAPI 3)
+- Flyway · springdoc-openapi (OpenAPI 3) · Spring Boot Actuator
 - JUnit 5 · Mockito · AssertJ · Testcontainers
 
 ## Spring Boot
@@ -154,7 +154,7 @@ Backend of the FieldOps platform.
 * HTTP edge → `controller/` (`*Controller`)
 * Domain logic → `service/` (`*Service`)
 * Input validation → annotated DTOs in `dto/`, enforced by `@Valid`
-* Persistence → `domain/` (`*Entity`) and `repository/` (`*Repository`)
+* Persistence → `model/` (`*Entity`) and `repository/` (`*Repository`)
 * Object mapping → `mapper/` (`*Mapper`, MapStruct)
 * Cross-cutting HTTP pieces → `common/` (`@RestControllerAdvice`, filters, interceptors)
 * Security → `security/` (filter, `UserDetailsService`, profile-based authz)
@@ -175,11 +175,12 @@ src/main/java/br/com/fieldops/api/
     service/
     repository/
     dto/
-    domain/
+    model/
     mapper/
 src/main/resources/
   application.yml
   application-dev.yml
+  application-prod.yml
   db/migration/
 src/test/java/...
 ```

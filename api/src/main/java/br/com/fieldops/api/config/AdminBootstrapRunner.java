@@ -1,7 +1,7 @@
 package br.com.fieldops.api.config;
 
-import br.com.fieldops.api.usuario.domain.Perfil;
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Perfil;
+import br.com.fieldops.api.usuario.model.Usuario;
 import br.com.fieldops.api.usuario.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package br.com.fieldops.api.usuario.domain;
+package br.com.fieldops.api.usuario.model;
 
 /**
  * User profiles. Members are code, not copy: the English name is persisted and used as the

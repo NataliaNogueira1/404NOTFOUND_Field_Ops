@@ -4,7 +4,7 @@ import br.com.fieldops.api.auth.dto.LoginRequest;
 import br.com.fieldops.api.auth.dto.TokenResponse;
 import br.com.fieldops.api.common.exception.CredenciaisInvalidasException;
 import br.com.fieldops.api.security.service.JwtService;
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Usuario;
 import br.com.fieldops.api.usuario.repository.UsuarioRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

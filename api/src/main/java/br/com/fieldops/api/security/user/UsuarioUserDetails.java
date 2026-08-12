@@ -1,7 +1,7 @@
 package br.com.fieldops.api.security.user;
 
-import br.com.fieldops.api.usuario.domain.Perfil;
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Perfil;
+import br.com.fieldops.api.usuario.model.Usuario;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

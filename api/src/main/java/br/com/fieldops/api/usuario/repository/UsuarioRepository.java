@@ -1,6 +1,6 @@
 package br.com.fieldops.api.usuario.repository;
 
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

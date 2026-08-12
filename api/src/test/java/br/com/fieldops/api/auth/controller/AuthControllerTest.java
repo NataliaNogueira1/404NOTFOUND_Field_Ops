@@ -1,7 +1,7 @@
 package br.com.fieldops.api.auth.controller;
 
-import br.com.fieldops.api.usuario.domain.Perfil;
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Perfil;
+import br.com.fieldops.api.usuario.model.Usuario;
 import br.com.fieldops.api.usuario.repository.UsuarioRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,6 +85,13 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.email").value("sup@fieldops.com"))
                 .andExpect(jsonPath("$.perfil").value("SUPERVISOR"))
                 .andExpect(jsonPath("$.nome").value("Supervisor One"));
+    }
+
+    @Test
+    void actuatorHealthIsPublicAndReturnsUp() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     private String obtainToken(String email, String senha) throws Exception {

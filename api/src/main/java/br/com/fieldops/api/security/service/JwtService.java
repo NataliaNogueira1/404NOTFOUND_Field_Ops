@@ -1,7 +1,7 @@
 package br.com.fieldops.api.security.service;
 
 import br.com.fieldops.api.config.JwtProperties;
-import br.com.fieldops.api.usuario.domain.Perfil;
+import br.com.fieldops.api.usuario.model.Perfil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;

@@ -1,6 +1,6 @@
 package br.com.fieldops.api.security.user;
 
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Usuario;
 import br.com.fieldops.api.usuario.repository.UsuarioRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

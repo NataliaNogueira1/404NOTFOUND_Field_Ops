@@ -1,7 +1,7 @@
 package br.com.fieldops.api.usuario.repository;
 
-import br.com.fieldops.api.usuario.domain.Perfil;
-import br.com.fieldops.api.usuario.domain.Usuario;
+import br.com.fieldops.api.usuario.model.Perfil;
+import br.com.fieldops.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
