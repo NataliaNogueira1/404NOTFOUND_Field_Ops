@@ -98,9 +98,9 @@ Backend of the FieldOps platform.
 ## Bootstrap & OpenAPI
 
 * The main class (`@SpringBootApplication`) boots the context; controllers expose routes under a global `/api/v1` base path. `application.yml` sets CORS, the global exception handler, and the port from env.
-* Swagger UI is served at `/swagger-ui.html`; the OpenAPI JSON at `/v3/api-docs`.
+* Swagger UI is served at `/swagger-ui`; the OpenAPI JSON at `/v3/api-docs`.
 * Every route is documented before it's considered done. Critical endpoints (auth, inspections, evidence) ship with payload examples; protected routes declare `Bearer JWT`.
-* Open locally: `./mvnw spring-boot:run` → `http://localhost:8080/swagger-ui.html`.
+* Open locally: `./mvnw spring-boot:run` → `http://localhost:8080/swagger-ui`.
 
 ## Config & env
 
