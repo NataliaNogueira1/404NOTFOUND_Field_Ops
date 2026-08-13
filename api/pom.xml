@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>br.com.fieldops</groupId>
+    <groupId>com.fieldops</groupId>
     <artifactId>fieldops-api</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>fieldops-api</name>

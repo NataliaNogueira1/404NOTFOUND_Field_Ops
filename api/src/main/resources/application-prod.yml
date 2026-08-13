@@ -11,5 +11,5 @@ management:
 
 logging:
   level:
-    br.com.fieldops: INFO
+    com.fieldops: INFO
     org.hibernate.SQL: WARN

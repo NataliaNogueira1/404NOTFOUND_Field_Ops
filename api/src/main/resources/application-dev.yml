@@ -7,7 +7,7 @@ spring:
 
 logging:
   level:
-    br.com.fieldops: DEBUG
+    com.fieldops: DEBUG
     org.hibernate.SQL: DEBUG
 
 fieldops:

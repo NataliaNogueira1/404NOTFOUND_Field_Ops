@@ -10,7 +10,7 @@ Backend of the FieldOps platform.
 
 ## Spring Boot
 
-* One package per domain, under `br.com.fieldops.api.<domain>`.
+* One package per domain, under `com.fieldops.<domain>`.
 * Layer strictly: **controller → service → repository**. Never skip a layer.
 * Controllers receive the request, delegate to a service, and return a response. No business logic, no DB calls.
 * Services own domain logic, rules, and transactions (`@Transactional`). They never touch the HTTP request object.
@@ -98,9 +98,9 @@ Backend of the FieldOps platform.
 ## Bootstrap & OpenAPI
 
 * The main class (`@SpringBootApplication`) boots the context; controllers expose routes under a global `/api/v1` base path. `application.yml` sets CORS, the global exception handler, and the port from env.
-* Swagger UI is served at `/swagger-ui`; the OpenAPI JSON at `/v3/api-docs`.
+* Swagger UI is served at `/swagger-ui` and `/swagger-ui.html`; the OpenAPI JSON at `/v3/api-docs`.
 * Every route is documented before it's considered done. Critical endpoints (auth, inspections, evidence) ship with payload examples; protected routes declare `Bearer JWT`.
-* Open locally: `./mvnw spring-boot:run` → `http://localhost:8080/swagger-ui`.
+* Open locally: `./mvnw spring-boot:run` → `http://localhost:8080/swagger-ui.html`.
 
 ## Config & env
 
@@ -156,21 +156,20 @@ Backend of the FieldOps platform.
 * Input validation → annotated DTOs in `dto/`, enforced by `@Valid`
 * Persistence → `model/` (`*Entity`) and `repository/` (`*Repository`)
 * Object mapping → `mapper/` (`*Mapper`, MapStruct)
-* Cross-cutting HTTP pieces → `common/` (`@RestControllerAdvice`, filters, interceptors)
-* Security → `security/` (filter, `UserDetailsService`, profile-based authz)
-* Global config → `config/` (beans, OpenAPI, async, storage)
+* Cross-cutting HTTP pieces → `shared/exception/` (`@RestControllerAdvice`, error shapes)
+* Security → `shared/security/` (JWT filter, `JwtService`, `UserDetailsService`, profile-based authz)
+* Global config → `config/` (security, CORS, OpenAPI, properties, async, storage)
 * Migrations → `src/main/resources/db/migration/` (Flyway)
-* Shared helpers → `common/`
+* Shared helpers → `shared/`
 
 ### Recommended structure
 
 ```text
-src/main/java/br/com/fieldops/api/
+src/main/java/com/fieldops/
   FieldOpsApiApplication.java
-  config/
-  common/ { dto, exception, interceptor, storage, types }
-  security/ { filter, service, config }
-  <domain>/
+  config/ { SecurityConfig, CorsConfig, OpenApiConfig, *Properties, SwaggerUiRedirectConfig }
+  shared/ { exception, security }
+  <domain>/          # e.g. auth/, user/
     controller/
     service/
     repository/
@@ -186,5 +185,5 @@ src/test/java/...
 ```
 
 * A rule that belongs to one domain is born in `<domain>/`.
-* A rule shared across domains lives in `common/` or `config/`.
+* A rule shared across domains lives in `shared/` or `config/`.
 * Nothing business-related goes loose in the root package.
