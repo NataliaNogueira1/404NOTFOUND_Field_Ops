@@ -6,9 +6,9 @@ import org.springframework.security.core.AuthenticationException;
  * Thrown when an authentication attempt fails (bad email or password).
  * Extends Spring Security's {@link AuthenticationException} and maps to HTTP 401.
  */
-public class CredenciaisInvalidasException extends AuthenticationException {
+public class InvalidCredentialsException extends AuthenticationException {
 
-    public CredenciaisInvalidasException(String message) {
+    public InvalidCredentialsException(String message) {
         super(message);
     }
 }

@@ -1,7 +1,7 @@
 package com.fieldops.shared.security;
 
 import com.fieldops.config.JwtProperties;
-import com.fieldops.user.model.Perfil;
+import com.fieldops.user.model.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -19,7 +19,7 @@ import java.util.Date;
 @Service
 public class JwtTokenProvider {
 
-    static final String PERFIL_CLAIM = "perfil";
+    static final String ROLE_CLAIM = "role";
     private static final int MIN_SECRET_BYTES = 32;
 
     private final SecretKey key;
@@ -36,11 +36,11 @@ public class JwtTokenProvider {
         this.expirationMillis = properties.expiration().toMillis();
     }
 
-    public String generateToken(String subject, Perfil perfil) {
+    public String generateToken(String subject, Role role) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(subject)
-                .claim(PERFIL_CLAIM, perfil.name())
+                .claim(ROLE_CLAIM, role.name())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMillis))
                 .signWith(key)
@@ -60,8 +60,8 @@ public class JwtTokenProvider {
         return parse(token).getSubject();
     }
 
-    public Perfil extractPerfil(String token) {
-        return Perfil.valueOf(parse(token).get(PERFIL_CLAIM, String.class));
+    public Role extractRole(String token) {
+        return Role.valueOf(parse(token).get(ROLE_CLAIM, String.class));
     }
 
     public long expirationSeconds() {

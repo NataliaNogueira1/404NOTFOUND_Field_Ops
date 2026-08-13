@@ -2,12 +2,12 @@ package com.fieldops.auth.service;
 
 import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.TokenResponse;
-import com.fieldops.shared.exception.CredenciaisInvalidasException;
+import com.fieldops.shared.exception.InvalidCredentialsException;
 import com.fieldops.config.JwtProperties;
 import com.fieldops.shared.security.JwtTokenProvider;
-import com.fieldops.user.model.Perfil;
-import com.fieldops.user.model.Usuario;
-import com.fieldops.user.repository.UsuarioRepository;
+import com.fieldops.user.model.Role;
+import com.fieldops.user.model.User;
+import com.fieldops.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +28,7 @@ class AuthServiceTest {
     private static final String SECRET = "test-secret-test-secret-test-secret-test-secret-32";
 
     @Mock
-    private UsuarioRepository usuarioRepository;
+    private UserRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -38,13 +38,13 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofHours(1)));
-        authService = new AuthService(usuarioRepository, passwordEncoder, jwtTokenProvider);
+        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider);
     }
 
     @Test
     void returnsTokenWhenCredentialsAreValid() {
-        Usuario usuario = buildUsuario(Perfil.SUPERVISOR, "hashed");
-        when(usuarioRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(usuario));
+        User user = buildUser(Role.SUPERVISOR, "hashed");
+        when(userRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("raw-pass", "hashed")).thenReturn(true);
 
         TokenResponse response = authService.login(new LoginRequest("sup@fieldops.com", "raw-pass"));
@@ -55,28 +55,28 @@ class AuthServiceTest {
 
     @Test
     void throwsWhenPasswordDoesNotMatch() {
-        Usuario usuario = buildUsuario(Perfil.SUPERVISOR, "hashed");
-        when(usuarioRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(usuario));
+        User user = buildUser(Role.SUPERVISOR, "hashed");
+        when(userRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("sup@fieldops.com", "wrong")))
-                .isInstanceOf(CredenciaisInvalidasException.class);
+                .isInstanceOf(InvalidCredentialsException.class);
     }
 
     @Test
     void throwsWhenUserIsUnknown() {
-        when(usuarioRepository.findByEmail("ghost@fieldops.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("ghost@fieldops.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("ghost@fieldops.com", "any")))
-                .isInstanceOf(CredenciaisInvalidasException.class);
+                .isInstanceOf(InvalidCredentialsException.class);
     }
 
-    private Usuario buildUsuario(Perfil perfil, String senha) {
-        Usuario usuario = new Usuario();
-        usuario.setNome("Supervisor");
-        usuario.setEmail("sup@fieldops.com");
-        usuario.setSenha(senha);
-        usuario.setPerfil(perfil);
-        return usuario;
+    private User buildUser(Role role, String password) {
+        User user = new User();
+        user.setName("Supervisor");
+        user.setEmail("sup@fieldops.com");
+        user.setPassword(password);
+        user.setRole(role);
+        return user;
     }
 }

@@ -50,9 +50,9 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed", request, fieldErrors);
     }
 
-    @ExceptionHandler(CredenciaisInvalidasException.class)
+    @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(
-            CredenciaisInvalidasException ex, HttpServletRequest request) {
+            InvalidCredentialsException ex, HttpServletRequest request) {
 
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage(), request, List.of());
     }
@@ -64,9 +64,9 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication failed", request, List.of());
     }
 
-    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(
-            RecursoNaoEncontradoException ex, HttpServletRequest request) {
+            ResourceNotFoundException ex, HttpServletRequest request) {
 
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request, List.of());
     }
@@ -79,9 +79,9 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found", request, List.of());
     }
 
-    @ExceptionHandler(NegocioException.class)
+    @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(
-            NegocioException ex, HttpServletRequest request) {
+            BusinessException ex, HttpServletRequest request) {
 
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "BUSINESS_RULE", ex.getMessage(), request, List.of());
     }

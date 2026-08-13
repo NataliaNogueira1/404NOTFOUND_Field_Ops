@@ -1,8 +1,8 @@
 package com.fieldops.auth.controller;
 
-import com.fieldops.user.model.Perfil;
-import com.fieldops.user.model.Usuario;
-import com.fieldops.user.repository.UsuarioRepository;
+import com.fieldops.user.model.Role;
+import com.fieldops.user.model.User;
+import com.fieldops.user.repository.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,20 +29,20 @@ class AuthControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void seedUser() {
-        usuarioRepository.deleteAll();
-        Usuario usuario = new Usuario();
-        usuario.setNome("Supervisor One");
-        usuario.setEmail("sup@fieldops.com");
-        usuario.setSenha(passwordEncoder.encode("pass123"));
-        usuario.setPerfil(Perfil.SUPERVISOR);
-        usuarioRepository.save(usuario);
+        userRepository.deleteAll();
+        User user = new User();
+        user.setName("Supervisor One");
+        user.setEmail("sup@fieldops.com");
+        user.setPassword(passwordEncoder.encode("pass123"));
+        user.setRole(Role.SUPERVISOR);
+        userRepository.save(user);
     }
 
     @Test
@@ -83,8 +83,8 @@ class AuthControllerTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("sup@fieldops.com"))
-                .andExpect(jsonPath("$.perfil").value("SUPERVISOR"))
-                .andExpect(jsonPath("$.nome").value("Supervisor One"));
+                .andExpect(jsonPath("$.role").value("SUPERVISOR"))
+                .andExpect(jsonPath("$.name").value("Supervisor One"));
     }
 
     @Test
@@ -94,16 +94,16 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value("UP"));
     }
 
-    private String obtainToken(String email, String senha) throws Exception {
+    private String obtainToken(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(email, senha)))
+                        .content(loginBody(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.token");
     }
 
-    private String loginBody(String email, String senha) {
-        return "{\"email\":\"" + email + "\",\"senha\":\"" + senha + "\"}";
+    private String loginBody(String email, String password) {
+        return "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
     }
 }

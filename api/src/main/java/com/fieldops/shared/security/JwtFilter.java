@@ -25,9 +25,9 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UsuarioUserDetailsService userDetailsService;
+    private final AuthenticatedUserDetailsService userDetailsService;
 
-    public JwtFilter(JwtTokenProvider jwtTokenProvider, UsuarioUserDetailsService userDetailsService) {
+    public JwtFilter(JwtTokenProvider jwtTokenProvider, AuthenticatedUserDetailsService userDetailsService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userDetailsService = userDetailsService;
     }

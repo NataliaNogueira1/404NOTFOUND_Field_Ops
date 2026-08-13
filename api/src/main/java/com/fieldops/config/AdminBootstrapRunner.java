@@ -1,8 +1,8 @@
 package com.fieldops.config;
 
-import com.fieldops.user.model.Perfil;
-import com.fieldops.user.model.Usuario;
-import com.fieldops.user.repository.UsuarioRepository;
+import com.fieldops.user.model.Role;
+import com.fieldops.user.model.User;
+import com.fieldops.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -21,27 +21,27 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrapRunner.class);
 
     private final BootstrapProperties properties;
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public AdminBootstrapRunner(BootstrapProperties properties, UsuarioRepository usuarioRepository,
+    public AdminBootstrapRunner(BootstrapProperties properties, UserRepository userRepository,
                                 PasswordEncoder passwordEncoder) {
         this.properties = properties;
-        this.usuarioRepository = usuarioRepository;
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!properties.isEnabled() || usuarioRepository.existsByEmail(properties.adminEmail())) {
+        if (!properties.isEnabled() || userRepository.existsByEmail(properties.adminEmail())) {
             return;
         }
-        Usuario admin = new Usuario();
-        admin.setNome("Administrator");
+        User admin = new User();
+        admin.setName("Administrator");
         admin.setEmail(properties.adminEmail());
-        admin.setSenha(passwordEncoder.encode(properties.adminPassword()));
-        admin.setPerfil(Perfil.ADMINISTRATOR);
-        usuarioRepository.save(admin);
+        admin.setPassword(passwordEncoder.encode(properties.adminPassword()));
+        admin.setRole(Role.ADMINISTRATOR);
+        userRepository.save(admin);
         log.info("Bootstrapped administrator account for {}", properties.adminEmail());
     }
 }

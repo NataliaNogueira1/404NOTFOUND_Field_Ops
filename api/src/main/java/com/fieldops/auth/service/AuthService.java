@@ -2,10 +2,10 @@ package com.fieldops.auth.service;
 
 import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.TokenResponse;
-import com.fieldops.shared.exception.CredenciaisInvalidasException;
+import com.fieldops.shared.exception.InvalidCredentialsException;
 import com.fieldops.shared.security.JwtTokenProvider;
-import com.fieldops.user.model.Usuario;
-import com.fieldops.user.repository.UsuarioRepository;
+import com.fieldops.user.model.User;
+import com.fieldops.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,24 +20,24 @@ public class AuthService {
 
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
 
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
-        this.usuarioRepository = usuarioRepository;
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new CredenciaisInvalidasException(INVALID_CREDENTIALS));
-        if (!passwordEncoder.matches(request.senha(), usuario.getSenha())) {
-            throw new CredenciaisInvalidasException(INVALID_CREDENTIALS);
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new InvalidCredentialsException(INVALID_CREDENTIALS));
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS);
         }
-        String token = jwtTokenProvider.generateToken(usuario.getEmail(), usuario.getPerfil());
+        String token = jwtTokenProvider.generateToken(user.getEmail(), user.getRole());
         return TokenResponse.bearer(token, jwtTokenProvider.expirationSeconds());
     }
 }

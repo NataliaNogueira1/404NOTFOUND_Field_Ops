@@ -15,28 +15,28 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Authenticated user of the platform. {@code senha} holds a BCrypt hash — never plaintext.
+ * Authenticated user of the platform. {@code password} holds a BCrypt hash — never plaintext.
  */
 @Entity
 @Table(name = "users")
-public class Usuario {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, length = 150)
-    private String nome;
+    private String name;
 
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
     @Column(nullable = false, length = 100)
-    private String senha;
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private Perfil perfil;
+    private Role role;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -44,7 +44,7 @@ public class Usuario {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Usuario() {
+    public User() {
         // required by JPA
     }
 
@@ -64,12 +64,12 @@ public class Usuario {
         return id;
     }
 
-    public String getNome() {
-        return nome;
+    public String getName() {
+        return name;
     }
 
-    public void setNome(String nome) {
-        this.nome = nome;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getEmail() {
@@ -80,20 +80,20 @@ public class Usuario {
         this.email = email;
     }
 
-    public String getSenha() {
-        return senha;
+    public String getPassword() {
+        return password;
     }
 
-    public void setSenha(String senha) {
-        this.senha = senha;
+    public void setPassword(String password) {
+        this.password = password;
     }
 
-    public Perfil getPerfil() {
-        return perfil;
+    public Role getRole() {
+        return role;
     }
 
-    public void setPerfil(Perfil perfil) {
-        this.perfil = perfil;
+    public void setRole(Role role) {
+        this.role = role;
     }
 
     public Instant getCreatedAt() {
@@ -109,10 +109,10 @@ public class Usuario {
         if (this == other) {
             return true;
         }
-        if (!(other instanceof Usuario usuario)) {
+        if (!(other instanceof User user)) {
             return false;
         }
-        return id != null && Objects.equals(id, usuario.id);
+        return id != null && Objects.equals(id, user.id);
     }
 
     @Override

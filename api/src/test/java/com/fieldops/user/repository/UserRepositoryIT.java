@@ -1,7 +1,7 @@
 package com.fieldops.user.repository;
 
-import com.fieldops.user.model.Perfil;
-import com.fieldops.user.model.Usuario;
+import com.fieldops.user.model.Role;
+import com.fieldops.user.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Testcontainers
 @SpringBootTest
-class UsuarioRepositoryIT {
+class UserRepositoryIT {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -37,22 +37,22 @@ class UsuarioRepositoryIT {
     }
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
+    private UserRepository userRepository;
 
     @Test
     void persistsAndFindsByEmail() {
-        Usuario usuario = new Usuario();
-        usuario.setNome("Technician");
-        usuario.setEmail("it@fieldops.com");
-        usuario.setSenha("hashed");
-        usuario.setPerfil(Perfil.TECHNICIAN);
-        Usuario saved = usuarioRepository.saveAndFlush(usuario);
+        User user = new User();
+        user.setName("Technician");
+        user.setEmail("it@fieldops.com");
+        user.setPassword("hashed");
+        user.setRole(Role.TECHNICIAN);
+        User saved = userRepository.saveAndFlush(user);
 
-        Optional<Usuario> found = usuarioRepository.findByEmail("it@fieldops.com");
+        Optional<User> found = userRepository.findByEmail("it@fieldops.com");
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(saved.getId());
-        assertThat(found.get().getPerfil()).isEqualTo(Perfil.TECHNICIAN);
+        assertThat(found.get().getRole()).isEqualTo(Role.TECHNICIAN);
         assertThat(found.get().getCreatedAt()).isNotNull();
     }
 }

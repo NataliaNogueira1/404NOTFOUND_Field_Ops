@@ -10,7 +10,7 @@ package com.fieldops.user.model;
  *     <li>{@link #ADMINISTRATOR} — administrator (Portuguese: Administrador)</li>
  * </ul>
  */
-public enum Perfil {
+public enum Role {
     TECHNICIAN,
     SUPERVISOR,
     ADMINISTRATOR

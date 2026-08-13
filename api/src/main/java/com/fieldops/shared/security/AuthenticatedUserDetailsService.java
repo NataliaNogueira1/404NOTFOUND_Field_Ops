@@ -1,7 +1,7 @@
 package com.fieldops.shared.security;
 
-import com.fieldops.user.model.Usuario;
-import com.fieldops.user.repository.UsuarioRepository;
+import com.fieldops.user.model.User;
+import com.fieldops.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -11,18 +11,18 @@ import org.springframework.stereotype.Service;
  * Loads users by email for Spring Security (used by the JWT filter and authentication manager).
  */
 @Service
-public class UsuarioUserDetailsService implements UserDetailsService {
+public class AuthenticatedUserDetailsService implements UserDetailsService {
 
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
 
-    public UsuarioUserDetailsService(UsuarioRepository usuarioRepository) {
-        this.usuarioRepository = usuarioRepository;
+    public AuthenticatedUserDetailsService(UserRepository userRepository) {
+        this.userRepository = userRepository;
     }
 
     @Override
     public UserDetails loadUserByUsername(String email) {
-        Usuario usuario = usuarioRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
-        return new UsuarioUserDetails(usuario);
+        return new AuthenticatedUser(user);
     }
 }

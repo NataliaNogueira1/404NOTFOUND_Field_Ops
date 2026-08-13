@@ -38,9 +38,7 @@ Backend of the FieldOps platform.
 * Extract shared logic; don't duplicate.
 * Prefer early returns / guard clauses. Max 2 levels of nesting.
 * Error messages include the offending value and the expected shape.
-* Enum names and members are always in English (`APPROVED`, not `APROVADO`), both the key and the string returned by `name()` — regardless of the domain being Portuguese-speaking (FieldOps). User-facing strings/messages stay in Portuguese; enums are code, not copy.
-
-  > Exception: business entity **class names** keep Portuguese to mirror the domain (`Inspecao`, `Equipamento`, `NaoConformidade`). Enum members still follow the English rule above.
+* All code identifiers — classes, methods, fields, columns, DTOs, enums — are in English (`APPROVED`, not `APROVADO`; `User`/`Role`, not `Usuario`/`Perfil`). API messages and error text are English too. Portuguese is reserved for product/UI copy that lives in the frontend, not in this backend.
 
 ## Comments
 

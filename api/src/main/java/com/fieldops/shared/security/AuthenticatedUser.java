@@ -1,7 +1,7 @@
 package com.fieldops.shared.security;
 
-import com.fieldops.user.model.Perfil;
-import com.fieldops.user.model.Usuario;
+import com.fieldops.user.model.Role;
+import com.fieldops.user.model.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,45 +10,45 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Spring Security adapter over a {@link Usuario}. The profile name is the single granted
+ * Spring Security adapter over a {@link User}. The profile name is the single granted
  * authority, so endpoints can authorize with {@code hasAuthority('ADMINISTRATOR')} etc.
  */
-public class UsuarioUserDetails implements UserDetails {
+public class AuthenticatedUser implements UserDetails {
 
     private final Long id;
-    private final String nome;
+    private final String name;
     private final String email;
-    private final String senha;
-    private final Perfil perfil;
+    private final String password;
+    private final Role role;
 
-    public UsuarioUserDetails(Usuario usuario) {
-        this.id = usuario.getId();
-        this.nome = usuario.getNome();
-        this.email = usuario.getEmail();
-        this.senha = usuario.getSenha();
-        this.perfil = usuario.getPerfil();
+    public AuthenticatedUser(User user) {
+        this.id = user.getId();
+        this.name = user.getName();
+        this.email = user.getEmail();
+        this.password = user.getPassword();
+        this.role = user.getRole();
     }
 
     public Long getId() {
         return id;
     }
 
-    public String getNome() {
-        return nome;
+    public String getName() {
+        return name;
     }
 
-    public Perfil getPerfil() {
-        return perfil;
+    public Role getRole() {
+        return role;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(perfil.name()));
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override
     public String getPassword() {
-        return senha;
+        return password;
     }
 
     @Override

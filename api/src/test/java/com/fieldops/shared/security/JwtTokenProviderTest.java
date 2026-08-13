@@ -1,7 +1,7 @@
 package com.fieldops.shared.security;
 
 import com.fieldops.config.JwtProperties;
-import com.fieldops.user.model.Perfil;
+import com.fieldops.user.model.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,17 +21,17 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void roundTripsSubjectAndPerfil() {
-        String token = jwtTokenProvider.generateToken("tech@fieldops.com", Perfil.TECHNICIAN);
+    void roundTripsSubjectAndRole() {
+        String token = jwtTokenProvider.generateToken("tech@fieldops.com", Role.TECHNICIAN);
 
         assertThat(jwtTokenProvider.isValid(token)).isTrue();
         assertThat(jwtTokenProvider.extractSubject(token)).isEqualTo("tech@fieldops.com");
-        assertThat(jwtTokenProvider.extractPerfil(token)).isEqualTo(Perfil.TECHNICIAN);
+        assertThat(jwtTokenProvider.extractRole(token)).isEqualTo(Role.TECHNICIAN);
     }
 
     @Test
     void rejectsTamperedToken() {
-        String token = jwtTokenProvider.generateToken("admin@fieldops.com", Perfil.ADMINISTRATOR);
+        String token = jwtTokenProvider.generateToken("admin@fieldops.com", Role.ADMINISTRATOR);
 
         assertThat(jwtTokenProvider.isValid(token + "tampered")).isFalse();
     }
@@ -40,7 +40,7 @@ class JwtTokenProviderTest {
     void rejectsForeignToken() {
         JwtTokenProvider other = new JwtTokenProvider(new JwtProperties(
                 "another-secret-another-secret-another-secret!!", Duration.ofHours(1)));
-        String foreignToken = other.generateToken("x@fieldops.com", Perfil.TECHNICIAN);
+        String foreignToken = other.generateToken("x@fieldops.com", Role.TECHNICIAN);
 
         assertThat(jwtTokenProvider.isValid(foreignToken)).isFalse();
     }
