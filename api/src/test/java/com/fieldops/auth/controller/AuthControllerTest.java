@@ -51,9 +51,10 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("sup@fieldops.com", "pass123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").isNumber());
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.expiresIn").isNumber())
+                .andExpect(jsonPath("$.user.email").value("sup@fieldops.com"));
     }
 
     @Test
@@ -62,7 +63,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("sup@fieldops.com", "wrong")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
     }
 
     @Test
@@ -100,7 +102,7 @@ class AuthControllerTest {
                         .content(loginBody(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.token");
+        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
     }
 
     private String loginBody(String email, String password) {

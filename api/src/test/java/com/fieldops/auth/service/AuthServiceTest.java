@@ -1,10 +1,11 @@
 package com.fieldops.auth.service;
 
 import com.fieldops.auth.dto.LoginRequest;
-import com.fieldops.auth.dto.TokenResponse;
+import com.fieldops.auth.dto.LoginResponse;
 import com.fieldops.shared.exception.InvalidCredentialsException;
 import com.fieldops.config.JwtProperties;
 import com.fieldops.shared.security.JwtTokenProvider;
+import com.fieldops.user.mapper.UserMapper;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
@@ -33,24 +34,28 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private UserMapper userMapper;
+
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofHours(1)));
-        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider);
+        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider, userMapper);
     }
 
     @Test
-    void returnsTokenWhenCredentialsAreValid() {
+    void returnsTokensWhenCredentialsAreValid() {
         User user = buildUser(Role.SUPERVISOR, "hashed");
         when(userRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("raw-pass", "hashed")).thenReturn(true);
 
-        TokenResponse response = authService.login(new LoginRequest("sup@fieldops.com", "raw-pass"));
+        LoginResponse response = authService.login(new LoginRequest("sup@fieldops.com", "raw-pass"));
 
-        assertThat(response.token()).isNotBlank();
-        assertThat(response.tokenType()).isEqualTo("Bearer");
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.refreshToken()).isNotBlank();
+        assertThat(response.expiresIn()).isPositive();
     }
 
     @Test

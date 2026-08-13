@@ -21,6 +21,7 @@ public class JwtTokenProvider {
 
     static final String ROLE_CLAIM = "role";
     private static final int MIN_SECRET_BYTES = 32;
+    private static final long REFRESH_EXPIRATION_MILLIS = 7L * 24 * 60 * 60 * 1000; // 7 days
 
     private final SecretKey key;
     private final long expirationMillis;
@@ -43,6 +44,21 @@ public class JwtTokenProvider {
                 .claim(ROLE_CLAIM, role.name())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMillis))
+                .signWith(key)
+                .compact();
+    }
+
+    /**
+     * Issues a longer-lived refresh JWT. Rotation via a refresh endpoint is out of scope for the
+     * contract story; this token is currently only returned at login so frontends can mock it.
+     */
+    public String generateRefreshToken(String subject) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(subject)
+                .claim("typ", "refresh")
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + REFRESH_EXPIRATION_MILLIS))
                 .signWith(key)
                 .compact();
     }

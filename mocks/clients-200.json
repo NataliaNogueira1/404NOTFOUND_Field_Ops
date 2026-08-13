@@ -1,0 +1,11 @@
+{
+  "content": [
+    { "id": 1, "name": "Indústria Atlas", "document": "12.345.678/0001-90", "email": "contato@atlas.com" },
+    { "id": 2, "name": "Metalúrgica Vega", "document": "98.765.432/0001-10", "email": "ops@vega.com" }
+  ],
+  "pageable": { "pageNumber": 0, "pageSize": 20 },
+  "totalPages": 3,
+  "totalElements": 42,
+  "number": 0,
+  "size": 20
+}
