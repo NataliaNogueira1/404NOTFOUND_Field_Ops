@@ -10,6 +10,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.List;
@@ -70,6 +71,14 @@ public class GlobalExceptionHandler {
             RecursoNaoEncontradoException ex, HttpServletRequest request) {
 
         return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNoStaticResource(
+            NoResourceFoundException ex, HttpServletRequest request) {
+
+        // Unmapped paths fall through to the static-resource resolver; report 404, not 500.
+        return build(HttpStatus.NOT_FOUND, "Not Found", "Resource not found", request);
     }
 
     @ExceptionHandler(NegocioException.class)
