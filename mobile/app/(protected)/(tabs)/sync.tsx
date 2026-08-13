@@ -1,81 +1,30 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+﻿import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, StatusBadge } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
-import type { SyncState } from '@/features/synchronization';
+import { Button, Card } from '@/design-system';
+import { SyncBadge } from '@/components/fieldops';
+import { useFieldOps } from '@/features/fieldops';
 
 export default function SyncScreen() {
-  const [syncState, setSyncState] = useState<SyncState>({
-    status: 'idle',
-    pendingCount: 4,
-    lastSyncedAt: '2026-08-12T08:30:00Z',
-  });
-
-  async function handleSync() {
-    setSyncState((s) => ({ ...s, status: 'syncing' }));
-    // TODO: integrate with real sync logic
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setSyncState({
-      status: 'success',
-      pendingCount: 0,
-      lastSyncedAt: new Date().toISOString(),
-    });
-  }
-
-  const lastSync = syncState.lastSyncedAt
-    ? new Date(syncState.lastSyncedAt).toLocaleString('pt-BR')
-    : '—';
-
+  const { syncOperations, syncNow } = useFieldOps();
+  const [syncing, setSyncing] = useState(false);
+  const hasPending = syncOperations.some((operation) => operation.status === 'Pendente' || operation.status === 'Erro');
+  async function handleSync() { setSyncing(true); await new Promise((resolve) => setTimeout(resolve, 700)); syncNow(); setSyncing(false); }
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <View style={styles.container}>
-        <Card style={styles.card}>
-          <Text style={styles.label}>Itens pendentes</Text>
-          <Text style={styles.count}>{syncState.pendingCount}</Text>
-        </Card>
-
-        <Card style={styles.card}>
-          <Text style={styles.label}>Última sincronização</Text>
-          <Text style={styles.dateText}>{lastSync}</Text>
-          {syncState.status === 'success' && (
-            <StatusBadge status="synced" style={styles.badge} />
-          )}
-          {syncState.pendingCount > 0 && syncState.status === 'idle' && (
-            <StatusBadge status="unsynced" style={styles.badge} />
-          )}
-        </Card>
-
-        <Button
-          label={syncState.status === 'syncing' ? 'Sincronizando...' : 'Sincronizar agora'}
-          onPress={handleSync}
-          loading={syncState.status === 'syncing'}
-          fullWidth
-          size="lg"
-        />
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Sincronização</Text>
+        <Card style={styles.card}><Text style={styles.label}>Status</Text><Text style={styles.value}>{hasPending ? 'Pendências locais' : 'Sincronizado'}</Text><Text style={styles.muted}>Última sync</Text><Text style={styles.date}>03/08/2026 11:20</Text><Button label="Sincronizar agora" onPress={handleSync} loading={syncing} fullWidth /></Card>
+        <Text style={styles.section}>Operações</Text>
+        {syncOperations.map((operation) => <Card key={operation.id} style={styles.operation}><View><Text style={styles.operationTitle}>{operation.title}</Text><Text style={styles.muted}>{operation.status}</Text></View><SyncBadge status={operation.status === 'Erro' ? 'error' : operation.status === 'Pendente' ? 'pending' : 'synced'} /></Card>)}
+        <Button label="Tentar novamente" onPress={handleSync} variant="secondary" fullWidth />
+        <Card style={styles.card}><Text style={styles.section}>Download</Text><Text style={styles.valueSmall}>Inspeções atualizadas: 3</Text></Card>
+        <Card style={styles.card}><Text style={styles.section}>Dispositivo</Text><Row label="Espaço usado" value="128 MB" /><Row label="Fotos pendentes" value="5" /><Row label="Modo" value="Online" /></Card>
+      </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, padding: Spacing.md, gap: Spacing.md },
-  card: { alignItems: 'center', gap: Spacing.xs },
-  label: {
-    fontSize: FontSize.sm,
-    color: Colors.gray500,
-  },
-  count: {
-    fontSize: 48,
-    fontWeight: FontWeight.bold,
-    color: Colors.primary,
-  },
-  dateText: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-    color: Colors.gray800,
-  },
-  badge: { marginTop: Spacing.xs },
-});
+function Row({ label, value }: { label: string; value: string }) { return <View style={styles.row}><Text style={styles.muted}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>; }
+const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: Colors.background }, container: { padding: Spacing.md, paddingBottom: 100, gap: Spacing.md }, title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text }, card: { gap: Spacing.sm }, label: { color: Colors.textSecondary, fontWeight: FontWeight.semibold }, value: { fontSize: FontSize.xxl, color: Colors.text, fontWeight: FontWeight.bold }, valueSmall: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.semibold }, muted: { color: Colors.textSecondary, fontSize: FontSize.sm }, date: { color: Colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }, section: { fontSize: FontSize.lg, color: Colors.text, fontWeight: FontWeight.semibold }, operation: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm }, operationTitle: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.semibold }, row: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: Spacing.sm }, rowValue: { color: Colors.text, fontWeight: FontWeight.semibold } });
