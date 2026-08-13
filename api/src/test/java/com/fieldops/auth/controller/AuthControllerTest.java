@@ -72,7 +72,7 @@ class AuthControllerTest {
                         .content(loginBody("not-an-email", "")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.issues").isArray());
+                .andExpect(jsonPath("$.fieldErrors").isArray());
     }
 
     @Test

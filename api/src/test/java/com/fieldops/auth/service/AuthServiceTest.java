@@ -4,7 +4,7 @@ import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.TokenResponse;
 import com.fieldops.shared.exception.CredenciaisInvalidasException;
 import com.fieldops.config.JwtProperties;
-import com.fieldops.shared.security.JwtService;
+import com.fieldops.shared.security.JwtTokenProvider;
 import com.fieldops.user.model.Perfil;
 import com.fieldops.user.model.Usuario;
 import com.fieldops.user.repository.UsuarioRepository;
@@ -37,8 +37,8 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        JwtService jwtService = new JwtService(new JwtProperties(SECRET, Duration.ofHours(1)));
-        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService);
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofHours(1)));
+        authService = new AuthService(usuarioRepository, passwordEncoder, jwtTokenProvider);
     }
 
     @Test

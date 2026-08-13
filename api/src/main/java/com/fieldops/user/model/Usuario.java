@@ -18,7 +18,7 @@ import java.util.Objects;
  * Authenticated user of the platform. {@code senha} holds a BCrypt hash — never plaintext.
  */
 @Entity
-@Table(name = "usuario")
+@Table(name = "users")
 public class Usuario {
 
     @Id

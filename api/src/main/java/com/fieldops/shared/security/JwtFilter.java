@@ -1,7 +1,5 @@
 package com.fieldops.shared.security;
 
-import com.fieldops.shared.security.JwtService;
-import com.fieldops.shared.security.UsuarioUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,15 +20,15 @@ import java.io.IOException;
  * the downstream security chain decides whether the request is authorized.
  */
 @Component
-public class JwtAuthFilter extends OncePerRequestFilter {
+public class JwtFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final JwtService jwtService;
+    private final JwtTokenProvider jwtTokenProvider;
     private final UsuarioUserDetailsService userDetailsService;
 
-    public JwtAuthFilter(JwtService jwtService, UsuarioUserDetailsService userDetailsService) {
-        this.jwtService = jwtService;
+    public JwtFilter(JwtTokenProvider jwtTokenProvider, UsuarioUserDetailsService userDetailsService) {
+        this.jwtTokenProvider = jwtTokenProvider;
         this.userDetailsService = userDetailsService;
     }
 
@@ -40,8 +38,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String token = extractToken(request);
-        if (token != null && jwtService.isValid(token) && notYetAuthenticated()) {
-            String email = jwtService.extractSubject(token);
+        if (token != null && jwtTokenProvider.isValid(token) && notYetAuthenticated()) {
+            String email = jwtTokenProvider.extractSubject(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
             authenticate(request, userDetails);
         }

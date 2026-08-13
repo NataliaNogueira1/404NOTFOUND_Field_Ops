@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Translates every exception into a consistent JSON error shape.
+ * Translates every exception into a consistent {@link ErrorResponse} shape.
  * Controllers and services throw domain exceptions; this advice owns the HTTP mapping.
  */
 @RestControllerAdvice
@@ -25,91 +25,80 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleBodyValidation(
+    public ResponseEntity<ErrorResponse> handleBodyValidation(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
 
-        List<ValidationErrorResponse.FieldIssue> issues = ex.getBindingResult().getFieldErrors().stream()
-                .map(fieldError -> new ValidationErrorResponse.FieldIssue(
+        List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -> new ErrorResponse.FieldError(
                         fieldError.getField(),
                         fieldError.getDefaultMessage()))
                 .toList();
 
-        return ResponseEntity.badRequest()
-                .body(buildValidation(HttpStatus.BAD_REQUEST, request, issues));
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed", request, fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ValidationErrorResponse> handleConstraintViolation(
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(
             ConstraintViolationException ex, HttpServletRequest request) {
 
-        List<ValidationErrorResponse.FieldIssue> issues = ex.getConstraintViolations().stream()
-                .map(violation -> new ValidationErrorResponse.FieldIssue(
+        List<ErrorResponse.FieldError> fieldErrors = ex.getConstraintViolations().stream()
+                .map(violation -> new ErrorResponse.FieldError(
                         violation.getPropertyPath().toString(),
                         violation.getMessage()))
                 .toList();
 
-        return ResponseEntity.badRequest()
-                .body(buildValidation(HttpStatus.BAD_REQUEST, request, issues));
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed", request, fieldErrors);
     }
 
     @ExceptionHandler(CredenciaisInvalidasException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(
             CredenciaisInvalidasException ex, HttpServletRequest request) {
 
-        return build(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), request);
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ApiErrorResponse> handleAuthentication(
+    public ResponseEntity<ErrorResponse> handleAuthentication(
             AuthenticationException ex, HttpServletRequest request) {
 
-        return build(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication failed", request);
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication failed", request, List.of());
     }
 
     @ExceptionHandler(RecursoNaoEncontradoException.class)
-    public ResponseEntity<ApiErrorResponse> handleNotFound(
+    public ResponseEntity<ErrorResponse> handleNotFound(
             RecursoNaoEncontradoException ex, HttpServletRequest request) {
 
-        return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleNoStaticResource(
+    public ResponseEntity<ErrorResponse> handleNoStaticResource(
             NoResourceFoundException ex, HttpServletRequest request) {
 
         // Unmapped paths fall through to the static-resource resolver; report 404, not 500.
-        return build(HttpStatus.NOT_FOUND, "Not Found", "Resource not found", request);
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found", request, List.of());
     }
 
     @ExceptionHandler(NegocioException.class)
-    public ResponseEntity<ApiErrorResponse> handleBusinessRule(
+    public ResponseEntity<ErrorResponse> handleBusinessRule(
             NegocioException ex, HttpServletRequest request) {
 
-        return build(HttpStatus.UNPROCESSABLE_ENTITY, "Unprocessable Entity", ex.getMessage(), request);
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, "BUSINESS_RULE", ex.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleUnexpected(
+    public ResponseEntity<ErrorResponse> handleUnexpected(
             Exception ex, HttpServletRequest request) {
 
         log.error("Unexpected error on {} {}", request.getMethod(), request.getRequestURI(), ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "Unexpected error", request);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected error", request, List.of());
     }
 
-    private ResponseEntity<ApiErrorResponse> build(
-            HttpStatus status, String error, String message, HttpServletRequest request) {
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String code, String message,
+                                                HttpServletRequest request, List<ErrorResponse.FieldError> fieldErrors) {
 
-        ApiErrorResponse body = new ApiErrorResponse(
-                Instant.now(), status.value(), error, message, request.getRequestURI());
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(), status.value(), code, message, request.getRequestURI(), fieldErrors);
         return ResponseEntity.status(status).body(body);
-    }
-
-    private ValidationErrorResponse buildValidation(
-            HttpStatus status, HttpServletRequest request,
-            List<ValidationErrorResponse.FieldIssue> issues) {
-
-        return new ValidationErrorResponse(
-                Instant.now(), status.value(), "Validation failed", request.getRequestURI(), issues);
     }
 }

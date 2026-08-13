@@ -1,7 +1,7 @@
 -- FieldOps initial schema
--- Table: usuario (authenticated users)
+-- Table: users (authenticated users)
 
-CREATE TABLE usuario (
+CREATE TABLE users (
     id          BIGSERIAL    PRIMARY KEY,
     nome        VARCHAR(150) NOT NULL,
     email       VARCHAR(150) NOT NULL,
@@ -9,5 +9,5 @@ CREATE TABLE usuario (
     perfil      VARCHAR(30)  NOT NULL,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT uk_usuario_email UNIQUE (email)
+    CONSTRAINT uk_users_email UNIQUE (email)
 );

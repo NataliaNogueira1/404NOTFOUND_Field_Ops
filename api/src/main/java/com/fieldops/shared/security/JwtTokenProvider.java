@@ -17,7 +17,7 @@ import java.util.Date;
  * weak {@code JWT_SECRET} fails fast at startup rather than at the first sign attempt.
  */
 @Service
-public class JwtService {
+public class JwtTokenProvider {
 
     static final String PERFIL_CLAIM = "perfil";
     private static final int MIN_SECRET_BYTES = 32;
@@ -25,7 +25,7 @@ public class JwtService {
     private final SecretKey key;
     private final long expirationMillis;
 
-    public JwtService(JwtProperties properties) {
+    public JwtTokenProvider(JwtProperties properties) {
         byte[] secretBytes = properties.secret().getBytes(StandardCharsets.UTF_8);
         if (secretBytes.length < MIN_SECRET_BYTES) {
             throw new IllegalStateException(

@@ -3,7 +3,7 @@ package com.fieldops.auth.service;
 import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.TokenResponse;
 import com.fieldops.shared.exception.CredenciaisInvalidasException;
-import com.fieldops.shared.security.JwtService;
+import com.fieldops.shared.security.JwtTokenProvider;
 import com.fieldops.user.model.Usuario;
 import com.fieldops.user.repository.UsuarioRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,12 +22,12 @@ public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     @Transactional(readOnly = true)
@@ -37,7 +37,7 @@ public class AuthService {
         if (!passwordEncoder.matches(request.senha(), usuario.getSenha())) {
             throw new CredenciaisInvalidasException(INVALID_CREDENTIALS);
         }
-        String token = jwtService.generateToken(usuario.getEmail(), usuario.getPerfil());
-        return TokenResponse.bearer(token, jwtService.expirationSeconds());
+        String token = jwtTokenProvider.generateToken(usuario.getEmail(), usuario.getPerfil());
+        return TokenResponse.bearer(token, jwtTokenProvider.expirationSeconds());
     }
 }
