@@ -1,58 +1,27 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useState } from 'react';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-}
-
-interface AuthContextValue extends AuthState {
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => void;
-  isLoading: boolean;
-}
+interface User { id: string; name: string; email: string; role: string }
+interface AuthState { user: User | null; token: string | null; isAuthenticated: boolean }
+interface AuthContextValue extends AuthState { signIn: (email: string, password: string) => Promise<void>; signOut: () => void; isLoading: boolean }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    token: null,
-    isAuthenticated: false,
-  });
+  const [authState, setAuthState] = useState<AuthState>({ user: null, token: null, isAuthenticated: false });
   const [isLoading, setIsLoading] = useState(false);
 
   const signIn = useCallback(async (email: string, _password: string) => {
     setIsLoading(true);
     try {
-      // TODO: integrate with real API via infrastructure/api
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setAuthState({
-        user: { id: '1', name: 'Field Agent', email, role: 'inspector' },
-        token: 'mock-token-123',
-        isAuthenticated: true,
-      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setAuthState({ user: { id: 'usr-carlos', name: 'Carlos Henrique Silva', email: email || 'tecnico@fieldops.local', role: 'Técnico' }, token: 'mock-token-fieldops', isAuthenticated: true });
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const signOut = useCallback(() => {
-    setAuthState({ user: null, token: null, isAuthenticated: false });
-  }, []);
-
-  return (
-    <AuthContext.Provider value={{ ...authState, signIn, signOut, isLoading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const signOut = useCallback(() => setAuthState({ user: null, token: null, isAuthenticated: false }), []);
+  return <AuthContext.Provider value={{ ...authState, signIn, signOut, isLoading }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
