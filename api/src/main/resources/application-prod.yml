@@ -1,0 +1,15 @@
+# Production profile. Every secret MUST come from the environment;
+# application.yml requires JWT_SECRET (no default), so startup fails fast if unset.
+spring:
+  jpa:
+    show-sql: false
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.fieldops: INFO
+    org.hibernate.SQL: WARN

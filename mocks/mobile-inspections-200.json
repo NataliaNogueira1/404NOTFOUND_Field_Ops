@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "title": "Inspeção trimestral - Bomba centrífuga BC-200",
+    "status": "SCHEDULED",
+    "scheduledDate": "2026-09-01",
+    "clientName": "Indústria Atlas",
+    "equipmentName": "Bomba centrífuga BC-200",
+    "technicianName": "Carlos Souza"
+  },
+  {
+    "id": 2,
+    "title": "Inspeção de segurança - Caldeira CL-10",
+    "status": "IN_PROGRESS",
+    "scheduledDate": "2026-09-02",
+    "clientName": "Metalúrgica Vega",
+    "equipmentName": "Caldeira CL-10",
+    "technicianName": "Carlos Souza"
+  }
+]

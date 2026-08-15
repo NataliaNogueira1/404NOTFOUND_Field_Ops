@@ -1,0 +1,11 @@
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZWNoQGZpZWxkb3BzLmNvbSIsInJvbGUiOiJURUNITklDSUFOIn0.x",
+  "refreshToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZWNoQGZpZWxkb3BzLmNvbSIsInR5cCI6InJlZnJlc2gifQ.y",
+  "expiresIn": 28800,
+  "user": {
+    "id": 1,
+    "name": "Carlos Souza",
+    "email": "tech@fieldops.com",
+    "role": "TECHNICIAN"
+  }
+}
