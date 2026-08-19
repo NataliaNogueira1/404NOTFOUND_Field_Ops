@@ -1,5 +1,5 @@
 // API client — configure base URL via environment or app config
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
 
 interface RequestOptions extends RequestInit {
   token?: string;
