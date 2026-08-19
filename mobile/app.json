@@ -41,6 +41,12 @@
           "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções.",
           "photosPermission": "O FieldOps precisa acessar a galeria para anexar fotos como evidências das inspeções."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções."
+        }
       ]
     ],
     "experiments": {

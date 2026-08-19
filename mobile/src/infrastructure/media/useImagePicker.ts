@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -20,11 +21,9 @@ export interface CapturedImage {
  */
 async function persistImage(tempUri: string): Promise<string> {
   if (Platform.OS === 'web') {
-    // Web: no filesystem persistence needed, the blob URL works for the session
     return tempUri;
   }
 
-  // Native: use expo-file-system classes
   try {
     const { Paths, Directory, File } = await import('expo-file-system');
     const dir = new Directory(Paths.document, 'evidences');
@@ -37,7 +36,6 @@ async function persistImage(tempUri: string): Promise<string> {
     source.copy(destination);
     return destination.uri;
   } catch {
-    // Fallback: if file system fails, use temp URI
     return tempUri;
   }
 }
@@ -64,12 +62,51 @@ const SHARED_OPTIONS: Partial<ImagePicker.ImagePickerOptions> = {
 
 /**
  * Hook that exposes camera capture and gallery picking capabilities
- * with automatic permission handling and file persistence.
+ * with automatic permission handling, file persistence, and
+ * Android activity-destroyed recovery via getPendingResultAsync.
  */
-export function useImagePicker() {
+export function useImagePicker(onPendingResult?: (image: CapturedImage) => void) {
+  const pendingCallbackRef = useRef(onPendingResult);
+  pendingCallbackRef.current = onPendingResult;
+  const [recovering, setRecovering] = useState(false);
+
+  // On Android, if the activity was destroyed while the camera was open,
+  // getPendingResultAsync() returns the result when the app restarts.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    async function checkPendingResult() {
+      try {
+        const result = await ImagePicker.getPendingResultAsync();
+        if (result && 'assets' in result && !result.canceled && result.assets?.length) {
+          setRecovering(true);
+          const asset = result.assets[0];
+          const persistedUri = await persistImage(asset.uri);
+          const image: CapturedImage = {
+            uri: persistedUri,
+            width: asset.width,
+            height: asset.height,
+            fileSize: asset.fileSize ?? undefined,
+          };
+          pendingCallbackRef.current?.(image);
+          setRecovering(false);
+        }
+      } catch {
+        // No pending results — normal case
+      }
+    }
+
+    checkPendingResult();
+  }, []);
+
   /**
    * Launch the device camera to take a photo.
    * Returns the persisted image or null if cancelled/denied.
+   *
+   * NOTE: On Android with Expo Go, the system may destroy the app's Activity
+   * while the camera is open. If this happens, getPendingResultAsync() will
+   * recover the photo on the next mount. In production builds (APK/AAB) this
+   * issue does not occur.
    */
   async function takePhoto(): Promise<CapturedImage | null> {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -117,5 +154,5 @@ export function useImagePicker() {
     };
   }
 
-  return { takePhoto, pickFromGallery };
+  return { takePhoto, pickFromGallery, recovering };
 }

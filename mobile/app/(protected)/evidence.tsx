@@ -1,12 +1,15 @@
-﻿import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import { useCallback, useRef, useState } from 'react';
+import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { compressorTemplate, useFieldOps } from '@/features/fieldops';
 import { useImagePicker, type CapturedImage } from '@/infrastructure/media';
+
+type ScreenMode = 'idle' | 'camera' | 'preview';
 
 export default function EvidenceScreen() {
   const { inspectionId = 'ins-compressor', itemId = 'item-4' } = useLocalSearchParams<{
@@ -15,24 +18,47 @@ export default function EvidenceScreen() {
   }>();
   const router = useRouter();
   const { addEvidence } = useFieldOps();
-  const { takePhoto, pickFromGallery } = useImagePicker();
+  const { pickFromGallery } = useImagePicker();
 
+  const [mode, setMode] = useState<ScreenMode>('idle');
   const [captured, setCaptured] = useState<CapturedImage | null>(null);
   const [description, setDescription] = useState('');
+
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const item = compressorTemplate.sections
     .flatMap((section) => section.items)
     .find((candidate) => candidate.id === itemId);
 
-  async function handleCamera() {
-    const result = await takePhoto();
-    if (result) setCaptured(result);
-  }
+  const handleOpenCamera = useCallback(async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) return;
+    }
+    setMode('camera');
+  }, [permission, requestPermission]);
 
-  async function handleGallery() {
+  const handleTakePhoto = useCallback(async () => {
+    if (!cameraRef.current) return;
+    const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+    if (photo) {
+      setCaptured({
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
+      });
+      setMode('preview');
+    }
+  }, []);
+
+  const handleGallery = useCallback(async () => {
     const result = await pickFromGallery();
-    if (result) setCaptured(result);
-  }
+    if (result) {
+      setCaptured(result);
+      setMode('preview');
+    }
+  }, [pickFromGallery]);
 
   function usePhoto() {
     if (!captured) return;
@@ -40,52 +66,84 @@ export default function EvidenceScreen() {
     router.back();
   }
 
+  // ─── Camera mode: inline camera viewfinder ────────────────────────────────
+
+  if (mode === 'camera') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.cameraContainer}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing="back"
+            mode="picture"
+          />
+          <View style={styles.cameraControls}>
+            <Button label="Cancelar" onPress={() => setMode('idle')} variant="ghost" />
+            <View style={styles.shutterButton}>
+              <Button label="📷" onPress={handleTakePhoto} />
+            </View>
+            <Button label="Galeria" onPress={handleGallery} variant="ghost" />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── Preview mode: show captured photo ────────────────────────────────────
+
+  if (mode === 'preview' && captured) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Prévia da foto</Text>
+
+          <Card style={styles.viewer}>
+            <Image source={{ uri: captured.uri }} style={styles.preview} resizeMode="cover" />
+            <Text style={styles.item}>
+              Item: {item?.question ?? 'Não identificado'}
+            </Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Descrição (opcional)"
+              placeholderTextColor={Colors.gray400}
+              style={styles.input}
+              multiline
+            />
+          </Card>
+
+          <Button label="Usar esta foto" onPress={usePhoto} fullWidth size="lg" />
+          <Button label="Refazer (câmera)" onPress={() => setMode('camera')} variant="secondary" fullWidth />
+          <Button label="Escolher da galeria" onPress={handleGallery} variant="secondary" fullWidth />
+          <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── Idle mode: choose camera or gallery ──────────────────────────────────
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Capturar evidência</Text>
 
-        {captured ? (
-          <>
-            <Card style={styles.viewer}>
-              <Image source={{ uri: captured.uri }} style={styles.preview} resizeMode="cover" />
-              <Text style={styles.item}>
-                Item: {item?.question ?? 'Não identificado'}
-              </Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Descrição (opcional)"
-                placeholderTextColor={Colors.gray400}
-                style={styles.input}
-                multiline
-              />
-            </Card>
+        <Card style={styles.viewer}>
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderIcon}>📷</Text>
+            <Text style={styles.placeholderText}>
+              Tire uma foto ou escolha da galeria
+            </Text>
+          </View>
+          <Text style={styles.item}>
+            Item: {item?.question ?? 'Não identificado'}
+          </Text>
+        </Card>
 
-            <Button label="Usar esta foto" onPress={usePhoto} fullWidth size="lg" />
-            <Button label="Refazer (câmera)" onPress={handleCamera} variant="secondary" fullWidth />
-            <Button label="Escolher da galeria" onPress={handleGallery} variant="secondary" fullWidth />
-            <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
-          </>
-        ) : (
-          <>
-            <Card style={styles.viewer}>
-              <View style={styles.placeholder}>
-                <Text style={styles.placeholderIcon}>📷</Text>
-                <Text style={styles.placeholderText}>
-                  Tire uma foto ou escolha da galeria
-                </Text>
-              </View>
-              <Text style={styles.item}>
-                Item: {item?.question ?? 'Não identificado'}
-              </Text>
-            </Card>
-
-            <Button label="Abrir câmera" onPress={handleCamera} fullWidth size="lg" />
-            <Button label="Escolher da galeria" onPress={handleGallery} variant="secondary" fullWidth />
-            <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
-          </>
-        )}
+        <Button label="Abrir câmera" onPress={handleOpenCamera} fullWidth size="lg" />
+        <Button label="Escolher da galeria" onPress={handleGallery} variant="secondary" fullWidth />
+        <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
       </ScrollView>
     </SafeAreaView>
   );
@@ -130,5 +188,25 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlignVertical: 'top',
     backgroundColor: Colors.surface,
+  },
+  // Camera inline styles
+  cameraContainer: { flex: 1 },
+  camera: { flex: 1 },
+  cameraControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.text,
+  },
+  shutterButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: Colors.primary,
   },
 });
