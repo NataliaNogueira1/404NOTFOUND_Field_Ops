@@ -34,7 +34,14 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções.",
+          "photosPermission": "O FieldOps precisa acessar a galeria para anexar fotos como evidências das inspeções."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

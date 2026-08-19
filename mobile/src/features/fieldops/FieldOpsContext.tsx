@@ -11,7 +11,7 @@ interface FieldOpsContextValue {
   syncOperations: SyncOperation[];
   startInspection: (inspectionId: string) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
-  addEvidence: (inspectionId: string, itemId: string, description: string) => Evidence;
+  addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
   syncNow: () => void;
@@ -58,8 +58,8 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [evidences, updateProgress]);
 
-  const addEvidence = useCallback((inspectionId: string, itemId: string, description: string) => {
-    const evidence: Evidence = { id: `ev-${itemId}-${Date.now()}`, inspectionId, itemId, description, capturedAt: new Date().toISOString(), syncStatus: 'pending' };
+  const addEvidence = useCallback((inspectionId: string, itemId: string, description: string, uri?: string) => {
+    const evidence: Evidence = { id: `ev-${itemId}-${Date.now()}`, inspectionId, itemId, description, uri, capturedAt: new Date().toISOString(), syncStatus: 'pending' };
     setEvidences((current) => [...current, evidence]);
     setNonConformities((current) => current.map((nc) => nc.inspectionId === inspectionId && nc.itemId === itemId ? { ...nc, evidenceCount: nc.evidenceCount + 1 } : nc));
     setInspections((current) => current.map((inspection) => inspection.id === inspectionId ? { ...inspection, pendingSyncCount: inspection.pendingSyncCount + 1, syncStatus: 'pending' } : inspection));
