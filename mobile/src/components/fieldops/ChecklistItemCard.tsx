@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -45,7 +45,7 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
         </View>
       ) : null}
       {evidences.length > 0 ? (
-        <View style={styles.evidenceRow}>{evidences.map((evidence) => <View key={evidence.id} style={styles.thumb}><Text style={styles.thumbIcon}>▧</Text><SyncBadge status={evidence.syncStatus} /></View>)}</View>
+        <View style={styles.evidenceRow}>{evidences.map((evidence) => <View key={evidence.id} style={styles.thumb}>{evidence.uri ? <Image source={{ uri: evidence.uri }} style={styles.thumbImage} /> : <Text style={styles.thumbIcon}>▧</Text>}<SyncBadge status={evidence.syncStatus} /></View>)}</View>
       ) : null}
       {answer ? <Text style={styles.saved}>Salvo no dispositivo</Text> : null}
     </Card>
@@ -82,7 +82,8 @@ const styles = StyleSheet.create({
   failureTitle: { color: Colors.dangerDark, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  thumb: { width: 98, minHeight: 76, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.mutedSurface, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs },
+  thumb: { width: 98, minHeight: 76, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.mutedSurface, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, overflow: 'hidden' },
+  thumbImage: { width: 98, height: 64, borderRadius: 8 },
   thumbIcon: { fontSize: 26, color: Colors.primary },
   saved: { fontSize: FontSize.xs, color: Colors.successDark, fontWeight: FontWeight.semibold },
 });
