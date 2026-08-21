@@ -47,7 +47,8 @@
         {
           "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
