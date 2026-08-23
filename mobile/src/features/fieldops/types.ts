@@ -13,7 +13,31 @@ export interface User { id: string; name: string; email: string; role: 'Técnico
 export interface TemplateItem { id: string; question: string; description?: string; responseType: ResponseType; required: boolean; requireObservationOnFailure: boolean; requireEvidenceOnFailure: boolean; options?: string[] }
 export interface TemplateSection { id: string; title: string; items: TemplateItem[] }
 export interface InspectionTemplate { id: string; title: string; category: string; version: number; sections: TemplateSection[] }
-export interface Inspection { id: string; title: string; templateId: string; clientId: string; siteId: string; equipmentId: string; technicianId: string; supervisorId: string; status: InspectionStatus; priority: Priority; dueDate: string; dueTime: string; createdAt: string; progress: number; overdue?: boolean; syncStatus: SyncStatus; pendingSyncCount: number; supervisorInstructions: string; startedAt?: string }
+export interface Inspection {
+  id: string;
+  title: string;
+  templateId: string;
+  clientId: string;
+  clientName: string;
+  siteId: string;
+  siteName: string;
+  equipmentId: string;
+  equipmentName: string;
+  technicianId: string;
+  supervisorId: string;
+  supervisorName: string;
+  status: InspectionStatus;
+  priority: Priority;
+  dueDate: string;
+  dueTime: string;
+  createdAt: string;
+  progress: number;
+  overdue?: boolean;
+  syncStatus: SyncStatus;
+  pendingSyncCount: number;
+  supervisorInstructions: string;
+  startedAt?: string;
+}
 export interface Evidence { id: string; inspectionId: string; itemId: string; description: string; uri?: string; capturedAt: string; syncStatus: SyncStatus }
 export interface ChecklistAnswer { itemId: string; value: ChecklistValue; observation?: string; savedAt: string }
 export interface NonConformity { id: string; inspectionId: string; itemId: string; title: string; description: string; severity: Severity; evidenceCount: number }
