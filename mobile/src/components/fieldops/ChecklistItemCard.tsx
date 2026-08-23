@@ -1,6 +1,7 @@
 ﻿import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button, Card } from '@/design-system';
@@ -116,7 +117,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
   if (item.responseType === ResponseType.CONFORMITY) return <Segmented options={[['CONFORME', 'Conforme'], ['NAO_CONFORME', 'Não conforme'], ['NA', 'N/A']]} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.BOOLEAN) return <Segmented options={[[true, 'Sim'], [false, 'Não']]} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} />;
-  if (item.responseType === ResponseType.DATE) return <Segmented options={[[new Date().toISOString().slice(0, 10), 'Hoje'], ['2026-08-14', 'Amanhã'], ['2026-08-15', 'Outra data']]} value={value} onSelect={onAnswer} />;
+  if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} />;
   return (
     <TextInput
       value={text}
@@ -133,6 +134,39 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
 
 function Segmented({ options, value, onSelect }: { options: Array<[ChecklistValue, string]>; value?: ChecklistValue; onSelect: (value: ChecklistValue) => void }) {
   return <View style={styles.segmented}>{options.map(([optionValue, label]) => <Pressable key={`${optionValue}`} onPress={() => onSelect(optionValue)} style={[styles.option, value === optionValue && styles.optionActive]}><Text style={[styles.optionText, value === optionValue && styles.optionTextActive]}>{label}</Text></Pressable>)}</View>;
+}
+
+function DateInput({ value, onSelect }: { value?: string; onSelect: (value: ChecklistValue) => void }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const currentDate = value ? new Date(value + 'T00:00:00') : new Date();
+
+  const formattedDate = value
+    ? new Date(value + 'T00:00:00').toLocaleDateString('pt-BR')
+    : null;
+
+  return (
+    <View>
+      <Pressable onPress={() => setShowPicker(true)} style={styles.dateButton}>
+        <Text style={[styles.dateButtonText, !formattedDate && styles.datePlaceholder]}>
+          {formattedDate ?? 'Selecionar data'}
+        </Text>
+      </Pressable>
+      {showPicker && (
+        <DateTimePicker
+          value={currentDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(_event, selectedDate) => {
+            setShowPicker(Platform.OS === 'ios');
+            if (selectedDate) {
+              const iso = selectedDate.toISOString().slice(0, 10);
+              onSelect(iso);
+            }
+          }}
+        />
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -156,4 +190,7 @@ const styles = StyleSheet.create({
   thumb: { width: 98, minHeight: 76, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.mutedSurface, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, overflow: 'hidden' },
   thumbImage: { width: 98, height: 64, borderRadius: 8 },
   thumbIcon: { fontSize: 26, color: Colors.primary },
+  dateButton: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, paddingHorizontal: Spacing.md, justifyContent: 'center' },
+  dateButtonText: { fontSize: FontSize.md, color: Colors.text },
+  datePlaceholder: { color: Colors.gray400 },
 });
