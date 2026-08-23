@@ -12,17 +12,6 @@ import {
 import { InspectionSyncService } from '@/infrastructure/sync';
 
 import {
-  allTemplateItems,
-  clients,
-  compressorTemplate,
-  equipment,
-  initialInspections,
-  initialNonConformities,
-  initialSyncOperations,
-  sites,
-  supervisor,
-} from './data';
-import {
   InspectionStatus,
   Severity,
   type ChecklistAnswer,
@@ -37,6 +26,7 @@ import {
 
 interface FieldOpsContextValue {
   inspections: Inspection[];
+  isLoading: boolean;
   answers: Record<string, ChecklistAnswer>;
   evidences: Evidence[];
   nonConformities: NonConformity[];
@@ -62,14 +52,15 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // Refs to avoid stale closures and prevent re-init loops
   const initDoneRef = useRef(false);
-  const inspectionsRef = useRef<Inspection[]>(initialInspections);
+  const inspectionsRef = useRef<Inspection[]>([]);
 
   // State
-  const [inspections, setInspections] = useState<Inspection[]>(initialInspections);
+  const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
   const [evidences, setEvidences] = useState<Evidence[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
-  const [syncOperations, setSyncOperations] = useState<SyncOperation[]>(initialSyncOperations);
+  const [syncOperations, setSyncOperations] = useState<SyncOperation[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
 
@@ -90,35 +81,22 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
+        // Try to pull from API first (if we have a token)
+        if (token) {
+          try {
+            const syncService = new InspectionSyncService(db);
+            console.log('[FieldOps] Pulling inspections from API...');
+            const result = await syncService.pullInspections(token);
+            console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
+          } catch (apiError) {
+            console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+          }
+        }
+
         let dbInspections = await inspRepo.getAll();
 
-        if (dbInspections.length === 0) {
-          // First run: seed mock data
-          console.log('[FieldOps] Seeding mock data into SQLite...');
-          for (const insp of initialInspections) {
-            const client = clients.find((c) => c.id === insp.clientId);
-            const site = sites.find((s) => s.id === insp.siteId);
-            const equip = equipment.find((e) => e.id === insp.equipmentId);
-            await inspRepo.upsert({
-              ...insp,
-              clientName: client?.name ?? '',
-              siteName: site?.name ?? '',
-              equipmentName: equip?.name ?? '',
-              supervisorName: supervisor.name,
-            });
-            await inspRepo.saveTemplate(insp.id, compressorTemplate);
-          }
-          for (const nc of initialNonConformities) {
-            await ncRepo.add(nc);
-          }
-          console.log('[FieldOps] Seed complete');
-          dbInspections = await inspRepo.getAll();
-        }
-
         // Load everything from DB
-        if (dbInspections.length > 0) {
-          setInspections(dbInspections);
-        }
+        setInspections(dbInspections);
 
         const allAnswers: Record<string, ChecklistAnswer> = {};
         for (const insp of dbInspections) {
@@ -139,11 +117,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
           const n = await ncRepo.getByInspection(insp.id);
           allNCs.push(...n);
         }
-        if (allNCs.length > 0) {
-          setNonConformities(allNCs);
-        } else {
-          setNonConformities(initialNonConformities);
-        }
+        setNonConformities(allNCs);
 
         const queue = await sqRepo.getAll();
         if (queue.length > 0) {
@@ -157,10 +131,12 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
         console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
       } catch (error) {
-        console.warn('[FieldOps] DB init failed, using defaults:', error);
+        console.warn('[FieldOps] DB init failed:', error);
+      } finally {
+        setIsLoading(false);
       }
     })();
-  }, [db]);
+  }, [db, token]);
 
   // ─── Helper: get repos (only if db available) ────────────────────────────
 
@@ -202,47 +178,57 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     setAnswers((current) => {
       const next = { ...current, [itemId]: { itemId, value, observation, savedAt: new Date().toISOString() } };
 
-      // Update progress
-      const total = allTemplateItems(compressorTemplate).length;
-      const progress = Math.min(100, Math.round((Object.keys(next).length / total) * 100));
+      // Update progress — count answered vs total items for the active inspection
       const activeId = inspectionsRef.current.find(
         (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id ?? 'ins-compressor';
+      )?.id ?? inspectionsRef.current[0]?.id;
 
-      setInspections((curr) =>
-        curr.map((insp) =>
-          insp.id === activeId
-            ? { ...insp, progress, pendingSyncCount: Math.max(insp.pendingSyncCount, 1), syncStatus: 'pending' as const }
-            : insp,
-        ),
-      );
+      if (activeId) {
+        // Get total items count asynchronously, update progress
+        const repos = getRepos();
+        if (repos) {
+          repos.inspection.getAllItems(activeId).then((items) => {
+            const total = items.length || 12; // fallback
+            const progress = Math.min(100, Math.round((Object.keys(next).length / total) * 100));
+            setInspections((curr) =>
+              curr.map((insp) =>
+                insp.id === activeId
+                  ? { ...insp, progress, pendingSyncCount: Math.max(insp.pendingSyncCount, 1), syncStatus: 'pending' as const }
+                  : insp,
+              ),
+            );
+            repos.inspection.updateProgress(activeId, progress).catch(console.warn);
+          }).catch(console.warn);
+        }
+      }
 
       // Persist to DB
-      const repos = getRepos();
+      const repos2 = getRepos();
       const sync = getSyncService();
-      if (repos && sync) {
-        repos.answer.save(activeId, itemId, value, observation).catch(console.warn);
-        repos.inspection.updateProgress(activeId, progress).catch(console.warn);
-        sync.enqueueAnswer(activeId, itemId, value, observation).catch(console.warn);
+      const persistId = inspectionsRef.current.find(
+        (i) => i.status === InspectionStatus.IN_PROGRESS,
+      )?.id ?? inspectionsRef.current[0]?.id;
+      if (repos2 && sync && persistId) {
+        repos2.answer.save(persistId, itemId, value, observation).catch(console.warn);
+        sync.enqueueAnswer(persistId, itemId, value, observation).catch(console.warn);
       }
 
       return next;
     });
 
     // Auto-create non-conformity for NAO_CONFORME
-    const item = allTemplateItems(compressorTemplate).find((c) => c.id === itemId);
-    if (value === 'NAO_CONFORME' && item) {
+    if (value === 'NAO_CONFORME') {
       const activeId = inspectionsRef.current.find(
         (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id ?? 'ins-compressor';
+      )?.id ?? inspectionsRef.current[0]?.id;
 
       setNonConformities((current) => {
-        if (current.some((nc) => nc.inspectionId === activeId && nc.itemId === itemId)) return current;
+        if (!activeId || current.some((nc) => nc.inspectionId === activeId && nc.itemId === itemId)) return current;
         const nc: NonConformity = {
           id: `nc-${itemId}-${Date.now()}`,
           inspectionId: activeId,
           itemId,
-          title: item.question.replace('?', ''),
+          title: `Não conformidade - item ${itemId}`,
           description: observation ?? 'Não conformidade criada automaticamente pelo checklist.',
           severity: Severity.MEDIUM,
           evidenceCount: 0,
@@ -355,11 +341,12 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   const resetSession = useCallback(async () => {
     // Reset in-memory state
-    setInspections(initialInspections);
+    setInspections([]);
+    setIsLoading(true);
     setAnswers({});
     setEvidences([]);
-    setNonConformities(initialNonConformities);
-    setSyncOperations(initialSyncOperations);
+    setNonConformities([]);
+    setSyncOperations([]);
 
     // Reset DB
     if (db) {
@@ -386,6 +373,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<FieldOpsContextValue>(
     () => ({
       inspections,
+      isLoading,
       answers,
       evidences,
       nonConformities,
@@ -401,7 +389,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       lastSyncError,
     }),
     [
-      inspections, answers, evidences, nonConformities, syncOperations,
+      inspections, isLoading, answers, evidences, nonConformities, syncOperations,
       startInspection, answerItem, addEvidence, addNonConformity,
       concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
