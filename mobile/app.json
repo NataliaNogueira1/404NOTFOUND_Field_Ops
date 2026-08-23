@@ -48,7 +48,8 @@
           "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
