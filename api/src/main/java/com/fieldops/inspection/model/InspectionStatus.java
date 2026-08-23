@@ -1,13 +1,16 @@
 package com.fieldops.inspection.model;
 
 /**
- * Lifecycle of an inspection (stub contract — values follow the FieldOps flow:
- * scheduled → in progress → submitted → approved/rejected).
+ * Lifecycle states of an inspection, matching the FieldOps domain model:
+ * DRAFT → ASSIGNED → IN_PROGRESS → SUBMITTED → UNDER_REVIEW → APPROVED / REJECTED / CANCELED
  */
 public enum InspectionStatus {
-    SCHEDULED,
+    DRAFT,
+    ASSIGNED,
     IN_PROGRESS,
     SUBMITTED,
+    UNDER_REVIEW,
     APPROVED,
-    REJECTED
+    REJECTED,
+    CANCELED
 }
