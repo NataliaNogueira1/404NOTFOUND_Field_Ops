@@ -3,22 +3,19 @@ import { useRouter } from 'expo-router';
 
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Card } from '@/design-system';
-import { byId, clients, equipment, sites, type Inspection } from '@/features/fieldops';
+import type { Inspection } from '@/features/fieldops';
 import { InspectionStatusBadge, PriorityBadge, ProgressBar, SyncBadge } from './Badges';
 
 export function InspectionCard({ inspection }: { inspection: Inspection }) {
   const router = useRouter();
-  const client = byId(clients, inspection.clientId);
-  const site = byId(sites, inspection.siteId);
-  const asset = byId(equipment, inspection.equipmentId);
   return (
     <Pressable onPress={() => router.push(`/(protected)/inspections/${inspection.id}`)} style={({ pressed }) => pressed && styles.pressed}>
       <Card style={styles.card}>
         <View style={styles.row}><PriorityBadge priority={inspection.priority} /><InspectionStatusBadge status={inspection.status} /></View>
         <Text style={styles.title}>{inspection.title}</Text>
-        <Text style={styles.line}>Cliente: {client?.name}</Text>
-        <Text style={styles.line}>Local: {site?.name}</Text>
-        <Text style={styles.line}>Equipamento: {asset?.name}</Text>
+        <Text style={styles.line}>Cliente: {inspection.clientName}</Text>
+        <Text style={styles.line}>Local: {inspection.siteName}</Text>
+        <Text style={styles.line}>Equipamento: {inspection.equipmentName}</Text>
         <Text style={[styles.line, inspection.overdue && styles.overdue]}>Prevista: {inspection.dueDate} às {inspection.dueTime}</Text>
         <View style={styles.progressRow}><ProgressBar value={inspection.progress} /><Text style={styles.progressText}>{inspection.progress}%</Text></View>
         <View style={styles.row}><SyncBadge status={inspection.syncStatus} />{inspection.pendingSyncCount > 0 ? <Text style={styles.syncText}>{inspection.pendingSyncCount} pendentes</Text> : null}</View>
