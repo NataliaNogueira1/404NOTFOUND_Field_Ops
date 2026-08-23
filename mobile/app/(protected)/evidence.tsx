@@ -6,7 +6,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
-import { compressorTemplate, useFieldOps } from '@/features/fieldops';
+import { useFieldOps } from '@/features/fieldops';
+import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 import { useImagePicker, type CapturedImage } from '@/infrastructure/media';
 
 type ScreenMode = 'idle' | 'camera' | 'preview';
@@ -19,6 +20,7 @@ export default function EvidenceScreen() {
   const router = useRouter();
   const { addEvidence } = useFieldOps();
   const { pickFromGallery } = useImagePicker();
+  const { template } = useInspectionTemplate(inspectionId);
 
   const [mode, setMode] = useState<ScreenMode>('idle');
   const [captured, setCaptured] = useState<CapturedImage | null>(null);
@@ -27,7 +29,7 @@ export default function EvidenceScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const item = compressorTemplate.sections
+  const item = template?.sections
     .flatMap((section) => section.items)
     .find((candidate) => candidate.id === itemId);
 
