@@ -8,8 +8,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage').then(module => ({ default: module.DashboardPage })))
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage').then(module => ({ default: module.UsersPage })))
 const ClientsPage = lazy(() => import('@/pages/catalog/ClientsPage').then(module => ({ default: module.ClientsPage })))
-const SitesPage = lazy(() => import('@/pages/catalog/SitesPage').then(module => ({ default: module.SitesPage })))
-const EquipmentPage = lazy(() => import('@/pages/equipment/EquipmentPage').then(module => ({ default: module.EquipmentPage })))
+const ClientDetailsPage = lazy(() => import('@/pages/catalog/ClientsPage').then(module => ({ default: module.ClientDetailsPage })))
+const ClientSiteDetailsPage = lazy(() => import('@/pages/catalog/ClientsPage').then(module => ({ default: module.ClientSiteDetailsPage })))
 const TemplatesPage = lazy(() => import('@/pages/inspectionTemplates/TemplatesPage').then(module => ({ default: module.TemplatesPage })))
 const TemplateBuilderPage = lazy(() => import('@/pages/inspectionTemplates/TemplateBuilderPage').then(module => ({ default: module.TemplateBuilderPage })))
 const TemplatePreviewPage = lazy(() => import('@/pages/inspectionTemplates/TemplatePreviewPage').then(module => ({ default: module.TemplatePreviewPage })))
@@ -30,8 +30,10 @@ export function AppRoutes() {
       <Route path="dashboard" element={<LazyPage><DashboardPage /></LazyPage>} />
       <Route path="users" element={<LazyPage><UsersPage /></LazyPage>} />
       <Route path="clients" element={<LazyPage><ClientsPage /></LazyPage>} />
-      <Route path="sites" element={<LazyPage><SitesPage /></LazyPage>} />
-      <Route path="equipment" element={<LazyPage><EquipmentPage /></LazyPage>} />
+      <Route path="clients/:clientId" element={<LazyPage><ClientDetailsPage /></LazyPage>} />
+      <Route path="clients/:clientId/sites/:siteId" element={<LazyPage><ClientSiteDetailsPage /></LazyPage>} />
+      <Route path="sites" element={<Navigate to="/app/clients" replace />} />
+      <Route path="equipment" element={<Navigate to="/app/clients" replace />} />
       <Route path="inspection-templates" element={<LazyPage><TemplatesPage /></LazyPage>} />
       <Route path="inspection-templates/:id/edit" element={<LazyPage><TemplateBuilderPage /></LazyPage>} />
       <Route path="inspection-templates/:id/preview" element={<LazyPage><TemplatePreviewPage /></LazyPage>} />
