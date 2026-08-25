@@ -6,8 +6,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { users } from '@/mocks/domain'
-import { UserRole } from '@/types/domain'
+import { mockSession, roleHome } from '@/auth/mockSession'
 
 const loginSchema = z.object({ email: z.email('Informe um e-mail valido'), password: z.string().min(1, 'A senha e obrigatoria').min(6, 'A senha deve ter no minimo 6 caracteres') })
 type LoginForm = z.infer<typeof loginSchema>
@@ -16,8 +15,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { email: 'marina@fieldops.com', password: '123456' } })
   function submit(data: LoginForm) {
-    const user = users.find(item => item.email.toLowerCase() === data.email.toLowerCase())
-    navigate(user?.role === UserRole.TECHNICIAN ? '/technician/home' : '/app/dashboard')
+    const user = mockSession.login(data.email)
+    if (user) navigate(roleHome(user.role))
   }
   function fillProfile(email: string) {
     setValue('email', email, { shouldValidate: true })

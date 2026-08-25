@@ -7,6 +7,7 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { mockSession } from '@/auth/mockSession'
 import { inspectionTemplate, technicianAnswers, technicianEvidences, technicianNonConformities, technicianSyncOperations, technicianUser } from '@/mocks/technician'
 import { inspectionStore } from '@/state/mockStores'
 import { InspectionStatus, Priority, ResponseType, Severity, type ChecklistAnswer, type ChecklistValue, type Inspection, type TemplateItem } from '@/types/domain'
@@ -113,7 +114,11 @@ export function TechnicianSyncPage() {
 
 export function TechnicianProfilePage() {
   const navigate = useNavigate()
-  return <div className="mx-auto max-w-2xl space-y-6"><Card className="p-8 text-center"><div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">CH</div><h1 className="mt-4 text-2xl font-semibold">{technicianUser.name}</h1><p className="text-primary">Tecnico</p><p className="text-sm text-muted">{technicianUser.email}</p></Card><Card className="p-5"><Info label="Versao" value="1.0.0" /><div className="mt-3"><Info label="Experiencia" value="Portal web do tecnico" /></div></Card><div className="flex justify-end gap-3"><Button variant="secondary"><RefreshCw size={17} />Forcar sincronizacao</Button><Button variant="danger" onClick={() => navigate('/login')}>Logout mockado</Button></div></div>
+  function logout() {
+    mockSession.logout()
+    navigate('/login')
+  }
+  return <div className="mx-auto max-w-2xl space-y-6"><Card className="p-8 text-center"><div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">CH</div><h1 className="mt-4 text-2xl font-semibold">{technicianUser.name}</h1><p className="text-primary">Tecnico</p><p className="text-sm text-muted">{technicianUser.email}</p></Card><Card className="p-5"><Info label="Versao" value="1.0.0" /><div className="mt-3"><Info label="Experiencia" value="Portal web do tecnico" /></div></Card><div className="flex justify-end gap-3"><Button variant="secondary"><RefreshCw size={17} />Forcar sincronizacao</Button><Button variant="danger" onClick={logout}>Logout mockado</Button></div></div>
 }
 
 function TechnicianInspectionCard({ inspection }: { inspection: Inspection }) {

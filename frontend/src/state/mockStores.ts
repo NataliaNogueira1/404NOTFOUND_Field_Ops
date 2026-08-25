@@ -8,10 +8,16 @@ type Listener = () => void
 let adminInspections: Inspection[] = [...adminSeed]
 let technicianInspections: Inspection[] = [...technicianSeed]
 const inspectionListeners = new Set<Listener>()
+const templateListeners = new Set<Listener>()
 const templateDrafts = new Map<string, InspectionTemplate>()
+let templateRows: InspectionTemplate[] = []
 
 function emitInspections() {
   inspectionListeners.forEach(listener => listener())
+}
+
+function emitTemplates() {
+  templateListeners.forEach(listener => listener())
 }
 
 export const inspectionStore = {
@@ -38,10 +44,33 @@ export const inspectionStore = {
 }
 
 export const templateDraftStore = {
+  subscribe(listener: Listener) {
+    templateListeners.add(listener)
+    return () => { templateListeners.delete(listener) }
+  },
+  snapshot() {
+    return templateRows
+  },
   set(template: InspectionTemplate) {
     templateDrafts.set(template.id, template)
+    templateRows = [template, ...templateRows.filter(item => item.id !== template.id)]
+    emitTemplates()
   },
   get(id: string) {
     return templateDrafts.get(id)
+  },
+  createBlank() {
+    const id = `tpl-draft-${Date.now()}`
+    const template: InspectionTemplate = {
+      id,
+      title: '',
+      category: '',
+      description: '',
+      version: 1,
+      status: 'Rascunho',
+      sections: [],
+    }
+    this.set(template)
+    return template
   },
 }
