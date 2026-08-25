@@ -14,7 +14,7 @@ export const technicianTemplate = templates[0]
 
 export const technicianInspections: Inspection[] = [
   {
-    id: 'ins-tech-compressor',
+    id: 'ins-compressor',
     title: 'Inspecao Preventiva - Compressor XPTO 500',
     templateId: 'tpl-compressor',
     clientId: 'cli-industria',
@@ -37,7 +37,7 @@ export const technicianInspections: Inspection[] = [
     supervisorInstructions: 'Verificar condicao da bateria com atencao especial. Ultimo relatorio indicou corrosao.',
   },
   {
-    id: 'ins-tech-gerador',
+    id: 'ins-gerador',
     title: 'Inspecao Gerador Diesel',
     templateId: 'tpl-gerador',
     clientId: 'cli-logistica',
@@ -60,7 +60,7 @@ export const technicianInspections: Inspection[] = [
     supervisorInstructions: 'Validar nivel de combustivel e resposta em carga.',
   },
   {
-    id: 'ins-tech-extintor',
+    id: 'ins-extintor',
     title: 'Inspecao Extintor P12',
     templateId: 'tpl-extintor',
     clientId: 'cli-industria',
@@ -84,7 +84,7 @@ export const technicianInspections: Inspection[] = [
     supervisorInstructions: 'Corrigir evidencia do lacre e reenviar.',
   },
   {
-    id: 'ins-tech-empilhadeira',
+    id: 'ins-empilhadeira',
     title: 'Inspecao Empilhadeira 01',
     templateId: 'tpl-compressor',
     clientId: 'cli-horizonte',
@@ -117,13 +117,13 @@ export const technicianAnswers: Record<string, ChecklistAnswer> = {
 }
 
 export const technicianEvidences: Evidence[] = [
-  { id: 'ev-1', inspectionId: 'ins-tech-compressor', itemId: 'item-2', description: 'Foto mockada da base do compressor', capturedAt: `${fmt(today)} 09:18`, syncStatus: 'pending' },
-  { id: 'ev-2', inspectionId: 'ins-tech-compressor', itemId: 'item-7', description: 'Foto mockada do cabo eletrico', capturedAt: `${fmt(today)} 09:31`, syncStatus: 'error' },
+  { id: 'ev-1', inspectionId: 'ins-compressor', itemId: 'item-2', description: 'Foto mockada da base do compressor', capturedAt: `${fmt(today)} 09:18`, syncStatus: 'pending' },
+  { id: 'ev-2', inspectionId: 'ins-compressor', itemId: 'item-7', description: 'Foto mockada do cabo eletrico', capturedAt: `${fmt(today)} 09:31`, syncStatus: 'error' },
 ]
 
 export const technicianNonConformities: NonConformity[] = [
-  { id: 'nc-tech-oleo', title: 'Acumulo de oleo', inspectionId: 'ins-tech-compressor', item: 'Equipamento limpo e conservado?', clientId: 'cli-industria', severity: Severity.LOW, status: 'Aberta', date: fmt(today) },
-  { id: 'nc-tech-cabo', title: 'Cabo eletrico danificado', inspectionId: 'ins-tech-compressor', item: 'Cabos eletricos integros?', clientId: 'cli-industria', severity: Severity.CRITICAL, status: 'Aberta', date: fmt(today) },
+  { id: 'nc-tech-oleo', title: 'Acumulo de oleo', inspectionId: 'ins-compressor', item: 'Equipamento limpo e conservado?', clientId: 'cli-industria', severity: Severity.LOW, status: 'Aberta', date: fmt(today) },
+  { id: 'nc-tech-cabo', title: 'Cabo eletrico danificado', inspectionId: 'ins-compressor', item: 'Cabos eletricos integros?', clientId: 'cli-industria', severity: Severity.CRITICAL, status: 'Aberta', date: fmt(today) },
 ]
 
 export const technicianSyncOperations: SyncOperation[] = [

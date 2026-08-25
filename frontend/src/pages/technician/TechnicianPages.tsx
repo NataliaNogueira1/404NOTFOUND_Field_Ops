@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, ClipboardCheck, FileWarning, MapPin, Play, Plus, RefreshCw, Upload, UserCircle } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, PriorityBadge, SeverityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
@@ -7,10 +7,12 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { inspectionTemplate, technicianAnswers, technicianEvidences, technicianInspections, technicianNonConformities, technicianSyncOperations, technicianUser } from '@/mocks/technician'
+import { inspectionTemplate, technicianAnswers, technicianEvidences, technicianNonConformities, technicianSyncOperations, technicianUser } from '@/mocks/technician'
+import { inspectionStore } from '@/state/mockStores'
 import { InspectionStatus, Priority, ResponseType, Severity, type ChecklistAnswer, type ChecklistValue, type Inspection, type TemplateItem } from '@/types/domain'
 
 export function TechnicianHomePage() {
+  const technicianInspections = useTechnicianInspections()
   const today = new Date().toISOString().slice(0, 10)
   const todayCount = technicianInspections.filter(item => item.dueDate === today).length
   const overdue = technicianInspections.filter(item => item.overdue).length
@@ -20,6 +22,7 @@ export function TechnicianHomePage() {
 }
 
 export function TechnicianInspectionsPage() {
+  const technicianInspections = useTechnicianInspections()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
@@ -34,8 +37,10 @@ export function TechnicianInspectionsPage() {
     const haystack = `${inspection.title} ${inspection.clientName} ${inspection.equipmentName}`.toLowerCase()
     const matchesPeriod = !period || (period === 'today' && inspection.dueDate === today) || (period === 'week' && inspection.dueDate >= today && inspection.dueDate <= weekEnd)
     return haystack.includes(query.toLowerCase()) && (!status || inspection.status === status) && (!priority || inspection.priority === priority) && matchesPeriod
-  }), [period, priority, query, status, today, weekEnd])
-  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">Minhas Inspecoes</h1><p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuuidas.</p></div><Card className="grid gap-4 p-4 lg:grid-cols-4"><Input label="Buscar" id="tech-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Titulo, cliente ou equipamento" /><Select label="Status" id="tech-status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Todos</option><option value={InspectionStatus.ASSIGNED}>Atribuida</option><option value={InspectionStatus.IN_PROGRESS}>Em andamento</option><option value={InspectionStatus.REJECTED}>Reprovada</option><option value={InspectionStatus.SUBMITTED}>Enviada</option></Select><Select label="Prioridade" id="tech-priority" value={priority} onChange={event => setPriority(event.target.value)}><option value="">Todas</option>{Object.values(Priority).map(value => <option key={value} value={value}>{value}</option>)}</Select><Select label="Periodo" id="tech-period" value={period} onChange={event => setPeriod(event.target.value)}><option value="">Todos</option><option value="today">Hoje</option><option value="week">Esta semana</option></Select></Card><div className="grid gap-4 xl:grid-cols-2">{filtered.map(inspection => <TechnicianInspectionCard key={inspection.id} inspection={inspection} />)}</div>{filtered.length === 0 && <Card className="p-8 text-center text-sm text-muted">Nenhuma inspecao encontrada.</Card>}</div>
+  }), [period, priority, query, status, technicianInspections, today, weekEnd])
+  const hasFilters = Boolean(query || status || priority || period)
+  function clearFilters() { setQuery(''); setStatus(''); setPriority(''); setPeriod('') }
+  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">Minhas Inspecoes</h1><p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuuidas.</p></div><Card className="grid gap-4 p-4 lg:grid-cols-4"><Input label="Buscar" id="tech-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Titulo, cliente ou equipamento" /><Select label="Status" id="tech-status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Todos</option><option value={InspectionStatus.ASSIGNED}>Atribuida</option><option value={InspectionStatus.IN_PROGRESS}>Em andamento</option><option value={InspectionStatus.REJECTED}>Reprovada</option><option value={InspectionStatus.SUBMITTED}>Enviada</option><option value={InspectionStatus.CANCELED}>Cancelada</option></Select><Select label="Prioridade" id="tech-priority" value={priority} onChange={event => setPriority(event.target.value)}><option value="">Todas</option>{Object.values(Priority).map(value => <option key={value} value={value}>{value}</option>)}</Select><Select label="Periodo" id="tech-period" value={period} onChange={event => setPeriod(event.target.value)}><option value="">Todos</option><option value="today">Hoje</option><option value="week">Esta semana</option></Select>{hasFilters && <div className="lg:col-span-4"><Button variant="ghost" onClick={clearFilters}>Limpar filtros</Button></div>}</Card><div className="grid gap-4 xl:grid-cols-2">{filtered.map(inspection => <TechnicianInspectionCard key={inspection.id} inspection={inspection} />)}</div>{filtered.length === 0 && <Card className="p-8 text-center text-sm text-muted">Nenhuma inspecao encontrada.</Card>}</div>
 }
 
 export function TechnicianInspectionDetailsPage() {
@@ -44,7 +49,8 @@ export function TechnicianInspectionDetailsPage() {
   const evidences = technicianEvidences.filter(evidence => evidence.inspectionId === inspection.id)
   const ncs = technicianNonConformities.filter(nc => nc.inspectionId === inspection.id)
   const action = inspection.status === InspectionStatus.IN_PROGRESS ? 'Continuar' : inspection.status === InspectionStatus.REJECTED ? 'Corrigir' : 'Iniciar inspecao'
-  return <div className="space-y-6"><BackLink to="/technician/inspections" label="Minhas inspecoes" /><div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div><h1 className="text-2xl font-semibold">{inspection.title}</h1><div className="mt-3 flex flex-wrap gap-2"><PriorityBadge priority={inspection.priority} /><StatusBadge status={inspection.status} /><SyncBadge status={inspection.syncStatus} /></div></div><Link to={`/technician/inspections/${inspection.id}/start`}><Button><Play size={17} />{action}</Button></Link></div><section className="grid gap-4 lg:grid-cols-3"><InfoCard label="Cliente" value={inspection.clientName} icon={UserCircle} /><InfoCard label="Local" value={inspection.siteName} icon={MapPin} /><InfoCard label="Equipamento" value={inspection.equipmentName} icon={ClipboardCheck} /></section><div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]"><div className="space-y-4"><Card className="p-5"><h2 className="text-base font-semibold">Dados da inspecao</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><Info label="Data" value={`${inspection.dueDate} ${inspection.dueTime ?? ''}`} /><Info label="Supervisora" value={inspection.supervisorName} /><Info label="Modelo" value={template.title} /><Info label="Progresso" value={`${inspection.progress}%`} /></div></Card><Card className="p-5"><h2 className="text-base font-semibold">Instrucoes</h2><p className="mt-2 text-sm text-muted">{inspection.supervisorInstructions}</p></Card><Card className="p-5"><h2 className="text-base font-semibold">Progresso</h2><Progress value={inspection.progress} /><div className="mt-4 grid gap-3 sm:grid-cols-2"><Info label="Nao conformidades" value={String(ncs.length)} /><Info label="Evidencias" value={String(evidences.length)} /></div></Card></div><Card className="h-fit p-5"><h2 className="text-base font-semibold">Nao conformidades</h2><div className="mt-4 space-y-3">{ncs.map(nc => <div key={nc.id} className="rounded-fieldops border border-border p-3"><div className="flex items-center justify-between gap-2"><p className="font-medium">{nc.title}</p><SeverityBadge severity={nc.severity} /></div><p className="mt-1 text-xs text-muted">{nc.item}</p></div>)}</div><Link className="mt-4 block" to={`/technician/inspections/${inspection.id}/non-conformities`}><Button variant="secondary" className="w-full"><FileWarning size={17} />Abrir NCs</Button></Link></Card></div></div>
+  const isCanceled = inspection.status === InspectionStatus.CANCELED
+  return <div className="space-y-6"><BackLink to="/technician/inspections" label="Minhas inspecoes" /><div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"><div><h1 className="text-2xl font-semibold">{inspection.title}</h1><div className="mt-3 flex flex-wrap gap-2"><PriorityBadge priority={inspection.priority} /><StatusBadge status={inspection.status} /><SyncBadge status={inspection.syncStatus} /></div></div>{isCanceled ? <Button disabled><Play size={17} />Cancelada</Button> : <Link to={`/technician/inspections/${inspection.id}/start`}><Button><Play size={17} />{action}</Button></Link>}</div><section className="grid gap-4 lg:grid-cols-3"><InfoCard label="Cliente" value={inspection.clientName} icon={UserCircle} /><InfoCard label="Local" value={inspection.siteName} icon={MapPin} /><InfoCard label="Equipamento" value={inspection.equipmentName} icon={ClipboardCheck} /></section><div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]"><div className="space-y-4">{isCanceled && <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark">Esta inspecao foi cancelada pelo Admin/Supervisor e nao pode ser iniciada ou continuada.</Card>}<Card className="p-5"><h2 className="text-base font-semibold">Dados da inspecao</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><Info label="Data" value={`${inspection.dueDate} ${inspection.dueTime ?? ''}`} /><Info label="Supervisora" value={inspection.supervisorName} /><Info label="Modelo" value={template.title} /><Info label="Progresso" value={`${inspection.progress}%`} /></div></Card><Card className="p-5"><h2 className="text-base font-semibold">Instrucoes</h2><p className="mt-2 text-sm text-muted">{inspection.supervisorInstructions}</p></Card><Card className="p-5"><h2 className="text-base font-semibold">Progresso</h2><Progress value={inspection.progress} /><div className="mt-4 grid gap-3 sm:grid-cols-2"><Info label="Nao conformidades" value={String(ncs.length)} /><Info label="Evidencias" value={String(evidences.length)} /></div></Card></div><Card className="h-fit p-5"><h2 className="text-base font-semibold">Nao conformidades</h2><div className="mt-4 space-y-3">{ncs.map(nc => <div key={nc.id} className="rounded-fieldops border border-border p-3"><div className="flex items-center justify-between gap-2"><p className="font-medium">{nc.title}</p><SeverityBadge severity={nc.severity} /></div><p className="mt-1 text-xs text-muted">{nc.item}</p></div>)}</div><Link className="mt-4 block" to={`/technician/inspections/${inspection.id}/non-conformities`}><Button variant="secondary" className="w-full"><FileWarning size={17} />Abrir NCs</Button></Link></Card></div></div>
 }
 
 export function TechnicianStartInspectionPage() {
@@ -170,6 +176,11 @@ function BackLink({ to, label }: { to: string; label: string }) {
 }
 
 function useInspection() {
-  const { id = 'ins-tech-compressor' } = useParams()
+  const { id = 'ins-compressor' } = useParams()
+  const technicianInspections = useTechnicianInspections()
   return technicianInspections.find(inspection => inspection.id === id) ?? technicianInspections[0]
+}
+
+function useTechnicianInspections() {
+  return useSyncExternalStore(inspectionStore.subscribe, inspectionStore.technicianSnapshot, inspectionStore.technicianSnapshot)
 }
