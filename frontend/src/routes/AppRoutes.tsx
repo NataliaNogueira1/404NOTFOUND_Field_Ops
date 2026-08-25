@@ -2,6 +2,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/layouts/AppLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
+import { TechnicianLayout } from '@/layouts/TechnicianLayout'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -18,6 +19,15 @@ const NewInspectionPage = lazy(() => import('@/pages/inspections/NewInspectionPa
 const InspectionReviewPage = lazy(() => import('@/pages/inspections/InspectionReviewPage').then(module => ({ default: module.InspectionReviewPage })))
 const NonConformitiesPage = lazy(() => import('@/pages/nonConformities/NonConformitiesPage').then(module => ({ default: module.NonConformitiesPage })))
 const AuditPage = lazy(() => import('@/pages/audit/AuditPage').then(module => ({ default: module.AuditPage })))
+const TechnicianHomePage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianHomePage })))
+const TechnicianInspectionsPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianInspectionsPage })))
+const TechnicianInspectionDetailsPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianInspectionDetailsPage })))
+const TechnicianStartInspectionPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianStartInspectionPage })))
+const TechnicianChecklistPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianChecklistPage })))
+const TechnicianNonConformitiesPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianNonConformitiesPage })))
+const TechnicianSummaryPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianSummaryPage })))
+const TechnicianSyncPage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianSyncPage })))
+const TechnicianProfilePage = lazy(() => import('@/pages/technician/TechnicianPages').then(module => ({ default: module.TechnicianProfilePage })))
 
 function LoadingRoute() { return <div className="rounded-card border border-border bg-white p-6 text-sm text-muted shadow-fieldops">Carregando tela...</div> }
 function LazyPage({ children }: { children: React.ReactNode }) { return <Suspense fallback={<LoadingRoute />}>{children}</Suspense> }
@@ -42,6 +52,18 @@ export function AppRoutes() {
       <Route path="inspections/:id/review" element={<LazyPage><InspectionReviewPage /></LazyPage>} />
       <Route path="non-conformities" element={<LazyPage><NonConformitiesPage /></LazyPage>} />
       <Route path="audit" element={<LazyPage><AuditPage /></LazyPage>} />
+    </Route>
+    <Route path="/technician" element={<TechnicianLayout />}>
+      <Route index element={<Navigate to="home" replace />} />
+      <Route path="home" element={<LazyPage><TechnicianHomePage /></LazyPage>} />
+      <Route path="inspections" element={<LazyPage><TechnicianInspectionsPage /></LazyPage>} />
+      <Route path="inspections/:id" element={<LazyPage><TechnicianInspectionDetailsPage /></LazyPage>} />
+      <Route path="inspections/:id/start" element={<LazyPage><TechnicianStartInspectionPage /></LazyPage>} />
+      <Route path="inspections/:id/checklist" element={<LazyPage><TechnicianChecklistPage /></LazyPage>} />
+      <Route path="inspections/:id/non-conformities" element={<LazyPage><TechnicianNonConformitiesPage /></LazyPage>} />
+      <Route path="inspections/:id/summary" element={<LazyPage><TechnicianSummaryPage /></LazyPage>} />
+      <Route path="sync" element={<LazyPage><TechnicianSyncPage /></LazyPage>} />
+      <Route path="profile" element={<LazyPage><TechnicianProfilePage /></LazyPage>} />
     </Route>
     <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFoundPage />} />
