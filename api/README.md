@@ -38,6 +38,20 @@ GRANT ALL PRIVILEGES ON DATABASE fieldops TO fieldops;
 Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in `.env` to idempotently create an
 administrator on startup. Disabled when either value is blank.
 
+## Local development users
+
+The default `dev` profile creates three intentionally fictitious local accounts on startup:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| ADMINISTRATOR | `admin@fieldops.local` | `fieldops-admin-dev` |
+| SUPERVISOR | `supervisor@fieldops.local` | `fieldops-supervisor-dev` |
+| TECHNICIAN | `technician@fieldops.local` | `fieldops-technician-dev` |
+
+These accounts are created only by the `dev` profile and are never created in production. Set
+`FIELDOPS_DEV_USERS_ENABLED=false` to disable them, or override each `FIELDOPS_DEV_*` variable
+when needed. Passwords in this table are for local demonstration only.
+
 ## Commands
 
 ```sh
@@ -66,6 +80,12 @@ docker compose up --build
 - Swagger UI: `http://localhost:8080/swagger-ui`
 - Health: `http://localhost:8080/actuator/health`
 - DB: `localhost:5432`, persisted in the `db-data` volume
+
+For a host-run backend with the Compose database, start only PostgreSQL with
+`docker compose up -d db`, set `DB_PORT=5433` in `api/.env`, and run `./mvnw spring-boot:run`.
+The frontend can then run with `VITE_API_URL=http://localhost:8080`.
+
+Swagger UI is available at `http://localhost:8080/swagger-ui`.
 
 ## Layout
 
