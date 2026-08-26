@@ -1,6 +1,6 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
-import { canAccessAdmin, canAccessTechnician, mockSession, roleHome } from '@/auth/mockSession'
+import { authSession, canAccessAdmin, canAccessTechnician, roleHome } from '@/auth/session'
 import { AppLayout } from '@/layouts/AppLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { TechnicianLayout } from '@/layouts/TechnicianLayout'
@@ -34,16 +34,18 @@ function LoadingRoute() { return <div className="rounded-card border border-bord
 function LazyPage({ children }: { children: React.ReactNode }) { return <Suspense fallback={<LoadingRoute />}>{children}</Suspense> }
 
 function RequireAdmin() {
-  const user = useSyncExternalStore(mockSession.subscribe, mockSession.snapshot, mockSession.snapshot)
-  if (!user) return <Navigate to="/login" replace />
-  if (!canAccessAdmin(user.role)) return <Navigate to={roleHome(user.role)} replace />
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  if (session.status === 'loading') return <LoadingRoute />
+  if (!session.user) return <Navigate to="/login" replace />
+  if (!canAccessAdmin(session.user.role)) return <Navigate to={roleHome(session.user.role)} replace />
   return <Outlet />
 }
 
 function RequireTechnician() {
-  const user = useSyncExternalStore(mockSession.subscribe, mockSession.snapshot, mockSession.snapshot)
-  if (!user) return <Navigate to="/login" replace />
-  if (!canAccessTechnician(user.role)) return <Navigate to={roleHome(user.role)} replace />
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  if (session.status === 'loading') return <LoadingRoute />
+  if (!session.user) return <Navigate to="/login" replace />
+  if (!canAccessTechnician(session.user.role)) return <Navigate to={roleHome(session.user.role)} replace />
   return <Outlet />
 }
 

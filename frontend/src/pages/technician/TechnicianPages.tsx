@@ -7,19 +7,20 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { mockSession } from '@/auth/mockSession'
+import { authSession } from '@/auth/session'
 import { inspectionTemplate, technicianAnswers, technicianEvidences, technicianNonConformities, technicianSyncOperations, technicianUser } from '@/mocks/technician'
 import { inspectionStore } from '@/state/mockStores'
 import { InspectionStatus, Priority, ResponseType, Severity, type ChecklistAnswer, type ChecklistValue, type Inspection, type TemplateItem } from '@/types/domain'
 
 export function TechnicianHomePage() {
   const technicianInspections = useTechnicianInspections()
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const today = new Date().toISOString().slice(0, 10)
   const todayCount = technicianInspections.filter(item => item.dueDate === today).length
   const overdue = technicianInspections.filter(item => item.overdue).length
   const inProgress = technicianInspections.filter(item => item.status === InspectionStatus.IN_PROGRESS).length
   const pendingSync = technicianInspections.reduce((sum, item) => sum + (item.pendingSyncCount ?? 0), 0)
-  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">Ola, Carlos</h1><p className="text-sm text-muted">Suas atividades de campo para hoje.</p></div><section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><TechStat label="Hoje" value={todayCount} tone="primary" /><TechStat label="Atrasadas" value={overdue} tone="danger" /><TechStat label="Em andamento" value={inProgress} tone="warning" /><TechStat label="Pendencias de sync" value={pendingSync} tone="success" /></section><Card className="flex flex-col gap-4 border-primary-light/70 p-5 md:flex-row md:items-center md:justify-between"><div><p className="font-semibold">{pendingSync} operacoes pendentes</p><p className="text-sm text-muted">Ultima sincronizacao mockada: hoje, 11:20</p></div><Button variant="secondary"><RefreshCw size={17} />Sincronizar agora</Button></Card><section className="space-y-4"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Proximas inspecoes</h2><Link className="text-sm font-semibold text-primary" to="/technician/inspections">Ver todas</Link></div><div className="grid gap-4 xl:grid-cols-2">{technicianInspections.slice(0, 4).map(inspection => <TechnicianInspectionCard key={inspection.id} inspection={inspection} />)}</div></section></div>
+  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold">Ola, {session.user?.name.split(' ')[0] ?? 'Tecnico'}</h1><p className="text-sm text-muted">Suas atividades de campo para hoje.</p></div><section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><TechStat label="Hoje" value={todayCount} tone="primary" /><TechStat label="Atrasadas" value={overdue} tone="danger" /><TechStat label="Em andamento" value={inProgress} tone="warning" /><TechStat label="Pendencias de sync" value={pendingSync} tone="success" /></section><Card className="flex flex-col gap-4 border-primary-light/70 p-5 md:flex-row md:items-center md:justify-between"><div><p className="font-semibold">{pendingSync} operacoes pendentes</p><p className="text-sm text-muted">Ultima sincronizacao mockada: hoje, 11:20</p></div><Button variant="secondary"><RefreshCw size={17} />Sincronizar agora</Button></Card><section className="space-y-4"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Proximas inspecoes</h2><Link className="text-sm font-semibold text-primary" to="/technician/inspections">Ver todas</Link></div><div className="grid gap-4 xl:grid-cols-2">{technicianInspections.slice(0, 4).map(inspection => <TechnicianInspectionCard key={inspection.id} inspection={inspection} />)}</div></section></div>
 }
 
 export function TechnicianInspectionsPage() {
@@ -114,11 +115,14 @@ export function TechnicianSyncPage() {
 
 export function TechnicianProfilePage() {
   const navigate = useNavigate()
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  const user = session.user
+  const initials = (user?.name ?? technicianUser.name).split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()
   function logout() {
-    mockSession.logout()
+    authSession.logout()
     navigate('/login')
   }
-  return <div className="mx-auto max-w-2xl space-y-6"><Card className="p-8 text-center"><div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">CH</div><h1 className="mt-4 text-2xl font-semibold">{technicianUser.name}</h1><p className="text-primary">Tecnico</p><p className="text-sm text-muted">{technicianUser.email}</p></Card><Card className="p-5"><Info label="Versao" value="1.0.0" /><div className="mt-3"><Info label="Experiencia" value="Portal web do tecnico" /></div></Card><div className="flex justify-end gap-3"><Button variant="secondary"><RefreshCw size={17} />Forcar sincronizacao</Button><Button variant="danger" onClick={logout}>Logout mockado</Button></div></div>
+  return <div className="mx-auto max-w-2xl space-y-6"><Card className="p-8 text-center"><div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">{initials}</div><h1 className="mt-4 text-2xl font-semibold">{user?.name ?? technicianUser.name}</h1><p className="text-primary">{user?.role ?? 'TECHNICIAN'}</p><p className="text-sm text-muted">{user?.email ?? technicianUser.email}</p></Card><Card className="p-5"><Info label="Versao" value="1.0.0" /><div className="mt-3"><Info label="Experiencia" value="Portal web do tecnico" /></div></Card><div className="flex justify-end gap-3"><Button variant="secondary"><RefreshCw size={17} />Forcar sincronizacao</Button><Button variant="danger" onClick={logout}>Logout</Button></div></div>
 }
 
 function TechnicianInspectionCard({ inspection }: { inspection: Inspection }) {
