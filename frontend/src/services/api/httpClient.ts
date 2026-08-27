@@ -24,6 +24,9 @@ interface RefreshResponse {
 // the same promise — the pending-request queue from the auth story.
 let refreshInFlight: Promise<string> | null = null;
 
+/** Broadcast when a refresh dies, so the AuthContext can drop the user. */
+export const SESSION_EXPIRED_EVENT = 'fieldops:session-expired';
+
 async function requestAccessToken(): Promise<string> {
   const refreshToken = tokenStorage.getRefreshToken();
   if (!refreshToken) {
@@ -56,9 +59,23 @@ function renewAccessToken(): Promise<string> {
 }
 
 function redirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   if (window.location.pathname !== '/login') {
     window.location.assign('/login');
   }
+}
+
+/** Prefers the API's error message ("Invalid credentials") over raw JSON text. */
+async function toErrorMessage(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  try {
+    const body = JSON.parse(text) as { message?: string };
+    if (body.message) return body.message;
+  } catch {
+    // Not JSON — fall through to the raw text.
+  }
+  return text || response.statusText;
 }
 
 async function handleUnauthorized<T>(path: string, options: RequestOptions): Promise<T> {
@@ -90,7 +107,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
+    const message = await toErrorMessage(response);
     throw new Error(`API ${response.status}: ${message}`);
   }
 
