@@ -14,7 +14,7 @@ export { ErrorBoundary } from 'expo-router';
 SplashScreen.preventAutoHideAsync();
 
 function AuthGate() {
-  const { isAuthenticated, isHydrating } = useAuth();
+  const { isAuthenticated, isHydrating, isOfflineLimited } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -22,9 +22,12 @@ function AuthGate() {
     if (isHydrating) return; // Wait until we know if there's a stored session
 
     const inPublicGroup = segments[0] === '(public)';
-    if (!isAuthenticated && !inPublicGroup) router.replace('/(public)/login');
+    // In offline-limited mode the user keeps browsing locally cached data.
+    if (!isAuthenticated && !isOfflineLimited && !inPublicGroup) {
+      router.replace('/(public)/login');
+    }
     if (isAuthenticated && inPublicGroup) router.replace('/(protected)/(tabs)');
-  }, [isAuthenticated, isHydrating, segments, router]);
+  }, [isAuthenticated, isHydrating, isOfflineLimited, segments, router]);
 
   if (isHydrating) {
     return (
