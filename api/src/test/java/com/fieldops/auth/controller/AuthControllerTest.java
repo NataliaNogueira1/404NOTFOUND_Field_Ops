@@ -90,6 +90,66 @@ class AuthControllerTest {
     }
 
     @Test
+    void returnsNewAccessTokenOnValidRefreshWithoutAuthentication() throws Exception {
+        String refreshToken = obtainRefreshToken("sup@fieldops.com", "pass123");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.expiresIn").isNumber());
+    }
+
+    @Test
+    void returns401OnInvalidRefreshToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"not-a-jwt\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    void returns401WhenRefreshTokenIsAnAccessToken() throws Exception {
+        String accessToken = obtainToken("sup@fieldops.com", "pass123");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + accessToken + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    void returns401WhenRefreshTokenIsUsedAsAnAccessToken() throws Exception {
+        String refreshToken = obtainRefreshToken("sup@fieldops.com", "pass123");
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + refreshToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void returns401WhenAccessTokenIsMissingOnProtectedRoute() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void returns400OnBlankRefreshToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
     void actuatorHealthIsPublicAndReturnsUp() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
@@ -97,12 +157,20 @@ class AuthControllerTest {
     }
 
     private String obtainToken(String email, String password) throws Exception {
+        return JsonPath.read(loginAndGetBody(email, password), "$.accessToken");
+    }
+
+    private String obtainRefreshToken(String email, String password) throws Exception {
+        return JsonPath.read(loginAndGetBody(email, password), "$.refreshToken");
+    }
+
+    private String loginAndGetBody(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+        return result.getResponse().getContentAsString();
     }
 
     private String loginBody(String email, String password) {

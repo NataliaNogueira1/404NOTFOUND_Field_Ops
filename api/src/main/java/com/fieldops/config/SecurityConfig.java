@@ -1,6 +1,7 @@
 package com.fieldops.config;
 
 import com.fieldops.shared.security.JwtFilter;
+import com.fieldops.shared.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
             "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
             "/actuator/health",
             "/v3/api-docs/**",
             "/swagger-ui/**",
@@ -34,6 +36,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtFilter jwtFilter,
+                                                   RestAuthenticationEntryPoint authenticationEntryPoint,
                                                    CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -42,6 +45,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
+                .exceptionHandling(handling -> handling.authenticationEntryPoint(authenticationEntryPoint))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

@@ -2,7 +2,10 @@ package com.fieldops.auth.service;
 
 import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.LoginResponse;
+import com.fieldops.auth.dto.RefreshRequest;
+import com.fieldops.auth.dto.RefreshResponse;
 import com.fieldops.shared.exception.InvalidCredentialsException;
+import com.fieldops.shared.exception.InvalidRefreshTokenException;
 import com.fieldops.config.JwtProperties;
 import com.fieldops.shared.security.JwtTokenProvider;
 import com.fieldops.user.mapper.UserMapper;
@@ -37,11 +40,13 @@ class AuthServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofHours(1)));
+        jwtTokenProvider = new JwtTokenProvider(
+                new JwtProperties(SECRET, Duration.ofHours(1), Duration.ofDays(7)));
         authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider, userMapper);
     }
 
@@ -74,6 +79,53 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("ghost@fieldops.com", "any")))
                 .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void returnsNewAccessTokenWhenRefreshTokenIsValid() {
+        User user = buildUser(Role.SUPERVISOR, "hashed");
+        String refreshToken = jwtTokenProvider.generateRefreshToken("sup@fieldops.com");
+        when(userRepository.findByEmail("sup@fieldops.com")).thenReturn(Optional.of(user));
+
+        RefreshResponse response = authService.refresh(new RefreshRequest(refreshToken));
+
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.expiresIn()).isPositive();
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+        assertThat(jwtTokenProvider.extractSubject(response.accessToken())).isEqualTo("sup@fieldops.com");
+    }
+
+    @Test
+    void throwsWhenRefreshTokenIsAnAccessToken() {
+        String accessToken = jwtTokenProvider.generateToken("sup@fieldops.com", Role.SUPERVISOR);
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshRequest(accessToken)))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void throwsWhenRefreshTokenIsGarbage() {
+        assertThatThrownBy(() -> authService.refresh(new RefreshRequest("not-a-jwt")))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void throwsWhenRefreshTokenIsExpired() {
+        JwtTokenProvider expired = new JwtTokenProvider(
+                new JwtProperties(SECRET, Duration.ofHours(1), Duration.ofSeconds(-60)));
+        String refreshToken = expired.generateRefreshToken("sup@fieldops.com");
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshRequest(refreshToken)))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void throwsWhenRefreshTokenSubjectNoLongerExists() {
+        String refreshToken = jwtTokenProvider.generateRefreshToken("deleted@fieldops.com");
+        when(userRepository.findByEmail("deleted@fieldops.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshRequest(refreshToken)))
+                .isInstanceOf(InvalidRefreshTokenException.class);
     }
 
     private User buildUser(Role role, String password) {

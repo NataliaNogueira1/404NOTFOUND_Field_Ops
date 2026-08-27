@@ -15,16 +15,23 @@ import java.util.Date;
 /**
  * Issues and verifies HS256 JWTs. The signing key length is validated at construction so a
  * weak {@code JWT_SECRET} fails fast at startup rather than at the first sign attempt.
+ *
+ * <p>Two token types exist: short-lived <b>access</b> tokens (role claim, used as Bearer on
+ * API routes) and long-lived <b>refresh</b> tokens ({@code typ=refresh}, only accepted by
+ * {@code POST /api/v1/auth/refresh}). Type validation prevents one from being replayed as
+ * the other.</p>
  */
 @Service
 public class JwtTokenProvider {
 
     static final String ROLE_CLAIM = "role";
+    static final String TYPE_CLAIM = "typ";
+    static final String REFRESH_TYPE = "refresh";
     private static final int MIN_SECRET_BYTES = 32;
-    private static final long REFRESH_EXPIRATION_MILLIS = 7L * 24 * 60 * 60 * 1000; // 7 days
 
     private final SecretKey key;
     private final long expirationMillis;
+    private final long refreshExpirationMillis;
 
     public JwtTokenProvider(JwtProperties properties) {
         byte[] secretBytes = properties.secret().getBytes(StandardCharsets.UTF_8);
@@ -35,6 +42,7 @@ public class JwtTokenProvider {
         }
         this.key = Keys.hmacShaKeyFor(secretBytes);
         this.expirationMillis = properties.expiration().toMillis();
+        this.refreshExpirationMillis = properties.refreshExpiration().toMillis();
     }
 
     public String generateToken(String subject, Role role) {
@@ -49,24 +57,39 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Issues a longer-lived refresh JWT. Rotation via a refresh endpoint is out of scope for the
-     * contract story; this token is currently only returned at login so frontends can mock it.
+     * Issues a longer-lived refresh JWT, exchanged for new access tokens at
+     * {@code POST /api/v1/auth/refresh}. The token itself is not rotated on refresh.
      */
     public String generateRefreshToken(String subject) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(subject)
-                .claim("typ", "refresh")
+                .claim(TYPE_CLAIM, REFRESH_TYPE)
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + REFRESH_EXPIRATION_MILLIS))
+                .expiration(new Date(now.getTime() + refreshExpirationMillis))
                 .signWith(key)
                 .compact();
     }
 
-    public boolean isValid(String token) {
+    /**
+     * @return true when the token has a valid signature, is unexpired, and is <b>not</b> a
+     * refresh token — i.e. it may authenticate an API request as a Bearer credential.
+     */
+    public boolean isValidAccessToken(String token) {
         try {
-            parse(token);
-            return true;
+            return !isRefresh(parse(token));
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return true when the token has a valid signature, is unexpired, and carries the
+     * {@code typ=refresh} claim — i.e. it may only be used to obtain a new access token.
+     */
+    public boolean isValidRefreshToken(String token) {
+        try {
+            return isRefresh(parse(token));
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
@@ -82,6 +105,10 @@ public class JwtTokenProvider {
 
     public long expirationSeconds() {
         return expirationMillis / 1000;
+    }
+
+    private boolean isRefresh(Claims claims) {
+        return REFRESH_TYPE.equals(claims.get(TYPE_CLAIM, String.class));
     }
 
     private Claims parse(String token) {

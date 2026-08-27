@@ -1,6 +1,6 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-import { apiClient } from '@/infrastructure/api/client';
+import { apiClient, onSessionChanged } from '@/infrastructure/api/client';
 import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -133,6 +133,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await tokenStorage.clearTokens();
     setAuthState({ user: null, token: null, isAuthenticated: false });
+  }, []);
+
+  // ─── Track transparent renewals from the 401 interceptor ─────────────────────
+  // The interceptor refreshes the token below the UI layer; these events keep the
+  // in-memory state in sync and drop the session when the refresh token dies.
+  // Locally stored (offline) data survives an expiry — only the session is reset.
+
+  useEffect(() => {
+    return onSessionChanged((event) => {
+      if (event.type === 'renewed') {
+        setAuthState((state) =>
+          state.token ? { ...state, token: event.accessToken } : state,
+        );
+      } else {
+        setAuthState({ user: null, token: null, isAuthenticated: false });
+      }
+    });
   }, []);
 
   // ─── Render ──────────────────────────────────────────────────────────────────

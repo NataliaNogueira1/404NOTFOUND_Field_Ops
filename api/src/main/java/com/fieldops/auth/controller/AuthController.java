@@ -2,6 +2,8 @@ package com.fieldops.auth.controller;
 
 import com.fieldops.auth.dto.LoginRequest;
 import com.fieldops.auth.dto.LoginResponse;
+import com.fieldops.auth.dto.RefreshRequest;
+import com.fieldops.auth.dto.RefreshResponse;
 import com.fieldops.auth.service.AuthService;
 import com.fieldops.shared.security.AuthenticatedUser;
 import com.fieldops.user.dto.UserResponse;
@@ -55,6 +57,24 @@ public class AuthController {
             }
             """;
 
+    private static final String REFRESH_200_EXAMPLE = """
+            {
+              "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZWNoQGZpZWxkb3BzLmNvbSIsInJvbGUiOiJURUNITklDSUFOIn0.x",
+              "expiresIn": 28800
+            }
+            """;
+
+    private static final String REFRESH_401_EXAMPLE = """
+            {
+              "timestamp": "2026-08-12T23:00:00Z",
+              "status": 401,
+              "code": "INVALID_REFRESH_TOKEN",
+              "message": "Invalid refresh token",
+              "path": "/api/v1/auth/refresh",
+              "fieldErrors": []
+            }
+            """;
+
     private final AuthService authService;
     private final UserMapper userMapper;
 
@@ -73,6 +93,20 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @Operation(summary = "Exchange a refresh token for a new access token",
+            description = "Renews an expired access token without re-prompting for credentials. "
+                    + "The refresh token itself is not rotated.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "New access token issued",
+                    content = @Content(examples = @ExampleObject(value = REFRESH_200_EXAMPLE))),
+            @ApiResponse(responseCode = "401", description = "Refresh token missing, expired, or invalid",
+                    content = @Content(examples = @ExampleObject(value = REFRESH_401_EXAMPLE)))
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refresh(request));
     }
 
     @Operation(summary = "Return the authenticated user's profile", security = @SecurityRequirement(name = "bearer-jwt"))
