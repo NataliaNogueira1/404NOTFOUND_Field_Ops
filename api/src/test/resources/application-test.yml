@@ -16,5 +16,6 @@ fieldops:
     jwt:
       secret: test-secret-test-secret-test-secret-test-secret-32
       expiration: 1h
+      refresh-expiration: 7d
   cors:
     allowed-origins: http://localhost

@@ -17,7 +17,8 @@ class JwtTokenProviderTest {
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofHours(1)));
+        jwtTokenProvider = new JwtTokenProvider(
+                new JwtProperties(SECRET, Duration.ofHours(1), Duration.ofDays(7)));
     }
 
     @Test
@@ -39,7 +40,7 @@ class JwtTokenProviderTest {
     @Test
     void rejectsForeignToken() {
         JwtTokenProvider other = new JwtTokenProvider(new JwtProperties(
-                "another-secret-another-secret-another-secret!!", Duration.ofHours(1)));
+                "another-secret-another-secret-another-secret!!", Duration.ofHours(1), Duration.ofDays(7)));
         String foreignToken = other.generateToken("x@fieldops.com", Role.TECHNICIAN);
 
         assertThat(jwtTokenProvider.isValid(foreignToken)).isFalse();

@@ -1,6 +1,8 @@
 package com.fieldops.config;
 
 import com.fieldops.shared.security.JwtFilter;
+import com.fieldops.shared.security.RestAccessDeniedHandler;
+import com.fieldops.shared.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,9 +17,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
- * Stateless, JWT-based security. CORS, session policy, public paths, and the JWT filter
- * are configured here; method-level authorization is enabled with {@link EnableMethodSecurity}.
- * The CORS source itself is provided by {@link CorsConfig}.
+ * Stateless, JWT-based security. CORS, session policy, public paths, the role matrix,
+ * and the JWT filter are configured here; method-level authorization is enabled with
+ * {@link EnableMethodSecurity} for rules the path matrix cannot express (e.g. record
+ * ownership). The CORS source itself is provided by {@link CorsConfig}.
  */
 @Configuration
 @EnableMethodSecurity
@@ -25,15 +28,28 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
             "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
             "/actuator/health",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
     };
 
+    /** Resources shared by the web admin: ADMIN and SUPERVISOR, never TECHNICIAN. */
+    private static final String[] SUPERVISOR_SCOPED_PATHS = {
+            "/api/v1/clients/**",
+            "/api/v1/sites/**",
+            "/api/v1/equipment/**",
+            "/api/v1/inspection-templates/**",
+            "/api/v1/inspections/**"
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtFilter jwtFilter,
+                                                   RestAuthenticationEntryPoint authenticationEntryPoint,
+                                                   RestAccessDeniedHandler accessDeniedHandler,
                                                    CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -41,7 +57,14 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .requestMatchers("/api/v1/users/**").hasAuthority("ADMINISTRATOR")
+                        .requestMatchers("/api/v1/mobile/**").hasAuthority("TECHNICIAN")
+                        .requestMatchers(SUPERVISOR_SCOPED_PATHS)
+                        .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR")
                         .anyRequest().authenticated())
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

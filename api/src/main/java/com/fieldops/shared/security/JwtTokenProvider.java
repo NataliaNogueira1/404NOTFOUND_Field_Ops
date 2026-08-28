@@ -13,15 +13,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 /**
- * Issues and verifies HS256 JWTs. The signing key length is validated at construction so a
- * weak {@code JWT_SECRET} fails fast at startup rather than at the first sign attempt.
+ * Issues and verifies the HS256 <b>access</b> JWTs sent as Bearer credentials on API routes.
+ * The signing key length is validated at construction so a weak {@code JWT_SECRET} fails fast
+ * at startup rather than at the first sign attempt. Refresh tokens are not JWTs — they are
+ * opaque UUIDs persisted by the auth domain.
  */
 @Service
 public class JwtTokenProvider {
 
     static final String ROLE_CLAIM = "role";
     private static final int MIN_SECRET_BYTES = 32;
-    private static final long REFRESH_EXPIRATION_MILLIS = 7L * 24 * 60 * 60 * 1000; // 7 days
 
     private final SecretKey key;
     private final long expirationMillis;
@@ -49,20 +50,10 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Issues a longer-lived refresh JWT. Rotation via a refresh endpoint is out of scope for the
-     * contract story; this token is currently only returned at login so frontends can mock it.
+     * @return true when the token has a valid signature and is unexpired — i.e. it may
+     * authenticate an API request as a Bearer credential. Whether the subject is still an
+     * ACTIVE user is a separate check, owned by {@code AuthenticatedUserDetailsService}.
      */
-    public String generateRefreshToken(String subject) {
-        Date now = new Date();
-        return Jwts.builder()
-                .subject(subject)
-                .claim("typ", "refresh")
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + REFRESH_EXPIRATION_MILLIS))
-                .signWith(key)
-                .compact();
-    }
-
     public boolean isValid(String token) {
         try {
             parse(token);

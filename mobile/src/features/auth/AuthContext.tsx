@@ -1,6 +1,8 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-import { apiClient } from '@/infrastructure/api/client';
+import { apiClient, onSessionChanged } from '@/infrastructure/api/client';
+import { getDatabase } from '@/infrastructure/database';
+import { InspectionRepository } from '@/infrastructure/database/repositories';
 import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -16,6 +18,8 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  /** Session expired, but local (offline) data keeps the user in the app, read-only. */
+  isOfflineLimited: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -48,11 +52,27 @@ interface MeApiResponse {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Whether any inspection is cached in the local database — the condition for
+ * keeping the user in the app (limited offline mode) after the session dies.
+ * Never throws: a broken database simply means "no offline data".
+ */
+async function hasLocalInspections(): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const inspections = await new InspectionRepository(db).getAll();
+    return inspections.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     token: null,
     isAuthenticated: false,
+    isOfflineLimited: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
@@ -81,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             },
             token: storedToken,
             isAuthenticated: true,
+            isOfflineLimited: false,
           });
         } catch {
           // If /me fails (network, CORS, etc), still restore session optimistically.
@@ -89,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user: null,
             token: storedToken,
             isAuthenticated: true,
+            isOfflineLimited: false,
           });
         }
       } catch {
@@ -122,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         token: response.accessToken,
         isAuthenticated: true,
+        isOfflineLimited: false,
       });
     } finally {
       setIsLoading(false);
@@ -132,8 +155,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await tokenStorage.clearTokens();
-    setAuthState({ user: null, token: null, isAuthenticated: false });
+    setAuthState({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isOfflineLimited: false,
+    });
   }, []);
+
+  const handleSessionExpired = useCallback(async () => {
+    if (await hasLocalInspections()) {
+      setAuthState({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isOfflineLimited: true,
+      });
+      return;
+    }
+    await tokenStorage.clearTokens();
+    setAuthState({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isOfflineLimited: false,
+    });
+  }, []);
+
+  // ─── Track transparent renewals from the 401 interceptor ─────────────────────
+  // The interceptor refreshes the token below the UI layer; these events keep the
+  // in-memory state in sync and drop the session when the refresh token dies.
+  // When the session dies but inspections are cached locally, the user stays in
+  // the app in a limited offline mode instead of being kicked to the login screen.
+
+  useEffect(() => {
+    return onSessionChanged((event) => {
+      if (event.type === 'renewed') {
+        setAuthState((state) =>
+          state.token ? { ...state, token: event.accessToken } : state,
+        );
+        return;
+      }
+      void handleSessionExpired();
+    });
+  }, [handleSessionExpired]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 

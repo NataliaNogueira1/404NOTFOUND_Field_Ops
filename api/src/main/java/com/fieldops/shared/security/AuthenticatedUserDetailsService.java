@@ -1,6 +1,7 @@
 package com.fieldops.shared.security;
 
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -23,6 +24,11 @@ public class AuthenticatedUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            // Same failure as an unknown user: a deactivated account must not keep serving
+            // requests with a still-valid access token.
+            throw new UsernameNotFoundException("User is not active: " + email);
+        }
         return new AuthenticatedUser(user);
     }
 }

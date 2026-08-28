@@ -1,1 +1,2 @@
-export { apiClient } from './client';
+export { apiClient, onSessionChanged } from './client';
+export type { SessionEvent } from './client';
