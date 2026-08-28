@@ -1,7 +1,9 @@
 package com.fieldops.auth.controller;
 
+import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.repository.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,10 +34,15 @@ class AuthControllerTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void seedUser() {
+        // Refresh tokens reference users; clear them first or the FK blocks the cleanup.
+        refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         User user = new User();
         user.setName("Supervisor One");
@@ -43,6 +50,16 @@ class AuthControllerTest {
         user.setPassword(passwordEncoder.encode("pass123"));
         user.setRole(Role.SUPERVISOR);
         userRepository.save(user);
+    }
+
+    private User inactiveUser() {
+        User user = new User();
+        user.setName("Inactive User");
+        user.setEmail("inactive@fieldops.com");
+        user.setPassword(passwordEncoder.encode("pass123"));
+        user.setRole(Role.SUPERVISOR);
+        user.setStatus(UserStatus.INACTIVE);
+        return user;
     }
 
     @Test
@@ -105,21 +122,59 @@ class AuthControllerTest {
     void returns401OnInvalidRefreshToken() throws Exception {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"refreshToken\":\"not-a-jwt\"}"))
+                        .content("{\"refreshToken\":\"not-a-stored-token\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
     }
 
     @Test
-    void returns401WhenRefreshTokenIsAnAccessToken() throws Exception {
-        String accessToken = obtainToken("sup@fieldops.com", "pass123");
+    void logoutInvalidatesTheRefreshToken() throws Exception {
+        String refreshToken = obtainRefreshToken("sup@fieldops.com", "pass123");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"refreshToken\":\"" + accessToken + "\"}"))
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    void logoutIsIdempotentForUnknownTokens() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"never-existed\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void returns401OnInactiveUserLogin() throws Exception {
+        userRepository.save(inactiveUser());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("inactive@fieldops.com", "pass123")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void returns401WhenAnInactiveUserPresentsAValidAccessToken() throws Exception {
+        User user = userRepository.findByEmail("sup@fieldops.com").orElseThrow();
+        String token = obtainToken("sup@fieldops.com", "pass123");
+
+        user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
     @Test

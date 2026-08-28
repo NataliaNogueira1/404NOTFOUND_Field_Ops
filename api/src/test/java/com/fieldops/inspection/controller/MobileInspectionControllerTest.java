@@ -7,6 +7,7 @@ import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
+import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.user.model.Role;
@@ -50,6 +51,9 @@ class MobileInspectionControllerTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private InspectionRepository inspectionRepository;
 
     @Autowired
@@ -64,6 +68,8 @@ class MobileInspectionControllerTest {
     void seedTechnicianWithTwoActionableInspections() {
         inspectionRepository.deleteAll();
         templateRepository.deleteAll();
+        // Refresh tokens reference users; clear them first or the FK blocks the cleanup.
+        refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
 
         technician = persistUser("tech@fieldops.com", Role.TECHNICIAN);
