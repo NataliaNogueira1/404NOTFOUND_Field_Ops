@@ -64,6 +64,8 @@ class MobileInspectionControllerTest {
 
     private User technician;
 
+    private User otherTechnician;
+
     @BeforeEach
     void seedTechnicianWithTwoActionableInspections() {
         inspectionRepository.deleteAll();
@@ -73,11 +75,13 @@ class MobileInspectionControllerTest {
         userRepository.deleteAll();
 
         technician = persistUser("tech@fieldops.com", Role.TECHNICIAN);
+        otherTechnician = persistUser("other-tech@fieldops.com", Role.TECHNICIAN);
         User supervisor = persistUser("sup@fieldops.com", Role.SUPERVISOR);
         InspectionTemplate template = persistTemplate();
 
         saveInspection(template, technician, supervisor, InspectionStatus.ASSIGNED, Priority.HIGH);
         saveInspection(template, technician, supervisor, InspectionStatus.IN_PROGRESS, Priority.LOW);
+        saveInspection(template, otherTechnician, supervisor, InspectionStatus.ASSIGNED, Priority.MEDIUM);
     }
 
     @Test
@@ -91,6 +95,26 @@ class MobileInspectionControllerTest {
                 .andExpect(jsonPath("$..status",
                         containsInAnyOrder("ASSIGNED", "IN_PROGRESS")))
                 .andExpect(jsonPath("$[0].template.sections", hasSize(1)));
+    }
+
+    @Test
+    void doesNotListInspectionsAssignedToAnotherTechnician() throws Exception {
+        // Three inspections exist, but one belongs to the other technician: each
+        // technician must see only their own assignments.
+        mockMvc.perform(get("/api/v1/mobile/inspections")
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$..technicianId",
+                        containsInAnyOrder(String.valueOf(technician.getId()),
+                                String.valueOf(technician.getId()))));
+
+        mockMvc.perform(get("/api/v1/mobile/inspections")
+                        .header("Authorization", "Bearer " + obtainToken("other-tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].technicianId")
+                        .value(String.valueOf(otherTechnician.getId())));
     }
 
     private User persistUser(String email, Role role) {
