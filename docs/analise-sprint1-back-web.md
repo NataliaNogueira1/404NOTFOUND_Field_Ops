@@ -11,10 +11,10 @@
 | PBI-001 | Repositórios e convenções | [#11](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/11) | ✅ Concluído |
 | PBI-004 | API Spring Boot + PostgreSQL + migrações | [#14](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/14) | ✅ Concluído |
 | PBI-006 | Contrato OpenAPI e dados simulados | [#16](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/16) | ✅ Concluído |
-| PBI-007 | Autenticação JWT | [#17](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/17) | ❌ Aberta (porém login funciona no código — confirmar com Lucas) |
-| PBI-010 | Refresh token | [#20](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/20) | ❌ Aberta |
-| PBI-012 | Autorização por perfil | [#22](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/22) | ❌ Aberta |
-| PBI-011 | CRUD de usuários | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ❌ Aberta |
+| PBI-007 | Autenticação JWT | [#17](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/17) | ✅ Concluído — `POST /api/v1/auth/login` valida senha (BCrypt) e emite JWT |
+| PBI-010 | Refresh token | [#20](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/20) | ✅ Concluído — `POST /api/v1/auth/refresh` + entidade `RefreshToken` + migration V4 |
+| PBI-012 | Autorização por perfil | [#22](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/22) | ✅ Concluído — matriz de roles no `SecurityConfig` + `@PreAuthorize` por método |
+| PBI-011 | CRUD de usuários | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ❌ Aberta — sem `UserController`/service; só o conceito de `UserStatus` (V3) existe |
 | PBI-013 | CRUD de clientes | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ❌ Aberta |
 | PBI-014 | CRUD de locais | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ❌ Aberta |
 | PBI-015 | CRUD de equipamentos | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ❌ Aberta |
@@ -36,46 +36,14 @@
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 3 |
-| ❌ Não feito | 20 |
+| ✅ Concluído | 6 |
+| ❌ Não feito | 17 |
 
-**Porcentagem: ~13%** (3/23)
+**Porcentagem: ~26%** (6/23)
+
+> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)** — os três últimos entregues na branch `feat/refresh-token-session-renewal`. Também já existe endpoint de `logout` e o conceito de `UserStatus` (ativo/inativo), mas o CRUD de usuários (PBI-011) ainda não tem endpoint.
 
 ---
-
-## Sprint 1 Frontend Web (Andressa, Ian, Júlia, Carol)
-
-> O frontend opera 100% com dados mockados. Não há nenhuma chamada HTTP à API, nenhum service de integração, nenhuma autenticação real. Considerando apenas funcionalidade integrada com a API, a conclusão real é **0%** além da estrutura do projeto.
-
-| PBI | Título | Issue | Veredicto |
-|-----|--------|-------|-----------|
-| PBI-001 | Repositórios e convenções | [#11](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/11) | ✅ Concluído |
-| PBI-003 | Projeto Next.js com layout | [#13](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/13) | ✅ Concluído |
-| PBI-005 | Lint, tipos e fluxo de PR | [#15](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/15) | ❌ Aberta |
-| PBI-009 | Login e sessão na web | [#19](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/19) | ❌ Aberta |
-| PBI-011 | CRUD de usuários (telas) | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ❌ Aberta |
-| PBI-013 | CRUD de clientes (telas) | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ❌ Aberta |
-| PBI-014 | CRUD de locais (telas) | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ❌ Aberta |
-| PBI-015 | CRUD de equipamentos (telas) | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ❌ Aberta |
-| PBI-017 | Pesquisa e filtros (telas) | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ❌ Aberta |
-| PBI-018 | Modelo em rascunho (telas) | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ❌ Aberta |
-| PBI-019 | Seções do checklist (telas) | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ❌ Aberta |
-| PBI-020 | Itens com tipos (telas) | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ❌ Aberta |
-| PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ❌ Aberta |
-| PBI-026 | Seleção encadeada cliente→local→equip | [#93](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/93) | ❌ Aberta |
-| PBI-029 | Cancelar inspeção (tela) | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ❌ Aberta |
-| PBI-030 | Acompanhar inspeções com filtros | [#47](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/47) | ❌ Aberta |
-
-### Resumo Sprint 1 Frontend Web (16 itens)
-
-| Categoria | Qtd |
-|-----------|-----|
-| ✅ Concluído | 2 |
-| ❌ Não feito | 14 |
-
-**Porcentagem: ~13%** (2/16)
-
-> ⚠️ As telas existem como protótipos visuais com dados hardcoded, mas sem integração real com a API nenhuma delas pode ser considerada funcional.
 
 ## Sprint 1 Frontend Web (Andressa, Ian, Júlia, Carol)
 
@@ -137,6 +105,8 @@ Já estão integrados de forma real:
 - tratamento distinto de `401 Unauthorized` e `403 Forbidden`;
 - normalização da role `ADMINISTRATOR` do backend para `ADMIN` no frontend.
 
+> ⚠️ **Ressalva sobre renovação automática (PBI-010 no cliente web):** o backend está completo (endpoint de refresh + entidade + migration). No frontend existe um interceptor de refresh single-flight já implementado e testado (`src/services/api/httpClient.ts` + `src/services/auth/tokenStorage.ts`), **porém ele ainda não está plugado na aplicação** — a via de sessão ativa (`src/auth/session.ts` + `src/api/client.ts`) guarda apenas o `accessToken` e, ao receber 401, faz logout em vez de renovar. Ou seja, a renovação transparente está codificada mas ainda precisa ser conectada ao app.
+
 Os demais módulos continuam utilizando dados mockados/stores locais enquanto seus respectivos endpoints backend não estão disponíveis.
 
 ### Estrutura Web atual
@@ -194,16 +164,18 @@ O frontend possui atualmente:
 - GitHub Actions;
 - documentação de branches, commits e fluxo de PR.
 
-Última validação executada:
+Última validação executada (após merge da `develop` na branch `feat/refresh-token-session-renewal`):
 
 ```text
 Frontend
 npm run lint   → PASSOU
-npm.cmd test   → 13 testes passando
-npm run build  → PASSOU
+npm test       → 22 testes passando (6 arquivos)
+npm run build  → PASSOU (tsc -b + vite build)
 
 Backend
-.\mvnw.cmd test
-→ 16 testes executados
-→ 16 testes passando
+./mvnw.cmd test
+→ MobileInspectionControllerTest: 2 testes passando
 → BUILD SUCCESS
+```
+
+> Nota sobre a stack de testes: havia dois configs de Vitest conflitantes (um em `node`, outro em `jsdom`) trazidos pelo merge. Foram unificados em `jsdom` (`vite.config.ts`), removendo o `vitest.config.ts` duplicado, para que tanto os testes de componente quanto os de serviço rodem no mesmo ambiente.
