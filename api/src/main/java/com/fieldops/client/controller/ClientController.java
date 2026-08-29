@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,6 +27,7 @@ import java.util.List;
 @RequestMapping("/api/v1/clients")
 @Tag(name = "Clients")
 @SecurityRequirement(name = "bearer-jwt")
+@PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')")
 public class ClientController {
 
     private static final String EXAMPLE = """
@@ -45,7 +47,9 @@ public class ClientController {
     @Operation(summary = "List clients (paginated)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paginated list of clients",
-                    content = @Content(examples = @ExampleObject(value = EXAMPLE)))
+                    content = @Content(examples = @ExampleObject(value = EXAMPLE))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden — TECHNICIAN profile")
     })
     @GetMapping
     public ResponseEntity<Page<ClientResponse>> list(Pageable pageable) {
