@@ -1,10 +1,10 @@
-package com.fieldops.client.controller;
+package com.fieldops.site.controller;
 
-import com.fieldops.client.dto.ClientResponse;
-import com.fieldops.client.dto.CreateClientRequest;
-import com.fieldops.client.dto.UpdateClientRequest;
-import com.fieldops.client.model.ClientStatus;
-import com.fieldops.client.service.ClientService;
+import com.fieldops.site.dto.CreateSiteRequest;
+import com.fieldops.site.dto.SiteResponse;
+import com.fieldops.site.dto.UpdateSiteRequest;
+import com.fieldops.site.model.SiteStatus;
+import com.fieldops.site.service.InspectionSiteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,62 +27,63 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * CRUD endpoints for Client management.
+ * CRUD endpoints for Inspection Site management.
  * Access: ADMINISTRATOR and SUPERVISOR roles.
  */
 @RestController
-@RequestMapping("/api/v1/clients")
-@Tag(name = "Clients")
+@RequestMapping("/api/v1/sites")
+@Tag(name = "Inspection Sites")
 @SecurityRequirement(name = "bearer-jwt")
 @PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')")
-public class ClientController {
+public class InspectionSiteController {
 
-    private final ClientService clientService;
+    private final InspectionSiteService siteService;
 
-    public ClientController(ClientService clientService) {
-        this.clientService = clientService;
+    public InspectionSiteController(InspectionSiteService siteService) {
+        this.siteService = siteService;
     }
 
-    @Operation(summary = "List clients (paginated, filterable)")
+    @Operation(summary = "List sites by client (paginated, filterable)")
     @GetMapping
-    public ResponseEntity<Page<ClientResponse>> list(
-            @RequestParam(required = false) ClientStatus status,
+    public ResponseEntity<Page<SiteResponse>> listByClient(
+            @RequestParam Long clientId,
+            @RequestParam(required = false) SiteStatus status,
             @RequestParam(required = false) String search,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(clientService.list(status, search, pageable));
+        return ResponseEntity.ok(siteService.listByClient(clientId, status, search, pageable));
     }
 
-    @Operation(summary = "Get client by ID")
+    @Operation(summary = "Get site by ID")
     @GetMapping("/{id}")
-    public ResponseEntity<ClientResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(clientService.findById(id));
+    public ResponseEntity<SiteResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(siteService.findById(id));
     }
 
-    @Operation(summary = "Create a new client")
+    @Operation(summary = "Create a new inspection site")
     @PostMapping
-    public ResponseEntity<ClientResponse> create(@Valid @RequestBody CreateClientRequest request) {
-        ClientResponse created = clientService.create(request);
+    public ResponseEntity<SiteResponse> create(@Valid @RequestBody CreateSiteRequest request) {
+        SiteResponse created = siteService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @Operation(summary = "Update an existing client")
+    @Operation(summary = "Update an existing inspection site")
     @PutMapping("/{id}")
-    public ResponseEntity<ClientResponse> update(@PathVariable Long id,
-                                                  @Valid @RequestBody UpdateClientRequest request) {
-        return ResponseEntity.ok(clientService.update(id, request));
+    public ResponseEntity<SiteResponse> update(@PathVariable Long id,
+                                                @Valid @RequestBody UpdateSiteRequest request) {
+        return ResponseEntity.ok(siteService.update(id, request));
     }
 
-    @Operation(summary = "Deactivate a client (logical deletion)")
+    @Operation(summary = "Deactivate a site (logical deletion)")
     @PatchMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
-        clientService.deactivate(id);
+        siteService.deactivate(id);
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Reactivate a client")
+    @Operation(summary = "Reactivate a site")
     @PatchMapping("/{id}/activate")
     public ResponseEntity<Void> activate(@PathVariable Long id) {
-        clientService.activate(id);
+        siteService.activate(id);
         return ResponseEntity.noContent().build();
     }
 }

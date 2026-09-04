@@ -1,14 +1,22 @@
 package com.fieldops.client.dto;
 
+import com.fieldops.client.model.ClientStatus;
+
+import java.time.Instant;
+
 /**
- * Client representation. Part of the initial contract/stub.
- *
- * @param document CNPJ/CPF
+ * Client representation returned by the API.
  */
 public record ClientResponse(
         Long id,
         String name,
+        String legalName,
         String document,
-        String email
+        String email,
+        String phone,
+        ClientStatus status,
+        Instant createdAt,
+        Instant updatedAt,
+        Integer version
 ) {
 }
