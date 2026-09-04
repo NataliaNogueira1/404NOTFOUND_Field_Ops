@@ -8,6 +8,7 @@ import { Toast } from '@/components/feedback/Toast'
 import { Select } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
+import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -17,12 +18,11 @@ type EditTarget = ManagedUser | 'new' | null
 
 export function UsersPage() {
   const [rows, setRows] = useState<ManagedUser[]>([])
-  const [query, setQuery] = useState('')
-  const [role, setRole] = useState<UserRole | ''>('')
-  const [status, setStatus] = useState<UserStatus | ''>('')
-  const [sort, setSort] = useState('name,asc')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(10)
+  const list = useListQuery()
+  const query = list.value('name')
+  const debouncedQuery = useDebouncedValue(query)
+  const role = list.value('role') as UserRole | ''
+  const status = list.value('status') as UserStatus | ''
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [editing, setEditing] = useState<EditTarget>(null)
@@ -35,7 +35,7 @@ export function UsersPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await usersApi.list({ query, role, status, page, size, sort })
+      const result = await usersApi.list({ name: debouncedQuery, role, status, page: list.page, size: list.size, sort: list.sort })
       setRows(result.content)
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
@@ -44,7 +44,7 @@ export function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, query, role, size, sort, status])
+  }, [debouncedQuery, list.page, list.size, list.sort, role, status])
 
   useEffect(() => {
     const pendingLoad = window.setTimeout(() => void loadUsers(), 0)
@@ -80,16 +80,11 @@ export function UsersPage() {
     window.setTimeout(() => setToast(''), 2200)
   }
 
-  function resetPage(action: () => void) {
-    setPage(0)
-    action()
-  }
-
   const columns: Column<ManagedUser>[] = [
-    { header: 'Nome', cell: user => <span className="font-medium">{user.name}</span> },
-    { header: 'E-mail', cell: user => user.email },
-    { header: 'Perfil', cell: user => <RoleBadge role={user.role} /> },
-    { header: 'Status', cell: user => <UserStatusBadge status={user.status} /> },
+    { header: 'Nome', sortKey: 'name', cell: user => <span className="font-medium">{user.name}</span> },
+    { header: 'E-mail', sortKey: 'email', cell: user => user.email },
+    { header: 'Perfil', sortKey: 'role', cell: user => <RoleBadge role={user.role} /> },
+    { header: 'Status', sortKey: 'status', cell: user => <UserStatusBadge status={user.status} /> },
     { header: 'Acoes', cell: user => <div className="flex gap-2">
       <Button aria-label={`Editar ${user.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(user)}><Pencil size={16} /></Button>
       <Button aria-label={`${user.status === UserStatus.ACTIVE ? 'Inativar' : 'Ativar'} ${user.name}`} variant="ghost" className="h-8 px-2" onClick={() => setChangingStatus(user)}><Power size={16} /></Button>
@@ -98,15 +93,13 @@ export function UsersPage() {
 
   return <div className="space-y-6">
     <PageHeader title="Usuarios" description="Gerencie os usuarios e permissoes da plataforma." action={<Button onClick={() => setEditing('new')}><Plus size={17} />Novo usuario</Button>} />
-    <Card className="grid gap-4 p-4 md:grid-cols-5">
-      <Input label="Buscar" id="user-search" value={query} onChange={event => resetPage(() => setQuery(event.target.value))} placeholder="Nome ou e-mail" />
-      <Select label="Perfil" id="user-role" value={role} onChange={event => resetPage(() => setRole(event.target.value as UserRole | ''))}><option value="">Todos</option>{Object.values(UserRole).map(value => <option key={value}>{value}</option>)}</Select>
-      <Select label="Status" id="user-status" value={status} onChange={event => resetPage(() => setStatus(event.target.value as UserStatus | ''))}><option value="">Todos</option><option value={UserStatus.ACTIVE}>Ativo</option><option value={UserStatus.INACTIVE}>Inativo</option><option value={UserStatus.BLOCKED}>Bloqueado</option></Select>
-      <Select label="Ordenar" id="user-sort" value={sort} onChange={event => resetPage(() => setSort(event.target.value))}><option value="name,asc">Nome (A-Z)</option><option value="name,desc">Nome (Z-A)</option><option value="email,asc">E-mail (A-Z)</option><option value="createdAt,desc">Mais recentes</option></Select>
-      <Select label="Por pagina" id="user-size" value={size} onChange={event => resetPage(() => setSize(Number(event.target.value)))}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></Select>
+    <Card className="grid gap-4 p-4 md:grid-cols-3">
+      <Input label="Buscar" id="user-search" value={query} onChange={event => list.update('name', event.target.value)} placeholder="Nome ou e-mail" />
+      <Select label="Perfil" id="user-role" value={role} onChange={event => list.update('role', event.target.value)}><option value="">Todos</option>{Object.values(UserRole).map(value => <option key={value}>{value}</option>)}</Select>
+      <Select label="Status" id="user-status" value={status} onChange={event => list.update('status', event.target.value)}><option value="">Todos</option><option value={UserStatus.ACTIVE}>Ativo</option><option value={UserStatus.INACTIVE}>Inativo</option><option value={UserStatus.BLOCKED}>Bloqueado</option></Select>
     </Card>
     {error && <div role="alert" className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark">{error}</div>}
-    {loading ? <Card className="p-8 text-center text-sm text-muted">Carregando usuarios...</Card> : <DataTable columns={columns} rows={rows} page={page + 1} pageSize={size} totalRows={totalElements} totalPages={totalPages} onPageChange={next => setPage(next - 1)} />}
+    <DataTable columns={columns} rows={rows} loading={loading} loadingLabel="Carregando usuarios..." page={list.page + 1} pageSize={list.size} totalRows={totalElements} totalPages={totalPages} sort={list.sort} onSortChange={list.toggleSort} onPageChange={next => list.setPage(next - 1)} onPageSizeChange={list.setSize} />
     <UserModal key={editing === 'new' ? 'new' : editing?.id ?? 'closed'} target={editing} onClose={() => setEditing(null)} onSave={save} />
     <ConfirmDialog open={Boolean(changingStatus)} title={changingStatus?.status === UserStatus.ACTIVE ? 'Inativar usuario' : 'Ativar usuario'} description={changingStatus?.status === UserStatus.ACTIVE ? `O usuario ${changingStatus?.name} perdera o acesso ao sistema.` : `O usuario ${changingStatus?.name} voltara a ter acesso ao sistema.`} confirmLabel={changingStatus?.status === UserStatus.ACTIVE ? 'Inativar' : 'Ativar'} variant={changingStatus?.status === UserStatus.ACTIVE ? 'danger' : 'primary'} onCancel={() => setChangingStatus(null)} onConfirm={() => void confirmStatusChange()} />
     <Toast show={Boolean(toast)} message={toast} />

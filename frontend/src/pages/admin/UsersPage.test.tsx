@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersPage } from '@/pages/admin/UsersPage'
 
@@ -35,16 +35,34 @@ describe('UsersPage', () => {
     const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
       .mockImplementation(() => json(page()))
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    render(<MemoryRouter><UsersPage /><LocationProbe /></MemoryRouter>)
 
     expect(await screen.findByText('Ana Costa')).not.toBeNull()
     await userEvent.selectOptions(screen.getByLabelText('Status'), 'BLOCKED')
+
+    expect(screen.getByTestId('location')).toHaveTextContent('status=BLOCKED')
 
     await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining('status=BLOCKED'), expect.anything()))
     expect(String(fetchMock.mock.calls[0][0])).toContain('page=0')
     expect(String(fetchMock.mock.calls[0][0])).toContain('size=10')
     expect(String(fetchMock.mock.calls[0][0])).toContain('sort=name%2Casc')
+  })
+
+  it('reflects debounced search and column sorting in the URL', async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockImplementation(() => json(page()))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<MemoryRouter initialEntries={['/app/users?size=25']}><UsersPage /><LocationProbe /></MemoryRouter>)
+    await screen.findByText('Ana Costa')
+
+    await userEvent.type(screen.getByLabelText('Buscar'), 'Ana')
+    expect(screen.getByTestId('location')).toHaveTextContent('name=Ana')
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('name=Ana'), expect.anything()))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nome' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('sort=name%2Cdesc')
   })
 
   it('validates email on blur and creates a user through the API', async () => {
@@ -99,3 +117,7 @@ describe('UsersPage', () => {
     await waitFor(() => expect(statusBody).toEqual({ status: 'INACTIVE' }))
   })
 })
+
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().search}</span>
+}

@@ -55,11 +55,11 @@ public class UserController {
     })
     @GetMapping
     public ResponseEntity<Page<UserResponse>> list(
-            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String name,
             @RequestParam(required = false) Role role,
             @RequestParam(required = false) UserStatus status,
             Pageable pageable) {
-        return ResponseEntity.ok(userService.list(query, role, status, pageable));
+        return ResponseEntity.ok(userService.list(name, role, status, pageable));
     }
 
     @Operation(summary = "Check whether an email can be assigned to a user")

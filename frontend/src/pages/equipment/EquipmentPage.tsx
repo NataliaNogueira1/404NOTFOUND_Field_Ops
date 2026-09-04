@@ -10,6 +10,7 @@ import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
+import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -18,10 +19,11 @@ export function EquipmentPage() {
   const { siteId: contextualSiteId = '' } = useParams()
   const [rows, setRows] = useState<ManagedEquipment[]>([])
   const [sites, setSites] = useState<ManagedInspectionSite[]>([])
-  const [siteId, setSiteId] = useState(contextualSiteId)
-  const [status, setStatus] = useState<EquipmentStatus | ''>('')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(10)
+  const list = useListQuery()
+  const query = list.value('name')
+  const debouncedQuery = useDebouncedValue(query)
+  const siteId = contextualSiteId || list.value('siteId')
+  const status = list.value('status') as EquipmentStatus | ''
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [editing, setEditing] = useState<ManagedEquipment | 'new' | null>(null)
@@ -35,7 +37,7 @@ export function EquipmentPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await equipmentApi.list({ siteId, status, page, size })
+      const result = await equipmentApi.list({ name: debouncedQuery, siteId, status, page: list.page, size: list.size, sort: list.sort })
       setRows(result.content)
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
@@ -44,7 +46,7 @@ export function EquipmentPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, siteId, size, status])
+  }, [debouncedQuery, list.page, list.size, list.sort, siteId, status])
 
   useEffect(() => {
     void sitesApi.list({ name: '', clientId: '', status: InspectionSiteStatus.ACTIVE, page: 0, size: 100 })
@@ -88,11 +90,11 @@ export function EquipmentPage() {
   }
 
   const columns: Column<ManagedEquipment>[] = [
-    { header: 'Nome', cell: item => <span className="font-medium">{item.name}</span> },
-    { header: 'Patrimonio', cell: item => item.assetNumber || '-' },
-    { header: 'Local', cell: item => item.siteName },
-    { header: 'QR Code', cell: item => <button className="inline-flex items-center gap-1 font-mono text-xs text-primary" onClick={() => setQr(item)}><QrCode size={15} />{item.qrCode}</button> },
-    { header: 'Status', cell: item => <EquipmentStatusBadge status={item.status} /> },
+    { header: 'Nome', sortKey: 'name', cell: item => <span className="font-medium">{item.name}</span> },
+    { header: 'Patrimonio', sortKey: 'assetNumber', cell: item => item.assetNumber || '-' },
+    { header: 'Local', sortKey: 'site.name', cell: item => item.siteName },
+    { header: 'QR Code', sortKey: 'qrCode', cell: item => <button className="inline-flex items-center gap-1 font-mono text-xs text-primary" onClick={() => setQr(item)}><QrCode size={15} />{item.qrCode}</button> },
+    { header: 'Status', sortKey: 'status', cell: item => <EquipmentStatusBadge status={item.status} /> },
     { header: 'Acoes', cell: item => <div className="flex flex-wrap gap-2">
       <Button aria-label={`Editar ${item.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(item)}><Pencil size={16} /></Button>
       <Button aria-label={`Ver QR Code de ${item.name}`} variant="ghost" className="h-8 px-2" onClick={() => setQr(item)}><Eye size={16} /></Button>
@@ -103,12 +105,12 @@ export function EquipmentPage() {
   return <div className="space-y-6">
     <PageHeader title="Equipamentos" description={contextualSiteId ? 'Equipamentos vinculados ao local selecionado.' : 'Gerencie ativos, vinculos com locais e QR Codes unicos.'} action={<Button onClick={() => setEditing('new')} disabled={sites.length === 0 && !contextualSiteId}><Plus size={17} />Novo equipamento</Button>} />
     <Card className="grid gap-4 p-4 md:grid-cols-3">
-      <Select label="Local" id="equipment-site" value={siteId} disabled={Boolean(contextualSiteId)} onChange={event => { setPage(0); setSiteId(event.target.value) }}><option value="">Todos</option>{sites.map(site => <option key={site.id} value={site.id}>{site.clientName} - {site.name}</option>)}</Select>
-      <Select label="Status" id="equipment-status" value={status} onChange={event => { setPage(0); setStatus(event.target.value as EquipmentStatus | '') }}><option value="">Todos</option><option value={EquipmentStatus.ACTIVE}>Ativo</option><option value={EquipmentStatus.INACTIVE}>Inativo</option><option value={EquipmentStatus.DECOMMISSIONED}>Descomissionado</option></Select>
-      <Select label="Por pagina" id="equipment-size" value={size} onChange={event => { setPage(0); setSize(Number(event.target.value)) }}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></Select>
+      <Input label="Buscar" id="equipment-search" value={query} onChange={event => list.update('name', event.target.value)} placeholder="Nome do equipamento" />
+      <Select label="Local" id="equipment-site" value={siteId} disabled={Boolean(contextualSiteId)} onChange={event => list.update('siteId', event.target.value)}><option value="">Todos</option>{sites.map(site => <option key={site.id} value={site.id}>{site.clientName} - {site.name}</option>)}</Select>
+      <Select label="Status" id="equipment-status" value={status} onChange={event => list.update('status', event.target.value)}><option value="">Todos</option><option value={EquipmentStatus.ACTIVE}>Ativo</option><option value={EquipmentStatus.INACTIVE}>Inativo</option><option value={EquipmentStatus.DECOMMISSIONED}>Descomissionado</option></Select>
     </Card>
     {error && <div role="alert" className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark">{error}</div>}
-    {loading ? <Card className="p-8 text-center text-sm text-muted">Carregando equipamentos...</Card> : <DataTable columns={columns} rows={rows} page={page + 1} pageSize={size} totalRows={totalElements} totalPages={totalPages} onPageChange={next => setPage(next - 1)} empty="Nenhum equipamento encontrado." />}
+    <DataTable columns={columns} rows={rows} loading={loading} loadingLabel="Carregando equipamentos..." page={list.page + 1} pageSize={list.size} totalRows={totalElements} totalPages={totalPages} sort={list.sort} onSortChange={list.toggleSort} onPageChange={next => list.setPage(next - 1)} onPageSizeChange={list.setSize} />
     <EquipmentModal key={editing === 'new' ? 'new' : editing?.id ?? 'closed'} target={editing} sites={sites} initialSiteId={contextualSiteId || siteId} lockSite={Boolean(contextualSiteId)} onClose={() => setEditing(null)} onSave={save} />
     <ConfirmDialog open={Boolean(changingStatus)} title={changingStatus?.status === EquipmentStatus.ACTIVE ? 'Inativar equipamento' : 'Ativar equipamento'} description={changingStatus?.status === EquipmentStatus.ACTIVE ? `O equipamento ${changingStatus?.name} deixara de aparecer em novas inspecoes.` : `O equipamento ${changingStatus?.name} voltara a aparecer em novas inspecoes.`} confirmLabel={changingStatus?.status === EquipmentStatus.ACTIVE ? 'Inativar' : 'Ativar'} variant={changingStatus?.status === EquipmentStatus.ACTIVE ? 'danger' : 'primary'} onCancel={() => setChangingStatus(null)} onConfirm={() => void changeStatus()} />
     <QrModal item={qr} onClose={() => setQr(null)} />

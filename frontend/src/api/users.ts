@@ -71,9 +71,9 @@ function payload(input: UserInput) {
 }
 
 export const usersApi = {
-  async list(filters: { query: string; role: UserRole | ''; status: UserStatus | ''; page: number; size: number; sort: string }) {
+  async list(filters: { name: string; role: UserRole | ''; status: UserStatus | ''; page: number; size: number; sort: string }) {
     const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: filters.sort })
-    if (filters.query.trim()) params.set('query', filters.query.trim())
+    if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.role) params.set('role', backendRole(filters.role))
     if (filters.status) params.set('status', filters.status)
     const result = await apiRequest<BackendPage<BackendUser>>(`/api/v1/users?${params}`)

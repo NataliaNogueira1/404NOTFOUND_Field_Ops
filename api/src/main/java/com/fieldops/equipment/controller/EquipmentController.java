@@ -44,9 +44,10 @@ public class EquipmentController {
     @ApiResponse(responseCode = "200", description = "Paginated equipment list")
     @PreAuthorize(MANAGE_EQUIPMENT)
     @GetMapping
-    public ResponseEntity<Page<EquipmentResponse>> list(@RequestParam(required = false) Long siteId,
+    public ResponseEntity<Page<EquipmentResponse>> list(@RequestParam(required = false) String name,
+            @RequestParam(required = false) Long siteId,
             @RequestParam(required = false) EquipmentStatus status, Pageable pageable) {
-        return ResponseEntity.ok(equipmentService.list(siteId, status, pageable));
+        return ResponseEntity.ok(equipmentService.list(name, siteId, status, pageable));
     }
 
     @Operation(summary = "Get equipment by identifier")

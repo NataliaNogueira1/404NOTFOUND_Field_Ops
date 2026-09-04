@@ -68,7 +68,7 @@ class UserControllerTest {
         persist("Bruno Supervisor", "bruno.sup@example.com", Role.SUPERVISOR, UserStatus.INACTIVE);
 
         mockMvc.perform(get("/api/v1/users")
-                        .param("query", "ana.tech")
+                        .param("name", "ana.tech")
                         .param("role", "TECHNICIAN")
                         .param("status", "ACTIVE")
                         .param("page", "0")

@@ -63,9 +63,9 @@ function payload(input: ClientInput) {
 }
 
 export const clientsApi = {
-  async list(filters: { name: string; status: ClientStatus | ''; page: number; size: number }) {
+  async list(filters: { name: string; status: ClientStatus | ''; page: number; size: number; sort?: string }) {
     const params = new URLSearchParams({
-      page: String(filters.page), size: String(filters.size), sort: 'name,asc',
+      page: String(filters.page), size: String(filters.size), sort: filters.sort ?? 'name,asc',
     })
     if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.status) params.set('status', filters.status)

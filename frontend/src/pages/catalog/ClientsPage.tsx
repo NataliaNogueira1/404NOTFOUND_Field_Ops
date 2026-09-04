@@ -10,6 +10,7 @@ import { Toast } from '@/components/feedback/Toast'
 import { Select } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
+import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -19,10 +20,10 @@ import type { Client, Equipment, Site } from '@/types/domain'
 export function ClientsPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<ManagedClient[]>([])
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<ClientStatus | ''>('')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(10)
+  const list = useListQuery()
+  const query = list.value('name')
+  const debouncedQuery = useDebouncedValue(query)
+  const status = list.value('status') as ClientStatus | ''
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [editing, setEditing] = useState<ManagedClient | 'new' | null>(null)
@@ -35,7 +36,7 @@ export function ClientsPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await clientsApi.list({ name: query, status, page, size })
+      const result = await clientsApi.list({ name: debouncedQuery, status, page: list.page, size: list.size, sort: list.sort })
       setRows(result.content)
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
@@ -44,7 +45,7 @@ export function ClientsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, query, size, status])
+  }, [debouncedQuery, list.page, list.size, list.sort, status])
 
   useEffect(() => {
     const pendingLoad = window.setTimeout(() => void loadClients(), 0)
@@ -81,11 +82,11 @@ export function ClientsPage() {
   }
 
   const columns: Column<ManagedClient>[] = [
-    { header: 'Nome', cell: client => <button className="text-left font-medium text-primary" onClick={() => navigate(`/app/clients/${client.id}`)}>{client.name}</button> },
-    { header: 'Documento', cell: client => client.document || '-' },
-    { header: 'E-mail', cell: client => client.email || '-' },
+    { header: 'Nome', sortKey: 'name', cell: client => <button className="text-left font-medium text-primary" onClick={() => navigate(`/app/clients/${client.id}`)}>{client.name}</button> },
+    { header: 'Documento', sortKey: 'document', cell: client => client.document || '-' },
+    { header: 'E-mail', sortKey: 'email', cell: client => client.email || '-' },
     { header: 'Locais', cell: client => client.activeSitesCount },
-    { header: 'Status', cell: client => <ActiveBadge active={client.status === ClientStatus.ACTIVE} /> },
+    { header: 'Status', sortKey: 'status', cell: client => <ActiveBadge active={client.status === ClientStatus.ACTIVE} /> },
     { header: 'Acoes', cell: client => <div className="flex flex-wrap gap-2">
       <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}/sites`)}><Eye size={16} />Ver locais</Button>
       <Button aria-label={`Editar ${client.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(client)}><Pencil size={16} /></Button>
@@ -95,13 +96,12 @@ export function ClientsPage() {
 
   return <div className="space-y-6">
     <PageHeader title="Clientes" description="Ponto de entrada para dados gerais, locais e equipamentos do cliente." action={<Button onClick={() => setEditing('new')}><Plus size={17} />Novo cliente</Button>} />
-    <Card className="grid gap-4 p-4 md:grid-cols-3">
-      <Input label="Buscar" id="client-search" value={query} onChange={event => { setPage(0); setQuery(event.target.value) }} placeholder="Nome do cliente" />
-      <Select label="Status" id="client-status" value={status} onChange={event => { setPage(0); setStatus(event.target.value as ClientStatus | '') }}><option value="">Todos</option><option value={ClientStatus.ACTIVE}>Ativo</option><option value={ClientStatus.INACTIVE}>Inativo</option></Select>
-      <Select label="Por pagina" id="client-size" value={size} onChange={event => { setPage(0); setSize(Number(event.target.value)) }}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></Select>
+    <Card className="grid gap-4 p-4 md:grid-cols-2">
+      <Input label="Buscar" id="client-search" value={query} onChange={event => list.update('name', event.target.value)} placeholder="Nome do cliente" />
+      <Select label="Status" id="client-status" value={status} onChange={event => list.update('status', event.target.value)}><option value="">Todos</option><option value={ClientStatus.ACTIVE}>Ativo</option><option value={ClientStatus.INACTIVE}>Inativo</option></Select>
     </Card>
     {error && <div role="alert" className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark">{error}</div>}
-    {loading ? <Card className="p-8 text-center text-sm text-muted">Carregando clientes...</Card> : <DataTable columns={columns} rows={rows} page={page + 1} pageSize={size} totalRows={totalElements} totalPages={totalPages} onPageChange={next => setPage(next - 1)} />}
+    <DataTable columns={columns} rows={rows} loading={loading} loadingLabel="Carregando clientes..." page={list.page + 1} pageSize={list.size} totalRows={totalElements} totalPages={totalPages} sort={list.sort} onSortChange={list.toggleSort} onPageChange={next => list.setPage(next - 1)} onPageSizeChange={list.setSize} />
     <ManagedClientModal key={editing === 'new' ? 'new' : editing?.id ?? 'closed'} target={editing} onClose={() => setEditing(null)} onSave={save} />
     <ConfirmDialog open={Boolean(changingStatus)} title={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar cliente' : 'Ativar cliente'} description={changingStatus?.status === ClientStatus.ACTIVE ? `O cliente ${changingStatus?.name} deixara de aparecer em novos agendamentos.` : `O cliente ${changingStatus?.name} voltara a aparecer em novos agendamentos.`} confirmLabel={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar' : 'Ativar'} variant={changingStatus?.status === ClientStatus.ACTIVE ? 'danger' : 'primary'} onCancel={() => setChangingStatus(null)} onConfirm={() => void changeStatus()} />
     <Toast show={Boolean(toast)} message={toast} />

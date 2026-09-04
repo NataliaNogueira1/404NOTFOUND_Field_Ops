@@ -77,8 +77,9 @@ function payload(input: EquipmentInput) {
 }
 
 export const equipmentApi = {
-  async list(filters: { siteId: string; status: EquipmentStatus | ''; page: number; size: number }) {
-    const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: 'name,asc' })
+  async list(filters: { name?: string; siteId: string; status: EquipmentStatus | ''; page: number; size: number; sort?: string }) {
+    const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: filters.sort ?? 'name,asc' })
+    if (filters.name?.trim()) params.set('name', filters.name.trim())
     if (filters.siteId) params.set('siteId', filters.siteId)
     if (filters.status) params.set('status', filters.status)
     const result = await apiRequest<BackendPage<BackendEquipment>>(`/api/v1/equipment?${params}`)

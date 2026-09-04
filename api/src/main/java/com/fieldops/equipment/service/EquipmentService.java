@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class EquipmentService {
@@ -36,15 +37,15 @@ public class EquipmentService {
 
     /** Finds equipment using site and lifecycle filters with server-side pagination. */
     @Transactional(readOnly = true)
-    public Page<EquipmentResponse> list(Long siteId, EquipmentStatus status, Pageable pageable) {
-        return equipmentRepository.findAll(buildFilters(siteId, status), pageable).map(this::toResponse);
+    public Page<EquipmentResponse> list(String name, Long siteId, EquipmentStatus status, Pageable pageable) {
+        return equipmentRepository.findAll(buildFilters(name, siteId, status), pageable).map(this::toResponse);
     }
 
     /** Lists every equipment record attached to one inspection site. */
     @Transactional(readOnly = true)
     public List<EquipmentResponse> listBySite(Long siteId) {
         requireSite(siteId);
-        return equipmentRepository.findAll(buildFilters(siteId, null), Sort.by("name"))
+        return equipmentRepository.findAll(buildFilters(null, siteId, null), Sort.by("name"))
                 .stream().map(this::toResponse).toList();
     }
 
@@ -90,9 +91,13 @@ public class EquipmentService {
         return toResponse(equipmentRepository.saveAndFlush(equipment));
     }
 
-    private Specification<Equipment> buildFilters(Long siteId, EquipmentStatus status) {
+    private Specification<Equipment> buildFilters(String name, Long siteId, EquipmentStatus status) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
+            if (name != null && !name.isBlank()) {
+                String pattern = "%" + name.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(builder.like(builder.lower(root.get("name")), pattern));
+            }
             if (siteId != null) predicates.add(builder.equal(root.get("site").get("id"), siteId));
             if (status != null) predicates.add(builder.equal(root.get("status"), status));
             return builder.and(predicates.toArray(Predicate[]::new));

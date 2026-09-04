@@ -80,7 +80,8 @@ class EquipmentControllerTest {
         persistEquipment(other, "Outro", "FO-OTHER", EquipmentStatus.ACTIVE);
 
         mockMvc.perform(get("/api/v1/equipment")
-                        .param("siteId", target.getId().toString()).param("status", "ACTIVE")
+                        .param("name", "ativo").param("siteId", target.getId().toString())
+                        .param("status", "ACTIVE")
                         .param("page", "0").param("size", "1").param("sort", "name,asc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))

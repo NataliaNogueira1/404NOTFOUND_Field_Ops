@@ -79,8 +79,8 @@ function payload(input: InspectionSiteInput) {
 }
 
 export const sitesApi = {
-  async list(filters: { name: string; clientId: string; status: InspectionSiteStatus | ''; page: number; size: number }) {
-    const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: 'name,asc' })
+  async list(filters: { name: string; clientId: string; status: InspectionSiteStatus | ''; page: number; size: number; sort?: string }) {
+    const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: filters.sort ?? 'name,asc' })
     if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.clientId) params.set('clientId', filters.clientId)
     if (filters.status) params.set('status', filters.status)

@@ -10,6 +10,7 @@ import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
+import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -22,11 +23,11 @@ export function SitesPage() {
   const { clientId: routeClientId = '' } = useParams()
   const [rows, setRows] = useState<ManagedInspectionSite[]>([])
   const [clients, setClients] = useState<ManagedClient[]>([])
-  const [query, setQuery] = useState('')
-  const [clientId, setClientId] = useState(routeClientId)
-  const [status, setStatus] = useState<InspectionSiteStatus | ''>('')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState(10)
+  const list = useListQuery()
+  const query = list.value('name')
+  const debouncedQuery = useDebouncedValue(query)
+  const clientId = routeClientId || list.value('clientId')
+  const status = list.value('status') as InspectionSiteStatus | ''
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [editing, setEditing] = useState<ManagedInspectionSite | 'new' | null>(null)
@@ -39,7 +40,7 @@ export function SitesPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await sitesApi.list({ name: query, clientId, status, page, size })
+      const result = await sitesApi.list({ name: debouncedQuery, clientId, status, page: list.page, size: list.size, sort: list.sort })
       setRows(result.content)
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
@@ -48,7 +49,7 @@ export function SitesPage() {
     } finally {
       setLoading(false)
     }
-  }, [clientId, page, query, size, status])
+  }, [clientId, debouncedQuery, list.page, list.size, list.sort, status])
 
   useEffect(() => {
     void clientsApi.list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 100 })
@@ -92,11 +93,11 @@ export function SitesPage() {
   }
 
   const columns: Column<ManagedInspectionSite>[] = [
-    { header: 'Nome', cell: site => <span className="font-medium">{site.name}</span> },
-    { header: 'Cliente', cell: site => site.clientName },
-    { header: 'Cidade / UF', cell: site => [site.city, site.state].filter(Boolean).join(' / ') || '-' },
+    { header: 'Nome', sortKey: 'name', cell: site => <span className="font-medium">{site.name}</span> },
+    { header: 'Cliente', sortKey: 'client.name', cell: site => site.clientName },
+    { header: 'Cidade / UF', sortKey: 'city', cell: site => [site.city, site.state].filter(Boolean).join(' / ') || '-' },
     { header: 'Equipamentos', cell: site => site.equipmentCount },
-    { header: 'Status', cell: site => <ActiveBadge active={site.status === InspectionSiteStatus.ACTIVE} /> },
+    { header: 'Status', sortKey: 'status', cell: site => <ActiveBadge active={site.status === InspectionSiteStatus.ACTIVE} /> },
     { header: 'Acoes', cell: site => <div className="flex flex-wrap gap-2">
       <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/sites/${site.id}/equipment`)}><Eye size={16} />Equipamentos</Button>
       <Button aria-label={`Editar ${site.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(site)}><Pencil size={16} /></Button>
@@ -106,14 +107,13 @@ export function SitesPage() {
 
   return <div className="space-y-6">
     <PageHeader title="Locais" description={routeClientId ? 'Locais vinculados ao cliente selecionado.' : 'Gerencie unidades, CDs e pontos de atendimento.'} action={<Button onClick={() => setEditing('new')} disabled={clients.length === 0 || Boolean(routeClientId && !clients.some(client => client.id === routeClientId))}><Plus size={17} />Novo local</Button>} />
-    <Card className="grid gap-4 p-4 md:grid-cols-4">
-      <Input label="Buscar" id="site-search" value={query} onChange={event => { setPage(0); setQuery(event.target.value) }} placeholder="Nome do local" />
-      <Select label="Cliente" id="site-client" value={clientId} disabled={Boolean(routeClientId)} onChange={event => { setPage(0); setClientId(event.target.value) }}><option value="">Todos</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</Select>
-      <Select label="Status" id="site-status" value={status} onChange={event => { setPage(0); setStatus(event.target.value as InspectionSiteStatus | '') }}><option value="">Todos</option><option value={InspectionSiteStatus.ACTIVE}>Ativo</option><option value={InspectionSiteStatus.INACTIVE}>Inativo</option></Select>
-      <Select label="Por pagina" id="site-size" value={size} onChange={event => { setPage(0); setSize(Number(event.target.value)) }}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></Select>
+    <Card className="grid gap-4 p-4 md:grid-cols-3">
+      <Input label="Buscar" id="site-search" value={query} onChange={event => list.update('name', event.target.value)} placeholder="Nome do local" />
+      <Select label="Cliente" id="site-client" value={clientId} disabled={Boolean(routeClientId)} onChange={event => list.update('clientId', event.target.value)}><option value="">Todos</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</Select>
+      <Select label="Status" id="site-status" value={status} onChange={event => list.update('status', event.target.value)}><option value="">Todos</option><option value={InspectionSiteStatus.ACTIVE}>Ativo</option><option value={InspectionSiteStatus.INACTIVE}>Inativo</option></Select>
     </Card>
     {error && <div role="alert" className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark">{error}</div>}
-    {loading ? <Card className="p-8 text-center text-sm text-muted">Carregando locais...</Card> : <DataTable columns={columns} rows={rows} page={page + 1} pageSize={size} totalRows={totalElements} totalPages={totalPages} onPageChange={next => setPage(next - 1)} empty="Nenhum local encontrado." />}
+    <DataTable columns={columns} rows={rows} loading={loading} loadingLabel="Carregando locais..." page={list.page + 1} pageSize={list.size} totalRows={totalElements} totalPages={totalPages} sort={list.sort} onSortChange={list.toggleSort} onPageChange={next => list.setPage(next - 1)} onPageSizeChange={list.setSize} />
     <InspectionSiteModal key={editing === 'new' ? 'new' : editing?.id ?? 'closed'} target={editing} clients={clients} initialClientId={routeClientId || clientId} lockClient={Boolean(routeClientId)} onClose={() => setEditing(null)} onSave={save} />
     <ConfirmDialog open={Boolean(changingStatus)} title={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar local' : 'Ativar local'} description={changingStatus?.status === InspectionSiteStatus.ACTIVE ? `O local ${changingStatus?.name} deixara de aparecer em novas inspecoes.` : `O local ${changingStatus?.name} voltara a aparecer em novas inspecoes.`} confirmLabel={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar' : 'Ativar'} variant={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'danger' : 'primary'} onCancel={() => setChangingStatus(null)} onConfirm={() => void changeStatus()} />
     <Toast show={Boolean(toast)} message={toast} />
