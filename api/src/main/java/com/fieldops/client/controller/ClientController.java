@@ -1,8 +1,8 @@
 package com.fieldops.client.controller;
 
+import com.fieldops.client.dto.ClientRequest;
 import com.fieldops.client.dto.ClientResponse;
-import com.fieldops.client.dto.CreateClientRequest;
-import com.fieldops.client.dto.UpdateClientRequest;
+import com.fieldops.client.dto.ClientStatusRequest;
 import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.service.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,7 +13,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 /**
  * CRUD endpoints for Client management.
@@ -46,30 +47,38 @@ public class ClientController {
     @Operation(summary = "List clients (paginated, filterable)")
     @GetMapping
     public ResponseEntity<Page<ClientResponse>> list(
+            @RequestParam(required = false) String name,
             @RequestParam(required = false) ClientStatus status,
             @RequestParam(required = false) String search,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(clientService.list(status, search, pageable));
+        return ResponseEntity.ok(clientService.list(name != null ? name : search, status, pageable));
     }
 
     @Operation(summary = "Get client by ID")
     @GetMapping("/{id}")
-    public ResponseEntity<ClientResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(clientService.findById(id));
+    public ResponseEntity<ClientResponse> get(@PathVariable Long id) {
+        return ResponseEntity.ok(clientService.get(id));
     }
 
     @Operation(summary = "Create a new client")
     @PostMapping
-    public ResponseEntity<ClientResponse> create(@Valid @RequestBody CreateClientRequest request) {
+    public ResponseEntity<ClientResponse> create(@Valid @RequestBody ClientRequest request) {
         ClientResponse created = clientService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.created(URI.create("/api/v1/clients/" + created.id())).body(created);
     }
 
     @Operation(summary = "Update an existing client")
     @PutMapping("/{id}")
     public ResponseEntity<ClientResponse> update(@PathVariable Long id,
-                                                  @Valid @RequestBody UpdateClientRequest request) {
+            @Valid @RequestBody ClientRequest request) {
         return ResponseEntity.ok(clientService.update(id, request));
+    }
+
+    @Operation(summary = "Activate or deactivate a client")
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ClientResponse> updateStatus(@PathVariable Long id,
+            @Valid @RequestBody ClientStatusRequest request) {
+        return ResponseEntity.ok(clientService.updateStatus(id, request.status()));
     }
 
     @Operation(summary = "Deactivate a client (logical deletion)")

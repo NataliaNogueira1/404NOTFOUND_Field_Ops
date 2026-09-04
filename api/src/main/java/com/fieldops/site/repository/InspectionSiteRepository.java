@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface InspectionSiteRepository extends JpaRepository<InspectionSite, Long> {
 
+    long countByClientIdAndStatus(Long clientId, SiteStatus status);
+
     Page<InspectionSite> findByClientIdAndStatus(Long clientId, SiteStatus status, Pageable pageable);
 
     @Query("SELECT s FROM InspectionSite s WHERE s.client.id = :clientId AND s.status = :status " +
