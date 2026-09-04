@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientStatus, clientsApi } from '@/api/clients'
+import { EquipmentStatus, equipmentApi } from '@/api/equipment'
 import { InspectionSiteStatus, sitesApi } from '@/api/sites'
 import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
@@ -28,7 +29,7 @@ export function NewInspectionPage() {
     clients.filter(client => client.active).map(client => ({ id: client.id, name: client.name })),
   )
   const [availableSites, setAvailableSites] = useState<{ id: string; clientId: string; name: string }[]>([])
-  const availableEquipment = useMemo(() => equipment.filter(item => item.siteId === siteId), [siteId])
+  const [availableEquipment, setAvailableEquipment] = useState<{ id: string; siteId: string; name: string }[]>([])
   const technicians = users.filter(user => user.role === UserRole.TECHNICIAN && user.active)
 
   useEffect(() => {
@@ -44,12 +45,20 @@ export function NewInspectionPage() {
       .catch(() => setAvailableSites(sites.filter(site => site.active && site.clientId === clientId)))
   }, [clientId])
 
+  useEffect(() => {
+    if (!siteId) return
+    void equipmentApi.list({ siteId, status: EquipmentStatus.ACTIVE, page: 0, size: 100 })
+      .then(result => setAvailableEquipment(result.content.map(item => ({ id: item.id, siteId: item.siteId, name: item.name }))))
+      .catch(() => setAvailableEquipment(equipment.filter(item => item.active && item.siteId === siteId)
+        .map(item => ({ id: item.id, siteId: item.siteId, name: item.name }))))
+  }, [siteId])
+
   function submit() {
     if (!templateId || !clientId || !siteId || !equipmentId || !technicianId || !dueDate) {
       setError('Preencha modelo, cliente, local, equipamento, tecnico e data prevista.')
       return
     }
-    const selectedEquipment = equipment.find(item => item.id === equipmentId)
+    const selectedEquipment = availableEquipment.find(item => item.id === equipmentId)
     const inspection: Inspection = {
       id: `ins-${Date.now()}`,
       title: `Inspecao - ${selectedEquipment?.name ?? 'Equipamento'}`,

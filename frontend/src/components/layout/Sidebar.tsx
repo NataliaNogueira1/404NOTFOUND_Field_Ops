@@ -1,4 +1,4 @@
-import { ClipboardCheck, ClipboardList, FileSearch, Gauge, Menu, ShieldCheck, TriangleAlert, Users, Warehouse, X } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, FileSearch, Gauge, Menu, ShieldCheck, TriangleAlert, Users, Warehouse, Wrench, X } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { NavLink } from 'react-router-dom'
 import { authSession } from '@/auth/session'
@@ -7,7 +7,7 @@ import { cn } from '@/utils/cn'
 const navigation = [
   { label: 'GERAL', items: [{ label: 'Dashboard', to: '/app/dashboard', icon: Gauge }, { label: 'Inspecoes', to: '/app/inspections', icon: ClipboardCheck }] },
   { label: 'OPERACOES', items: [{ label: 'Modelos de inspecao', to: '/app/inspection-templates', icon: ClipboardList }, { label: 'Nao conformidades', to: '/app/non-conformities', icon: TriangleAlert }] },
-  { label: 'CADASTROS', items: [{ label: 'Clientes', to: '/app/clients', icon: Warehouse }, { label: 'Usuarios', to: '/app/users', icon: Users, adminOnly: true }] },
+  { label: 'CADASTROS', items: [{ label: 'Clientes', to: '/app/clients', icon: Warehouse }, { label: 'Equipamentos', to: '/app/equipment', icon: Wrench }, { label: 'Usuarios', to: '/app/users', icon: Users, adminOnly: true }] },
   { label: 'ADMINISTRACAO', items: [{ label: 'Auditoria', to: '/app/audit', icon: FileSearch }] },
 ]
 

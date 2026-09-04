@@ -4,6 +4,7 @@ import com.fieldops.client.model.Client;
 import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.repository.EquipmentRepository;
+import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.site.dto.InspectionSiteRequest;
@@ -136,7 +137,7 @@ public class InspectionSiteService {
         return new InspectionSiteResponse(site.getId(), client.getId(), client.getName(), site.getName(),
                 site.getDescription(), site.getAddressLine(), site.getCity(), site.getState(), site.getPostalCode(),
                 site.getLatitude(), site.getLongitude(), site.getContactName(), site.getContactPhone(),
-                site.getStatus(), equipmentRepository.countBySiteId(site.getId()),
+                site.getStatus(), equipmentRepository.countBySiteIdAndStatus(site.getId(), EquipmentStatus.ACTIVE),
                 site.getCreatedAt(), site.getUpdatedAt(), site.getVersion());
     }
 }

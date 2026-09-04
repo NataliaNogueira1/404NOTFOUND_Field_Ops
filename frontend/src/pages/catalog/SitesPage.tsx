@@ -98,7 +98,7 @@ export function SitesPage() {
     { header: 'Equipamentos', cell: site => site.equipmentCount },
     { header: 'Status', cell: site => <ActiveBadge active={site.status === InspectionSiteStatus.ACTIVE} /> },
     { header: 'Acoes', cell: site => <div className="flex flex-wrap gap-2">
-      <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${site.clientId}/sites/${site.id}`)}><Eye size={16} />Equipamentos</Button>
+      <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/sites/${site.id}/equipment`)}><Eye size={16} />Equipamentos</Button>
       <Button aria-label={`Editar ${site.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(site)}><Pencil size={16} /></Button>
       <Button aria-label={`${site.status === InspectionSiteStatus.ACTIVE ? 'Inativar' : 'Ativar'} ${site.name}`} variant="ghost" className="h-8 px-2" onClick={() => setChangingStatus(site)}><Power size={16} /></Button>
     </div> },

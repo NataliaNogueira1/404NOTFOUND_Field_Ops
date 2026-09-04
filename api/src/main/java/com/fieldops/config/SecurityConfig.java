@@ -59,6 +59,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .requestMatchers("/api/v1/users/**").hasAuthority("ADMINISTRATOR")
                         .requestMatchers("/api/v1/mobile/**").hasAuthority("TECHNICIAN")
+                        .requestMatchers("/api/v1/equipment/by-qr/**")
+                        .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers(SUPERVISOR_SCOPED_PATHS)
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR")
                         .anyRequest().authenticated())
