@@ -3,6 +3,22 @@ import { InspectionStatus, Priority } from '@/types/domain'
 
 export type TemplateListStatus = 'ACTIVE' | 'DRAFT'
 
+export interface InspectionTemplateInput {
+  title: string
+  description: string
+  category: string
+}
+
+export interface ManagedInspectionTemplate extends InspectionTemplateInput {
+  id: string
+  status: TemplateListStatus
+  currentVersion: number
+  createdBy: string
+  createdAt?: string
+  updatedAt?: string
+  version?: number
+}
+
 export interface TemplateSummary {
   id: string
   title: string
@@ -39,12 +55,34 @@ interface BackendPage<T> {
 }
 
 interface BackendTemplate extends Omit<TemplateSummary, 'id'> { id: number }
+interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy'> {
+  id: number
+  createdBy: number
+}
 interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technicianId'> {
   id: number
   technicianId: number
 }
 
 export const adminCatalogApi = {
+  async createTemplate(input: InspectionTemplateInput) {
+    const result = await apiRequest<BackendManagedTemplate>('/api/v1/inspection-templates', {
+      method: 'POST', body: JSON.stringify(input),
+    })
+    return managedTemplate(result)
+  },
+
+  async getTemplate(id: string) {
+    return managedTemplate(await apiRequest<BackendManagedTemplate>(`/api/v1/inspection-templates/${id}`))
+  },
+
+  async updateTemplate(id: string, input: InspectionTemplateInput) {
+    const result = await apiRequest<BackendManagedTemplate>(`/api/v1/inspection-templates/${id}`, {
+      method: 'PUT', body: JSON.stringify(input),
+    })
+    return managedTemplate(result)
+  },
+
   async listTemplates(filters: { name: string; status: TemplateListStatus | ''; page: number; size: number; sort: string }) {
     const params = pageParams(filters.page, filters.size, filters.sort)
     if (filters.name.trim()) params.set('name', filters.name.trim())
@@ -70,6 +108,10 @@ export const adminCatalogApi = {
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
     return { ...result, content: result.content.map(item => ({ ...item, id: String(item.id), technicianId: String(item.technicianId) })) }
   },
+}
+
+function managedTemplate(template: BackendManagedTemplate): ManagedInspectionTemplate {
+  return { ...template, id: String(template.id), createdBy: String(template.createdBy) }
 }
 
 function pageParams(page: number, size: number, sort: string) {

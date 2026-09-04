@@ -63,8 +63,7 @@ public class AdminCatalogListService {
                 predicates.add(builder.or(builder.like(builder.lower(root.get("title")), pattern),
                         builder.like(builder.lower(root.get("category")), pattern)));
             }
-            if (status == InspectionTemplateStatus.ACTIVE) predicates.add(builder.isTrue(root.get("published")));
-            if (status == InspectionTemplateStatus.DRAFT) predicates.add(builder.isFalse(root.get("published")));
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
             return builder.and(predicates.toArray(Predicate[]::new));
         };
     }
@@ -111,7 +110,7 @@ public class AdminCatalogListService {
         long items = template.getSections().stream().mapToLong(section -> section.getItems().size()).sum();
         return new InspectionTemplateSummary(template.getId(), template.getTitle(), template.getCategory(),
                 template.getVersion(), template.getSections().size(), items,
-                template.isPublished() ? "ACTIVE" : "DRAFT");
+                template.getStatus().name());
     }
 
     private AdminInspectionSummary inspectionSummary(Inspection inspection) {

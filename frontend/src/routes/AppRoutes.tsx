@@ -15,6 +15,7 @@ const ClientSiteDetailsPage = lazy(() => import('@/pages/catalog/ClientsPage').t
 const SitesPage = lazy(() => import('@/pages/catalog/SitesPage').then(module => ({ default: module.SitesPage })))
 const EquipmentPage = lazy(() => import('@/pages/equipment/EquipmentPage').then(module => ({ default: module.EquipmentPage })))
 const TemplatesPage = lazy(() => import('@/pages/inspectionTemplates/TemplatesPage').then(module => ({ default: module.TemplatesPage })))
+const NewTemplatePage = lazy(() => import('@/pages/inspectionTemplates/NewTemplatePage').then(module => ({ default: module.NewTemplatePage })))
 const TemplateBuilderPage = lazy(() => import('@/pages/inspectionTemplates/TemplateBuilderPage').then(module => ({ default: module.TemplateBuilderPage })))
 const TemplatePreviewPage = lazy(() => import('@/pages/inspectionTemplates/TemplatePreviewPage').then(module => ({ default: module.TemplatePreviewPage })))
 const InspectionsPage = lazy(() => import('@/pages/inspections/InspectionsPage').then(module => ({ default: module.InspectionsPage })))
@@ -75,6 +76,7 @@ export function AppRoutes() {
         <Route path="equipment" element={<LazyPage><EquipmentPage /></LazyPage>} />
         <Route path="sites/:siteId/equipment" element={<LazyPage><EquipmentPage /></LazyPage>} />
         <Route path="inspection-templates" element={<LazyPage><TemplatesPage /></LazyPage>} />
+        <Route path="inspection-templates/new" element={<LazyPage><NewTemplatePage /></LazyPage>} />
         <Route path="inspection-templates/:id/edit" element={<LazyPage><TemplateBuilderPage /></LazyPage>} />
         <Route path="inspection-templates/:id/preview" element={<LazyPage><TemplatePreviewPage /></LazyPage>} />
         <Route path="inspections" element={<LazyPage><InspectionsPage /></LazyPage>} />

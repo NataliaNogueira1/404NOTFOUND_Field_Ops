@@ -85,11 +85,14 @@ class AdminCatalogListControllerTest {
     }
 
     private InspectionTemplate persistTemplate(String title, String category, boolean published) {
+        User creator = userRepository.findByEmail("template.creator@example.com")
+                .orElseGet(() -> persistUser("Template Creator", Role.SUPERVISOR));
         InspectionTemplate template = new InspectionTemplate();
         template.setTitle(title);
         template.setCategory(category);
         template.setVersion(1);
         template.setPublished(published);
+        template.setCreatedBy(creator);
         return templateRepository.saveAndFlush(template);
     }
 

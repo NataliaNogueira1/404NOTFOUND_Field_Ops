@@ -51,16 +51,15 @@ export function TemplatesPage() {
   const columns: Column<TemplateSummary>[] = [
     { header: 'Titulo', sortKey: 'title', cell: template => <span className="font-medium">{template.title || 'Modelo sem titulo'}</span> },
     { header: 'Categoria', sortKey: 'category', cell: template => template.category || '-' },
-    { header: 'Versao atual', sortKey: 'version', cell: template => `v${template.version}` },
+    { header: 'Versao atual', sortKey: 'currentVersion', cell: template => `v${template.version}` },
     { header: 'Secoes', cell: template => template.sectionCount },
     { header: 'Itens', cell: template => template.itemCount },
-    { header: 'Status', sortKey: 'published', cell: template => <Badge tone={template.status === 'ACTIVE' ? 'success' : 'warning'}>{template.status === 'ACTIVE' ? 'Ativa' : 'Rascunho'}</Badge> },
+    { header: 'Status', sortKey: 'status', cell: template => <Badge tone={template.status === 'ACTIVE' ? 'success' : 'warning'}>{template.status === 'ACTIVE' ? 'Ativa' : 'Rascunho'}</Badge> },
     { header: 'Acoes', cell: template => <div className="flex flex-wrap gap-2"><Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/inspection-templates/${template.id}/edit`)}><Pencil size={16} />Editar</Button><Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/inspection-templates/${template.id}/preview`)}><Eye size={16} />Previa</Button><Button variant="ghost" className="h-8 px-2"><FileClock size={16} />Versoes</Button><Button variant="ghost" className="h-8 px-2"><Copy size={16} />Duplicar</Button></div> },
   ]
 
   function createTemplate() {
-    const template = templateDraftStore.createBlank()
-    navigate(`/app/inspection-templates/${template.id}/edit`)
+    navigate('/app/inspection-templates/new')
   }
 
   return <div className="space-y-6">
