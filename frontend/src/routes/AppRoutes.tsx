@@ -41,6 +41,12 @@ function RequireAdmin() {
   return <Outlet />
 }
 
+function RequireAdministrator() {
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  if (!session.user || session.user.role !== 'ADMIN') return <Navigate to="/app/dashboard" replace />
+  return <Outlet />
+}
+
 function RequireTechnician() {
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   if (session.status === 'loading') return <LoadingRoute />
@@ -56,7 +62,9 @@ export function AppRoutes() {
       <Route path="/app" element={<AppLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<LazyPage><DashboardPage /></LazyPage>} />
-        <Route path="users" element={<LazyPage><UsersPage /></LazyPage>} />
+        <Route element={<RequireAdministrator />}>
+          <Route path="users" element={<LazyPage><UsersPage /></LazyPage>} />
+        </Route>
         <Route path="clients" element={<LazyPage><ClientsPage /></LazyPage>} />
         <Route path="clients/:clientId" element={<LazyPage><ClientDetailsPage /></LazyPage>} />
         <Route path="clients/:clientId/sites/:siteId" element={<LazyPage><ClientSiteDetailsPage /></LazyPage>} />
