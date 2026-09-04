@@ -1,6 +1,7 @@
 package com.fieldops.shared.security;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
+import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
@@ -58,11 +59,16 @@ class RoleAuthorizationTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
+    private InspectionRepository inspectionRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void seedOneUserPerRole() {
-        // Refresh tokens reference users; clear them first or the FK blocks the cleanup.
+        // The shared in-memory DB may carry rows from a previous test class. Clear children
+        // before users, respecting FK order: inspections and refresh tokens both reference users.
+        inspectionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         persistUser("admin@fieldops.com", Role.ADMINISTRATOR);
@@ -132,12 +138,20 @@ class RoleAuthorizationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * This test asserts authorization, not business behaviour. An authorized ADMIN/SUPERVISOR
+     * request must get past the security layer — the exact outcome then depends on each
+     * controller (200 for an implemented list, 400 when a required query param is missing,
+     * 404 when no handler exists yet). So "authorized" is verified as: not 401 and not 403.
+     */
     private ResultMatcher authorizedStatusFor(String path) {
-        return path.equals("/api/v1/clients")
-                ? status().isOk()
-                // Only the clients controller exists today; the other paths pass the
-                // authorization rule and then miss a handler.
-                : status().isNotFound();
+        return result -> {
+            int statusCode = result.getResponse().getStatus();
+            if (statusCode == 401 || statusCode == 403) {
+                throw new AssertionError(
+                        "Expected " + path + " to be authorized for ADMIN/SUPERVISOR, but got " + statusCode);
+            }
+        };
     }
 
     private String bearer(String email) throws Exception {

@@ -23,4 +23,11 @@ public interface InspectionSiteRepository extends JpaRepository<InspectionSite, 
             Pageable pageable);
 
     Page<InspectionSite> findByStatus(SiteStatus status, Pageable pageable);
+
+    @Query("SELECT s FROM InspectionSite s WHERE s.status = :status " +
+           "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<InspectionSite> findByStatusAndSearch(
+            @Param("status") SiteStatus status,
+            @Param("search") String search,
+            Pageable pageable);
 }

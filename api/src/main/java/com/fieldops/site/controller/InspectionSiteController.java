@@ -43,14 +43,14 @@ public class InspectionSiteController {
         this.siteService = siteService;
     }
 
-    @Operation(summary = "List sites by client (paginated, filterable)")
+    @Operation(summary = "List sites (paginated, filterable). Optionally scoped by client.")
     @GetMapping
-    public ResponseEntity<Page<SiteResponse>> listByClient(
-            @RequestParam Long clientId,
+    public ResponseEntity<Page<SiteResponse>> list(
+            @RequestParam(required = false) Long clientId,
             @RequestParam(required = false) SiteStatus status,
             @RequestParam(required = false) String search,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(siteService.listByClient(clientId, status, search, pageable));
+        return ResponseEntity.ok(siteService.list(clientId, status, search, pageable));
     }
 
     @Operation(summary = "Get site by ID")
