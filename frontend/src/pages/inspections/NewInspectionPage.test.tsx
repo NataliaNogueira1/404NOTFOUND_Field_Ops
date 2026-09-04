@@ -6,12 +6,14 @@ import { NewInspectionPage } from '@/pages/inspections/NewInspectionPage'
 
 describe('NewInspectionPage chained selects', () => {
   it('filters sites by client and equipment by site', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
-      content: [
-        { id: 'cli-industria', name: 'Industria Modelo' },
-        { id: 'cli-logistica', name: 'Logistica ABC' },
-      ], totalElements: 2, totalPages: 1, number: 0, size: 100,
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const content = String(input).includes('/api/v1/sites?')
+        ? [{ id: 'site-sorocaba', clientId: 'cli-industria', name: 'Unidade Sorocaba', status: 'ACTIVE' }]
+        : [{ id: 'cli-industria', name: 'Industria Modelo' }, { id: 'cli-logistica', name: 'Logistica ABC' }]
+      return Promise.resolve(new Response(JSON.stringify({
+        content, totalElements: content.length, totalPages: 1, number: 0, size: 100,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    })
     vi.stubGlobal('fetch', fetchMock)
     render(<MemoryRouter><NewInspectionPage /></MemoryRouter>)
 
@@ -25,7 +27,8 @@ describe('NewInspectionPage chained selects', () => {
 
     await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'cli-industria')
     expect(siteSelect).toHaveProperty('disabled', false)
-    expect(screen.getByRole('option', { name: /unidade sorocaba/i })).not.toBeNull()
+    expect(await screen.findByRole('option', { name: /unidade sorocaba/i })).not.toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/sites\?.*clientId=cli-industria.*status=ACTIVE/), expect.anything())
 
     await userEvent.selectOptions(siteSelect, 'site-sorocaba')
     expect(equipmentSelect).toHaveProperty('disabled', false)

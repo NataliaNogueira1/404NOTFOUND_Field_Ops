@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientStatus, clientsApi } from '@/api/clients'
+import { InspectionSiteStatus, sitesApi } from '@/api/sites'
 import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -26,7 +27,7 @@ export function NewInspectionPage() {
   const [selectableClients, setSelectableClients] = useState(
     clients.filter(client => client.active).map(client => ({ id: client.id, name: client.name })),
   )
-  const availableSites = useMemo(() => sites.filter(site => site.clientId === clientId), [clientId])
+  const [availableSites, setAvailableSites] = useState<{ id: string; clientId: string; name: string }[]>([])
   const availableEquipment = useMemo(() => equipment.filter(item => item.siteId === siteId), [siteId])
   const technicians = users.filter(user => user.role === UserRole.TECHNICIAN && user.active)
 
@@ -35,6 +36,13 @@ export function NewInspectionPage() {
       .then(result => setSelectableClients(result.content.map(client => ({ id: client.id, name: client.name }))))
       .catch(() => { /* Keep the local prototype options while the API is unavailable. */ })
   }, [])
+
+  useEffect(() => {
+    if (!clientId) return
+    void sitesApi.list({ name: '', clientId, status: InspectionSiteStatus.ACTIVE, page: 0, size: 100 })
+      .then(result => setAvailableSites(result.content.map(site => ({ id: site.id, clientId: site.clientId, name: site.name }))))
+      .catch(() => setAvailableSites(sites.filter(site => site.active && site.clientId === clientId)))
+  }, [clientId])
 
   function submit() {
     if (!templateId || !clientId || !siteId || !equipmentId || !technicianId || !dueDate) {

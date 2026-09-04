@@ -3,153 +3,140 @@ package com.fieldops.site.service;
 import com.fieldops.client.model.Client;
 import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
+import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
-import com.fieldops.site.dto.CreateSiteRequest;
-import com.fieldops.site.dto.SiteResponse;
-import com.fieldops.site.dto.UpdateSiteRequest;
+import com.fieldops.site.dto.InspectionSiteRequest;
+import com.fieldops.site.dto.InspectionSiteResponse;
 import com.fieldops.site.model.InspectionSite;
 import com.fieldops.site.model.SiteStatus;
 import com.fieldops.site.repository.InspectionSiteRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Business logic for the InspectionSite domain.
- */
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 @Service
 public class InspectionSiteService {
 
     private final InspectionSiteRepository siteRepository;
     private final ClientRepository clientRepository;
+    private final EquipmentRepository equipmentRepository;
 
-    public InspectionSiteService(InspectionSiteRepository siteRepository,
-                                  ClientRepository clientRepository) {
+    public InspectionSiteService(InspectionSiteRepository siteRepository, ClientRepository clientRepository,
+            EquipmentRepository equipmentRepository) {
         this.siteRepository = siteRepository;
         this.clientRepository = clientRepository;
+        this.equipmentRepository = equipmentRepository;
     }
 
-    /**
-     * Lists inspection sites, optionally scoped to a single client.
-     * When {@code clientId} is null the whole catalog is listed (contract: GET /sites).
-     */
+    /** Finds sites using server-side name, client, and lifecycle filters. */
     @Transactional(readOnly = true)
-    public Page<SiteResponse> list(Long clientId, SiteStatus status, String search, Pageable pageable) {
-        SiteStatus effectiveStatus = status != null ? status : SiteStatus.ACTIVE;
-        boolean hasSearch = search != null && !search.isBlank();
-        String term = hasSearch ? search.trim() : null;
-
-        Page<InspectionSite> page;
-        if (clientId != null) {
-            page = hasSearch
-                    ? siteRepository.findByClientIdAndStatusAndSearch(clientId, effectiveStatus, term, pageable)
-                    : siteRepository.findByClientIdAndStatus(clientId, effectiveStatus, pageable);
-        } else {
-            page = hasSearch
-                    ? siteRepository.findByStatusAndSearch(effectiveStatus, term, pageable)
-                    : siteRepository.findByStatus(effectiveStatus, pageable);
-        }
-        return page.map(this::toResponse);
+    public Page<InspectionSiteResponse> list(String name, Long clientId, SiteStatus status,
+                                             Pageable pageable) {
+        return siteRepository.findAll(buildFilters(name, clientId, status), pageable).map(this::toResponse);
     }
 
+    /** Lists every site belonging to one client for the client structure view. */
     @Transactional(readOnly = true)
-    public SiteResponse findById(Long id) {
-        InspectionSite site = siteRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Inspection site not found: " + id));
-        return toResponse(site);
+    public List<InspectionSiteResponse> listByClient(Long clientId) {
+        requireClient(clientId);
+        return siteRepository.findAll(buildFilters(null, clientId, null), Sort.by("name"))
+                .stream().map(this::toResponse).toList();
     }
 
+    /** Returns one site together with its parent client identity. */
+    @Transactional(readOnly = true)
+    public InspectionSiteResponse get(Long id) {
+        return toResponse(getRequired(id));
+    }
+
+    /** Creates an active site attached to an active client. */
     @Transactional
-    public SiteResponse create(CreateSiteRequest request) {
-        Client client = clientRepository.findById(request.clientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + request.clientId()));
-
-        if (client.getStatus() == ClientStatus.INACTIVE) {
-            throw new BusinessException("Cannot add site to inactive client");
-        }
-
+    public InspectionSiteResponse create(InspectionSiteRequest request) {
         InspectionSite site = new InspectionSite();
-        site.setClient(client);
-        site.setName(request.name());
-        site.setDescription(request.description());
-        site.setAddressLine(request.addressLine());
-        site.setCity(request.city());
-        site.setState(request.state());
-        site.setPostalCode(request.postalCode());
+        apply(site, request);
+        return toResponse(siteRepository.saveAndFlush(site));
+    }
+
+    /** Updates site data and its client association without changing lifecycle status. */
+    @Transactional
+    public InspectionSiteResponse update(Long id, InspectionSiteRequest request) {
+        InspectionSite site = getRequired(id);
+        apply(site, request);
+        return toResponse(siteRepository.saveAndFlush(site));
+    }
+
+    /** Changes site availability while retaining the record and its history. */
+    @Transactional
+    public InspectionSiteResponse updateStatus(Long id, SiteStatus status) {
+        InspectionSite site = getRequired(id);
+        site.setStatus(status);
+        return toResponse(siteRepository.saveAndFlush(site));
+    }
+
+    private Specification<InspectionSite> buildFilters(String name, Long clientId, SiteStatus status) {
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (name != null && !name.isBlank()) {
+                String pattern = "%" + name.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(builder.like(builder.lower(root.get("name")), pattern));
+            }
+            if (clientId != null) predicates.add(builder.equal(root.get("client").get("id"), clientId));
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private void apply(InspectionSite site, InspectionSiteRequest request) {
+        site.setClient(requireActiveClient(request.clientId()));
+        site.setName(request.name().trim());
+        site.setDescription(optional(request.description()));
+        site.setAddressLine(optional(request.address()));
+        site.setCity(optional(request.city()));
+        site.setState(optional(request.state()));
+        site.setPostalCode(optional(request.zipCode()));
         site.setLatitude(request.latitude());
         site.setLongitude(request.longitude());
-        site.setContactName(request.contactName());
-        site.setContactPhone(request.contactPhone());
-
-        site = siteRepository.save(site);
-        return toResponse(site);
+        site.setContactName(optional(request.contactName()));
+        site.setContactPhone(optional(request.contactPhone()));
     }
 
-    @Transactional
-    public SiteResponse update(Long id, UpdateSiteRequest request) {
-        InspectionSite site = siteRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Inspection site not found: " + id));
-
-        site.setName(request.name());
-        site.setDescription(request.description());
-        site.setAddressLine(request.addressLine());
-        site.setCity(request.city());
-        site.setState(request.state());
-        site.setPostalCode(request.postalCode());
-        site.setLatitude(request.latitude());
-        site.setLongitude(request.longitude());
-        site.setContactName(request.contactName());
-        site.setContactPhone(request.contactPhone());
-
-        site = siteRepository.save(site);
-        return toResponse(site);
-    }
-
-    @Transactional
-    public void deactivate(Long id) {
-        InspectionSite site = siteRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Inspection site not found: " + id));
-
-        if (site.getStatus() == SiteStatus.INACTIVE) {
-            throw new BusinessException("Site is already inactive");
+    private Client requireActiveClient(Long clientId) {
+        Client client = requireClient(clientId);
+        if (client.getStatus() != ClientStatus.ACTIVE) {
+            throw new BusinessException("Client must be active: " + clientId);
         }
-        site.setStatus(SiteStatus.INACTIVE);
-        siteRepository.save(site);
+        return client;
     }
 
-    @Transactional
-    public void activate(Long id) {
-        InspectionSite site = siteRepository.findById(id)
+    private Client requireClient(Long clientId) {
+        return clientRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + clientId));
+    }
+
+    private InspectionSite getRequired(Long id) {
+        return siteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection site not found: " + id));
-
-        if (site.getStatus() == SiteStatus.ACTIVE) {
-            throw new BusinessException("Site is already active");
-        }
-        site.setStatus(SiteStatus.ACTIVE);
-        siteRepository.save(site);
     }
 
-    private SiteResponse toResponse(InspectionSite site) {
-        return new SiteResponse(
-                site.getId(),
-                site.getClient().getId(),
-                site.getClient().getName(),
-                site.getName(),
-                site.getDescription(),
-                site.getAddressLine(),
-                site.getCity(),
-                site.getState(),
-                site.getPostalCode(),
-                site.getLatitude(),
-                site.getLongitude(),
-                site.getContactName(),
-                site.getContactPhone(),
-                site.getStatus(),
-                site.getCreatedAt(),
-                site.getUpdatedAt(),
-                site.getVersion()
-        );
+    private String optional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private InspectionSiteResponse toResponse(InspectionSite site) {
+        Client client = site.getClient();
+        return new InspectionSiteResponse(site.getId(), client.getId(), client.getName(), site.getName(),
+                site.getDescription(), site.getAddressLine(), site.getCity(), site.getState(), site.getPostalCode(),
+                site.getLatitude(), site.getLongitude(), site.getContactName(), site.getContactPhone(),
+                site.getStatus(), equipmentRepository.countBySiteId(site.getId()),
+                site.getCreatedAt(), site.getUpdatedAt(), site.getVersion());
     }
 }

@@ -14,6 +14,8 @@ import java.util.Optional;
 @Repository
 public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
 
+    long countBySiteId(Long siteId);
+
     Page<Equipment> findBySiteIdAndStatus(Long siteId, EquipmentStatus status, Pageable pageable);
 
     @Query("SELECT e FROM Equipment e WHERE e.site.id = :siteId AND e.status = :status " +

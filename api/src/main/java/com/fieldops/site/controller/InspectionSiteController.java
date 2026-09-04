@@ -1,19 +1,18 @@
 package com.fieldops.site.controller;
 
-import com.fieldops.site.dto.CreateSiteRequest;
-import com.fieldops.site.dto.SiteResponse;
-import com.fieldops.site.dto.UpdateSiteRequest;
+import com.fieldops.site.dto.InspectionSiteRequest;
+import com.fieldops.site.dto.InspectionSiteResponse;
+import com.fieldops.site.dto.InspectionSiteStatusRequest;
 import com.fieldops.site.model.SiteStatus;
 import com.fieldops.site.service.InspectionSiteService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,13 +25,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * CRUD endpoints for Inspection Site management.
- * Access: ADMINISTRATOR and SUPERVISOR roles.
- */
+import java.net.URI;
+
 @RestController
 @RequestMapping("/api/v1/sites")
-@Tag(name = "Inspection Sites")
+@Tag(name = "Inspection sites")
 @SecurityRequirement(name = "bearer-jwt")
 @PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')")
 public class InspectionSiteController {
@@ -43,47 +40,56 @@ public class InspectionSiteController {
         this.siteService = siteService;
     }
 
-    @Operation(summary = "List sites (paginated, filterable). Optionally scoped by client.")
+    @Operation(summary = "List inspection sites with name, client, and status filters")
+    @ApiResponse(responseCode = "200", description = "Paginated inspection site list")
     @GetMapping
-    public ResponseEntity<Page<SiteResponse>> list(
+    public ResponseEntity<Page<InspectionSiteResponse>> list(@RequestParam(required = false) String name,
             @RequestParam(required = false) Long clientId,
-            @RequestParam(required = false) SiteStatus status,
-            @RequestParam(required = false) String search,
-            @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(siteService.list(clientId, status, search, pageable));
+            @RequestParam(required = false) SiteStatus status, Pageable pageable) {
+        return ResponseEntity.ok(siteService.list(name, clientId, status, pageable));
     }
 
-    @Operation(summary = "Get site by ID")
+    @Operation(summary = "Get an inspection site")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection site found"),
+            @ApiResponse(responseCode = "404", description = "Inspection site not found")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<SiteResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(siteService.findById(id));
+    public ResponseEntity<InspectionSiteResponse> get(@PathVariable Long id) {
+        return ResponseEntity.ok(siteService.get(id));
     }
 
-    @Operation(summary = "Create a new inspection site")
+    @Operation(summary = "Create an inspection site")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Inspection site created"),
+            @ApiResponse(responseCode = "400", description = "Invalid inspection site data"),
+            @ApiResponse(responseCode = "422", description = "Client is inactive")
+    })
     @PostMapping
-    public ResponseEntity<SiteResponse> create(@Valid @RequestBody CreateSiteRequest request) {
-        SiteResponse created = siteService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<InspectionSiteResponse> create(@Valid @RequestBody InspectionSiteRequest request) {
+        InspectionSiteResponse created = siteService.create(request);
+        return ResponseEntity.created(URI.create("/api/v1/sites/" + created.id())).body(created);
     }
 
-    @Operation(summary = "Update an existing inspection site")
+    @Operation(summary = "Update an inspection site")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection site updated"),
+            @ApiResponse(responseCode = "404", description = "Inspection site or client not found")
+    })
     @PutMapping("/{id}")
-    public ResponseEntity<SiteResponse> update(@PathVariable Long id,
-                                                @Valid @RequestBody UpdateSiteRequest request) {
+    public ResponseEntity<InspectionSiteResponse> update(@PathVariable Long id,
+            @Valid @RequestBody InspectionSiteRequest request) {
         return ResponseEntity.ok(siteService.update(id, request));
     }
 
-    @Operation(summary = "Deactivate a site (logical deletion)")
-    @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
-        siteService.deactivate(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @Operation(summary = "Reactivate a site")
-    @PatchMapping("/{id}/activate")
-    public ResponseEntity<Void> activate(@PathVariable Long id) {
-        siteService.activate(id);
-        return ResponseEntity.noContent().build();
+    @Operation(summary = "Activate or deactivate an inspection site")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection site status updated"),
+            @ApiResponse(responseCode = "404", description = "Inspection site not found")
+    })
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<InspectionSiteResponse> updateStatus(@PathVariable Long id,
+            @Valid @RequestBody InspectionSiteStatusRequest request) {
+        return ResponseEntity.ok(siteService.updateStatus(id, request.status()));
     }
 }

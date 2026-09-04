@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError } from '@/api/client'
 import { ClientStatus, type ClientInput, type ManagedClient, clientsApi } from '@/api/clients'
+import { sitesApi } from '@/api/sites'
 import { ActiveBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
@@ -86,7 +87,7 @@ export function ClientsPage() {
     { header: 'Locais', cell: client => client.activeSitesCount },
     { header: 'Status', cell: client => <ActiveBadge active={client.status === ClientStatus.ACTIVE} /> },
     { header: 'Acoes', cell: client => <div className="flex flex-wrap gap-2">
-      <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}`)}><Eye size={16} />Ver locais</Button>
+      <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}/sites`)}><Eye size={16} />Ver locais</Button>
       <Button aria-label={`Editar ${client.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(client)}><Pencil size={16} /></Button>
       <Button aria-label={`${client.status === ClientStatus.ACTIVE ? 'Inativar' : 'Ativar'} ${client.name}`} variant="ghost" className="h-8 px-2" onClick={() => setChangingStatus(client)}><Power size={16} /></Button>
     </div> },
@@ -202,7 +203,7 @@ export function ClientDetailsPage() {
 
 export function ClientSiteDetailsPage() {
   const { clientId = '', siteId = '' } = useParams()
-  const client = byId(seedClients, clientId) ?? seedClients[0]
+  const [client, setClient] = useState<Client>(byId(seedClients, clientId) ?? seedClients[0])
   const sourceSite = byId(seedSites, siteId) ?? seedSites.find(site => site.clientId === client.id) ?? seedSites[0]
   const [site, setSite] = useState<Site>(sourceSite)
   const [equipment, setEquipment] = useState(seedEquipment)
@@ -211,6 +212,15 @@ export function ClientSiteDetailsPage() {
   const [qr, setQr] = useState<Equipment | null>(null)
   const [toast, setToast] = useState(false)
   const siteEquipment = useMemo(() => equipment.filter(item => item.siteId === site.id), [equipment, site.id])
+
+  useEffect(() => {
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(siteId)) return
+    void sitesApi.get(siteId).then(result => {
+      setSite({ id: result.id, name: result.name, clientId: result.clientId, city: result.city,
+        state: result.state, contact: result.contactName || result.contactPhone, active: result.status === 'ACTIVE' })
+      setClient(current => ({ ...current, id: result.clientId, name: result.clientName }))
+    }).catch(() => { /* Keep the fallback view when the site cannot be loaded. */ })
+  }, [siteId])
 
   function saveSite(next: Site) {
     setSite(next)
