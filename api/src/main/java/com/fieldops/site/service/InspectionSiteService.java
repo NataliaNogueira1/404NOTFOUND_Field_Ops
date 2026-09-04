@@ -31,15 +31,25 @@ public class InspectionSiteService {
         this.clientRepository = clientRepository;
     }
 
+    /**
+     * Lists inspection sites, optionally scoped to a single client.
+     * When {@code clientId} is null the whole catalog is listed (contract: GET /sites).
+     */
     @Transactional(readOnly = true)
-    public Page<SiteResponse> listByClient(Long clientId, SiteStatus status, String search, Pageable pageable) {
+    public Page<SiteResponse> list(Long clientId, SiteStatus status, String search, Pageable pageable) {
         SiteStatus effectiveStatus = status != null ? status : SiteStatus.ACTIVE;
-        Page<InspectionSite> page;
+        boolean hasSearch = search != null && !search.isBlank();
+        String term = hasSearch ? search.trim() : null;
 
-        if (search != null && !search.isBlank()) {
-            page = siteRepository.findByClientIdAndStatusAndSearch(clientId, effectiveStatus, search.trim(), pageable);
+        Page<InspectionSite> page;
+        if (clientId != null) {
+            page = hasSearch
+                    ? siteRepository.findByClientIdAndStatusAndSearch(clientId, effectiveStatus, term, pageable)
+                    : siteRepository.findByClientIdAndStatus(clientId, effectiveStatus, pageable);
         } else {
-            page = siteRepository.findByClientIdAndStatus(clientId, effectiveStatus, pageable);
+            page = hasSearch
+                    ? siteRepository.findByStatusAndSearch(effectiveStatus, term, pageable)
+                    : siteRepository.findByStatus(effectiveStatus, pageable);
         }
         return page.map(this::toResponse);
     }
