@@ -1,12 +1,16 @@
 import { ArrowLeft, Building2, Eye, MapPin, Pencil, Plus, Power, QrCode, Wrench } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ApiError } from '@/api/client'
+import { ClientStatus, type ClientInput, type ManagedClient, clientsApi } from '@/api/clients'
+import { sitesApi } from '@/api/sites'
 import { ActiveBadge } from '@/components/badges/Badge'
-import { Modal } from '@/components/feedback/Modal'
+import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
 import { Select } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
+import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -15,31 +19,141 @@ import type { Client, Equipment, Site } from '@/types/domain'
 
 export function ClientsPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState(seedClients)
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('')
-  const [editing, setEditing] = useState<Client | null>(null)
-  const [toast, setToast] = useState(false)
-  const filtered = useMemo(() => rows.filter(row => row.name.toLowerCase().includes(query.toLowerCase()) && (!status || String(row.active) === status)), [rows, query, status])
+  const [rows, setRows] = useState<ManagedClient[]>([])
+  const list = useListQuery()
+  const query = list.value('name')
+  const debouncedQuery = useDebouncedValue(query)
+  const status = list.value('status') as ClientStatus | ''
+  const [totalElements, setTotalElements] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [editing, setEditing] = useState<ManagedClient | 'new' | null>(null)
+  const [changingStatus, setChangingStatus] = useState<ManagedClient | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
 
-  function save(client: Client) {
-    setRows(current => current.some(item => item.id === client.id) ? current.map(item => item.id === client.id ? client : item) : [client, ...current])
+  const loadClients = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const result = await clientsApi.list({ name: debouncedQuery, status, page: list.page, size: list.size, sort: list.sort })
+      setRows(result.content)
+      setTotalElements(result.totalElements)
+      setTotalPages(Math.max(result.totalPages, 1))
+    } catch (cause) {
+      setError(clientError(cause, 'Nao foi possivel carregar os clientes.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [debouncedQuery, list.page, list.size, list.sort, status])
+
+  useEffect(() => {
+    const pendingLoad = window.setTimeout(() => void loadClients(), 0)
+    return () => window.clearTimeout(pendingLoad)
+  }, [loadClients])
+
+  async function save(input: ClientInput) {
+    if (!editing) return
+    const creating = editing === 'new'
+    if (creating) await clientsApi.create(input)
+    else await clientsApi.update(editing.id, input)
     setEditing(null)
-    setToast(true)
-    setTimeout(() => setToast(false), 1800)
+    showClientToast(creating ? 'Cliente criado com sucesso.' : 'Cliente atualizado com sucesso.')
+    await loadClients()
   }
 
-  const columns: Column<Client>[] = [
-    { header: 'Nome', cell: client => <button className="text-left font-medium text-primary" onClick={() => navigate(`/app/clients/${client.id}`)}>{client.name}</button> },
-    { header: 'Documento', cell: client => client.document },
-    { header: 'E-mail', cell: client => client.email },
-    { header: 'Locais', cell: client => seedSites.filter(site => site.clientId === client.id).length },
-    { header: 'Equipamentos', cell: client => equipmentByClient(client.id).length },
-    { header: 'Status', cell: client => <ActiveBadge active={client.active} /> },
-    { header: 'Acoes', cell: client => <div className="flex gap-2"><Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}`)}><Eye size={16} />Abrir</Button><Button variant="ghost" className="h-8 px-2" onClick={() => setEditing(client)}><Pencil size={16} /></Button></div> },
+  async function changeStatus() {
+    if (!changingStatus) return
+    const next = changingStatus.status === ClientStatus.ACTIVE ? ClientStatus.INACTIVE : ClientStatus.ACTIVE
+    try {
+      await clientsApi.updateStatus(changingStatus.id, next)
+      setChangingStatus(null)
+      showClientToast(next === ClientStatus.ACTIVE ? 'Cliente ativado com sucesso.' : 'Cliente inativado com sucesso.')
+      await loadClients()
+    } catch (cause) {
+      setError(clientError(cause, 'Nao foi possivel alterar o status do cliente.'))
+      setChangingStatus(null)
+    }
+  }
+
+  function showClientToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(''), 2200)
+  }
+
+  const columns: Column<ManagedClient>[] = [
+    { header: 'Nome', sortKey: 'name', cell: client => <button className="text-left font-medium text-primary" onClick={() => navigate(`/app/clients/${client.id}`)}>{client.name}</button> },
+    { header: 'Documento', sortKey: 'document', cell: client => client.document || '-' },
+    { header: 'E-mail', sortKey: 'email', cell: client => client.email || '-' },
+    { header: 'Locais', cell: client => client.activeSitesCount },
+    { header: 'Status', sortKey: 'status', cell: client => <ActiveBadge active={client.status === ClientStatus.ACTIVE} /> },
+    { header: 'Acoes', cell: client => <div className="flex flex-wrap gap-2">
+      <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}/sites`)}><Eye size={16} />Ver locais</Button>
+      <Button aria-label={`Editar ${client.name}`} variant="ghost" className="h-8 px-2" onClick={() => setEditing(client)}><Pencil size={16} /></Button>
+      <Button aria-label={`${client.status === ClientStatus.ACTIVE ? 'Inativar' : 'Ativar'} ${client.name}`} variant="ghost" className="h-8 px-2" onClick={() => setChangingStatus(client)}><Power size={16} /></Button>
+    </div> },
   ]
 
-  return <div className="space-y-6"><PageHeader title="Clientes" description="Ponto de entrada para dados gerais, locais e equipamentos do cliente." action={<Button onClick={() => setEditing({ id: `cli-${Date.now()}`, name: '', document: '', email: '', active: true, siteIds: [] })}><Plus size={17} />Novo cliente</Button>} /><Card className="grid gap-4 p-4 md:grid-cols-3"><Input label="Buscar" id="client-search" value={query} onChange={event => setQuery(event.target.value)} /><Select label="Status" id="client-status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Todos</option><option value="true">Ativo</option><option value="false">Inativo</option></Select></Card><DataTable columns={columns} rows={filtered} /><ClientModal client={editing} onClose={() => setEditing(null)} onSave={save} /><Toast show={toast} message="Cliente salvo no prototipo" /></div>
+  return <div className="space-y-6">
+    <PageHeader title="Clientes" description="Ponto de entrada para dados gerais, locais e equipamentos do cliente." action={<Button onClick={() => setEditing('new')}><Plus size={17} />Novo cliente</Button>} />
+    <Card className="grid gap-4 p-4 md:grid-cols-2">
+      <Input label="Buscar" id="client-search" value={query} onChange={event => list.update('name', event.target.value)} placeholder="Nome do cliente" />
+      <Select label="Status" id="client-status" value={status} onChange={event => list.update('status', event.target.value)}><option value="">Todos</option><option value={ClientStatus.ACTIVE}>Ativo</option><option value={ClientStatus.INACTIVE}>Inativo</option></Select>
+    </Card>
+    {error && <div role="alert" className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark">{error}</div>}
+    <DataTable columns={columns} rows={rows} loading={loading} loadingLabel="Carregando clientes..." page={list.page + 1} pageSize={list.size} totalRows={totalElements} totalPages={totalPages} sort={list.sort} onSortChange={list.toggleSort} onPageChange={next => list.setPage(next - 1)} onPageSizeChange={list.setSize} />
+    <ManagedClientModal key={editing === 'new' ? 'new' : editing?.id ?? 'closed'} target={editing} onClose={() => setEditing(null)} onSave={save} />
+    <ConfirmDialog open={Boolean(changingStatus)} title={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar cliente' : 'Ativar cliente'} description={changingStatus?.status === ClientStatus.ACTIVE ? `O cliente ${changingStatus?.name} deixara de aparecer em novos agendamentos.` : `O cliente ${changingStatus?.name} voltara a aparecer em novos agendamentos.`} confirmLabel={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar' : 'Ativar'} variant={changingStatus?.status === ClientStatus.ACTIVE ? 'danger' : 'primary'} onCancel={() => setChangingStatus(null)} onConfirm={() => void changeStatus()} />
+    <Toast show={Boolean(toast)} message={toast} />
+  </div>
+}
+
+function ManagedClientModal({ target, onClose, onSave }: { target: ManagedClient | 'new' | null; onClose: () => void; onSave: (input: ClientInput) => Promise<void> }) {
+  const [draft, setDraft] = useState<ClientInput>(() => target && target !== 'new'
+    ? { name: target.name, legalName: target.legalName, document: target.document, email: target.email, phone: target.phone }
+    : { name: '', legalName: '', document: '', email: '', phone: '' })
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  if (!target) return null
+
+  const nameError = !draft.name.trim() ? 'Informe o nome do cliente.' : draft.name.trim().length > 200 ? 'Use no maximo 200 caracteres.' : ''
+  const documentError = draft.document && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(draft.document) ? 'Use o formato XX.XXX.XXX/XXXX-XX.' : ''
+  const emailError = draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email) ? 'Informe um e-mail valido.' : ''
+  const formError = nameError || documentError || emailError
+
+  async function submit() {
+    if (formError) return
+    setSaving(true)
+    setSubmitError('')
+    try {
+      await onSave({
+        name: draft.name.trim(), legalName: draft.legalName.trim(), document: draft.document.trim(),
+        email: draft.email.trim(), phone: draft.phone.trim(),
+      })
+    } catch (cause) {
+      setSubmitError(clientError(cause, 'Nao foi possivel salvar o cliente.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <Modal open title={target === 'new' ? 'Novo cliente' : 'Editar cliente'} onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button disabled={Boolean(formError) || saving} onClick={() => void submit()}>{saving ? 'Salvando...' : 'Salvar'}</Button></>}>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Input label="Nome" id="client-name" maxLength={200} value={draft.name} error={nameError} onChange={event => setDraft({ ...draft, name: event.target.value })} />
+      <Input label="Razao social (opcional)" id="client-legal-name" maxLength={200} value={draft.legalName} onChange={event => setDraft({ ...draft, legalName: event.target.value })} />
+      <Input label="Documento (CNPJ)" id="client-document" placeholder="XX.XXX.XXX/XXXX-XX" maxLength={18} value={draft.document} error={documentError} onChange={event => setDraft({ ...draft, document: event.target.value })} />
+      <Input label="E-mail (opcional)" id="client-email" type="email" maxLength={100} value={draft.email} error={emailError} onChange={event => setDraft({ ...draft, email: event.target.value })} />
+      <Input label="Telefone (opcional)" id="client-phone" maxLength={20} value={draft.phone} onChange={event => setDraft({ ...draft, phone: event.target.value })} />
+      {submitError && <p role="alert" className="text-sm font-medium text-danger sm:col-span-2">{submitError}</p>}
+    </div>
+  </Modal>
+}
+
+function clientError(cause: unknown, fallback: string) {
+  if (cause instanceof ApiError && cause.fieldErrors.length) {
+    return cause.fieldErrors.map(error => error.message).join(' ')
+  }
+  return fallback
 }
 
 export function ClientDetailsPage() {
@@ -47,11 +161,21 @@ export function ClientDetailsPage() {
   const { clientId = '' } = useParams()
   const source = byId(seedClients, clientId) ?? seedClients[0]
   const [client, setClient] = useState<Client>(source)
+  const [managedClient, setManagedClient] = useState<ManagedClient | null>(null)
   const [sites, setSites] = useState(seedSites)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [editingSite, setEditingSite] = useState<Site | null>(null)
   const [toast, setToast] = useState(false)
   const clientSites = useMemo(() => sites.filter(site => site.clientId === client.id), [sites, client.id])
+
+  useEffect(() => {
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(clientId)) return
+    void clientsApi.get(clientId).then(result => {
+      setManagedClient(result)
+      setClient({ id: result.id, name: result.name, document: result.document,
+        email: result.email, active: result.status === ClientStatus.ACTIVE, siteIds: [] })
+    }).catch(() => { /* Keep the fallback view when the client cannot be loaded. */ })
+  }, [clientId])
 
   function saveClient(next: Client) {
     setClient(next)
@@ -74,12 +198,12 @@ export function ClientDetailsPage() {
     { header: 'Acoes', cell: site => <div className="flex gap-2"><Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}/sites/${site.id}`)}><Eye size={16} />Abrir</Button><Button variant="ghost" className="h-8 px-2" onClick={() => setEditingSite(site)}><Pencil size={16} /></Button><Button variant="ghost" className="h-8 px-2" onClick={() => setSites(current => current.map(item => item.id === site.id ? { ...item, active: !item.active } : item))}><Power size={16} /></Button></div> },
   ]
 
-  return <div className="space-y-6"><div><Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/clients"><ArrowLeft size={16} />Clientes</Link><PageHeader title={client.name} description="Estrutura de cadastro do cliente: dados gerais, locais e equipamentos vinculados." action={<Button variant="secondary" onClick={() => setEditingClient(client)}><Pencil size={17} />Editar cliente</Button>} /></div><section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]"><Card className="p-5"><div className="mb-4 flex items-center gap-2"><Building2 size={20} className="text-primary" /><h2 className="text-base font-semibold">Dados do cliente</h2></div><dl className="grid gap-4 sm:grid-cols-2"><Info label="Nome" value={client.name} /><Info label="Documento" value={client.document} /><Info label="E-mail" value={client.email} /><Info label="Telefone" value="Nao informado no mock atual" /><Info label="Status" value={client.active ? 'Ativo' : 'Inativo'} /></dl></Card><Card className="p-5"><div className="mb-4 flex items-center gap-2"><MapPin size={20} className="text-primary" /><h2 className="text-base font-semibold">Resumo da estrutura</h2></div><div className="grid gap-3"><Summary label="Locais cadastrados" value={clientSites.length} /><Summary label="Equipamentos vinculados" value={equipmentByClient(client.id).length} /></div></Card></section><section className="space-y-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Locais</h2><p className="text-sm text-muted">Unidades e pontos de atendimento deste cliente.</p></div><Button onClick={() => setEditingSite({ id: `site-${Date.now()}`, name: '', clientId: client.id, city: '', state: 'SP', contact: '', active: true })}><Plus size={17} />Adicionar local</Button></div><DataTable columns={siteColumns} rows={clientSites} empty="Nenhum local cadastrado para este cliente." /></section><ClientModal client={editingClient} onClose={() => setEditingClient(null)} onSave={saveClient} /><SiteModal site={editingSite} clientId={client.id} onClose={() => setEditingSite(null)} onSave={saveSite} /><Toast show={toast} message="Estrutura do cliente salva no prototipo" /></div>
+  return <div className="space-y-6"><div><Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/clients"><ArrowLeft size={16} />Clientes</Link><PageHeader title={client.name} description="Estrutura de cadastro do cliente: dados gerais, locais e equipamentos vinculados." action={<Button variant="secondary" onClick={() => setEditingClient(client)}><Pencil size={17} />Editar cliente</Button>} /></div><section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]"><Card className="p-5"><div className="mb-4 flex items-center gap-2"><Building2 size={20} className="text-primary" /><h2 className="text-base font-semibold">Dados do cliente</h2></div><dl className="grid gap-4 sm:grid-cols-2"><Info label="Nome" value={client.name} /><Info label="Razao social" value={managedClient?.legalName} /><Info label="Documento" value={client.document} /><Info label="E-mail" value={client.email} /><Info label="Telefone" value={managedClient?.phone} /><Info label="Status" value={client.active ? 'Ativo' : 'Inativo'} /></dl></Card><Card className="p-5"><div className="mb-4 flex items-center gap-2"><MapPin size={20} className="text-primary" /><h2 className="text-base font-semibold">Resumo da estrutura</h2></div><div className="grid gap-3"><Summary label="Locais cadastrados" value={managedClient?.activeSitesCount ?? clientSites.length} /><Summary label="Equipamentos vinculados" value={equipmentByClient(client.id).length} /></div></Card></section><section className="space-y-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Locais</h2><p className="text-sm text-muted">Unidades e pontos de atendimento deste cliente.</p></div><Button onClick={() => setEditingSite({ id: `site-${Date.now()}`, name: '', clientId: client.id, city: '', state: 'SP', contact: '', active: true })}><Plus size={17} />Adicionar local</Button></div><DataTable columns={siteColumns} rows={clientSites} empty="Nenhum local cadastrado para este cliente." /></section><ClientModal client={editingClient} onClose={() => setEditingClient(null)} onSave={saveClient} /><SiteModal site={editingSite} clientId={client.id} onClose={() => setEditingSite(null)} onSave={saveSite} /><Toast show={toast} message="Estrutura do cliente salva no prototipo" /></div>
 }
 
 export function ClientSiteDetailsPage() {
   const { clientId = '', siteId = '' } = useParams()
-  const client = byId(seedClients, clientId) ?? seedClients[0]
+  const [client, setClient] = useState<Client>(byId(seedClients, clientId) ?? seedClients[0])
   const sourceSite = byId(seedSites, siteId) ?? seedSites.find(site => site.clientId === client.id) ?? seedSites[0]
   const [site, setSite] = useState<Site>(sourceSite)
   const [equipment, setEquipment] = useState(seedEquipment)
@@ -88,6 +212,15 @@ export function ClientSiteDetailsPage() {
   const [qr, setQr] = useState<Equipment | null>(null)
   const [toast, setToast] = useState(false)
   const siteEquipment = useMemo(() => equipment.filter(item => item.siteId === site.id), [equipment, site.id])
+
+  useEffect(() => {
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(siteId)) return
+    void sitesApi.get(siteId).then(result => {
+      setSite({ id: result.id, name: result.name, clientId: result.clientId, city: result.city,
+        state: result.state, contact: result.contactName || result.contactPhone, active: result.status === 'ACTIVE' })
+      setClient(current => ({ ...current, id: result.clientId, name: result.clientName }))
+    }).catch(() => { /* Keep the fallback view when the site cannot be loaded. */ })
+  }, [siteId])
 
   function saveSite(next: Site) {
     setSite(next)

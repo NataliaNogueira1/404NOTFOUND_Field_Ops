@@ -77,7 +77,7 @@ class MobileInspectionControllerTest {
         technician = persistUser("tech@fieldops.com", Role.TECHNICIAN);
         otherTechnician = persistUser("other-tech@fieldops.com", Role.TECHNICIAN);
         User supervisor = persistUser("sup@fieldops.com", Role.SUPERVISOR);
-        InspectionTemplate template = persistTemplate();
+        InspectionTemplate template = persistTemplate(supervisor);
 
         saveInspection(template, technician, supervisor, InspectionStatus.ASSIGNED, Priority.HIGH);
         saveInspection(template, technician, supervisor, InspectionStatus.IN_PROGRESS, Priority.LOW);
@@ -126,7 +126,7 @@ class MobileInspectionControllerTest {
         return userRepository.save(user);
     }
 
-    private InspectionTemplate persistTemplate() {
+    private InspectionTemplate persistTemplate(User creator) {
         TemplateItem item = new TemplateItem();
         item.setQuestion("Is the equipment grounded?");
         item.setResponseType(ResponseType.BOOLEAN);
@@ -145,6 +145,7 @@ class MobileInspectionControllerTest {
         template.setCategory("ELECTRICAL");
         template.setVersion(1);
         template.setPublished(true);
+        template.setCreatedBy(creator);
         section.setTemplate(template);
         template.getSections().add(section);
 

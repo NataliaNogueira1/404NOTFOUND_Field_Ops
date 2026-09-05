@@ -2,6 +2,7 @@ package com.fieldops.user.mapper;
 
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.dto.UserResponse;
 import org.mapstruct.Mapper;
 
@@ -14,5 +15,8 @@ public interface UserMapper {
 
     UserResponse toResponse(User user);
 
-    UserResponse toResponse(Long id, String name, String email, Role role);
+    default UserResponse toResponse(Long id, String name, String email, Role role) {
+        return new UserResponse(id, name, email, role, UserStatus.ACTIVE,
+                null, null, null, null);
+    }
 }

@@ -3,6 +3,7 @@ package com.fieldops.site.service;
 import com.fieldops.client.model.Client;
 import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
+import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.site.dto.CreateSiteRequest;
@@ -41,11 +42,14 @@ class InspectionSiteServiceTest {
     @Mock
     private ClientRepository clientRepository;
 
+    @Mock
+    private EquipmentRepository equipmentRepository;
+
     private InspectionSiteService siteService;
 
     @BeforeEach
     void setUp() {
-        siteService = new InspectionSiteService(siteRepository, clientRepository);
+        siteService = new InspectionSiteService(siteRepository, clientRepository, equipmentRepository);
     }
 
     @Test

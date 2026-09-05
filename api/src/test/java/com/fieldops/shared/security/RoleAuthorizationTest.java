@@ -131,11 +131,9 @@ class RoleAuthorizationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
-        // The authorization rule passes for ADMIN; the users controller itself is
-        // not implemented yet, so the request ends in 404 rather than 403.
         mockMvc.perform(get("/api/v1/users")
                         .header("Authorization", bearer("admin@fieldops.com")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk());
     }
 
     /**

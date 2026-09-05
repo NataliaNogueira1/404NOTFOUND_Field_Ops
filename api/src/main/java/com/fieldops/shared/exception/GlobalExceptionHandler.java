@@ -89,6 +89,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(
+            ResourceConflictException ex, HttpServletRequest request) {
+
+        return build(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request, List.of());
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoStaticResource(
             NoResourceFoundException ex, HttpServletRequest request) {
