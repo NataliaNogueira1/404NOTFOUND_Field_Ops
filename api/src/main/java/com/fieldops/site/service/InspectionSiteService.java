@@ -7,8 +7,11 @@ import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.site.dto.CreateSiteRequest;
 import com.fieldops.site.dto.InspectionSiteRequest;
 import com.fieldops.site.dto.InspectionSiteResponse;
+import com.fieldops.site.dto.SiteResponse;
+import com.fieldops.site.dto.UpdateSiteRequest;
 import com.fieldops.site.model.InspectionSite;
 import com.fieldops.site.model.SiteStatus;
 import com.fieldops.site.repository.InspectionSiteRepository;
@@ -45,6 +48,26 @@ public class InspectionSiteService {
         return siteRepository.findAll(buildFilters(name, clientId, status), pageable).map(this::toResponse);
     }
 
+    /** Keeps the original paginated site contract available for internal callers. */
+    @Transactional(readOnly = true)
+    public Page<SiteResponse> list(Long clientId, SiteStatus status, String search, Pageable pageable) {
+        SiteStatus effectiveStatus = status != null ? status : SiteStatus.ACTIVE;
+        boolean hasSearch = search != null && !search.isBlank();
+        String term = hasSearch ? search.trim() : null;
+
+        Page<InspectionSite> page;
+        if (clientId != null) {
+            page = hasSearch
+                    ? siteRepository.findByClientIdAndStatusAndSearch(clientId, effectiveStatus, term, pageable)
+                    : siteRepository.findByClientIdAndStatus(clientId, effectiveStatus, pageable);
+        } else {
+            page = hasSearch
+                    ? siteRepository.findByStatusAndSearch(effectiveStatus, term, pageable)
+                    : siteRepository.findByStatus(effectiveStatus, pageable);
+        }
+        return page.map(this::toLegacyResponse);
+    }
+
     /** Lists every site belonging to one client for the client structure view. */
     @Transactional(readOnly = true)
     public List<InspectionSiteResponse> listByClient(Long clientId) {
@@ -59,12 +82,31 @@ public class InspectionSiteService {
         return toResponse(getRequired(id));
     }
 
+    @Transactional(readOnly = true)
+    public SiteResponse findById(Long id) {
+        return toLegacyResponse(getRequired(id));
+    }
+
     /** Creates an active site attached to an active client. */
     @Transactional
     public InspectionSiteResponse create(InspectionSiteRequest request) {
         InspectionSite site = new InspectionSite();
         apply(site, request);
         return toResponse(siteRepository.saveAndFlush(site));
+    }
+
+    @Transactional
+    public SiteResponse create(CreateSiteRequest request) {
+        Client client = requireClient(request.clientId());
+        if (client.getStatus() != ClientStatus.ACTIVE) {
+            throw new BusinessException("Cannot add site to inactive client");
+        }
+        InspectionSite site = new InspectionSite();
+        site.setClient(client);
+        applyLegacyFields(site, request.name(), request.description(), request.addressLine(), request.city(),
+                request.state(), request.postalCode(), request.latitude(), request.longitude(),
+                request.contactName(), request.contactPhone());
+        return toLegacyResponse(siteRepository.save(site));
     }
 
     /** Updates site data and its client association without changing lifecycle status. */
@@ -75,12 +117,31 @@ public class InspectionSiteService {
         return toResponse(siteRepository.saveAndFlush(site));
     }
 
+    @Transactional
+    public SiteResponse update(Long id, UpdateSiteRequest request) {
+        InspectionSite site = getRequired(id);
+        applyLegacyFields(site, request.name(), request.description(), request.addressLine(), request.city(),
+                request.state(), request.postalCode(), request.latitude(), request.longitude(),
+                request.contactName(), request.contactPhone());
+        return toLegacyResponse(siteRepository.save(site));
+    }
+
     /** Changes site availability while retaining the record and its history. */
     @Transactional
     public InspectionSiteResponse updateStatus(Long id, SiteStatus status) {
         InspectionSite site = getRequired(id);
         site.setStatus(status);
         return toResponse(siteRepository.saveAndFlush(site));
+    }
+
+    @Transactional
+    public void deactivate(Long id) {
+        changeStatus(id, SiteStatus.INACTIVE);
+    }
+
+    @Transactional
+    public void activate(Long id) {
+        changeStatus(id, SiteStatus.ACTIVE);
     }
 
     private Specification<InspectionSite> buildFilters(String name, Long clientId, SiteStatus status) {
@@ -108,6 +169,30 @@ public class InspectionSiteService {
         site.setLongitude(request.longitude());
         site.setContactName(optional(request.contactName()));
         site.setContactPhone(optional(request.contactPhone()));
+    }
+
+    private void applyLegacyFields(InspectionSite site, String name, String description, String addressLine,
+            String city, String state, String postalCode, java.math.BigDecimal latitude,
+            java.math.BigDecimal longitude, String contactName, String contactPhone) {
+        site.setName(name);
+        site.setDescription(description);
+        site.setAddressLine(addressLine);
+        site.setCity(city);
+        site.setState(state);
+        site.setPostalCode(postalCode);
+        site.setLatitude(latitude);
+        site.setLongitude(longitude);
+        site.setContactName(contactName);
+        site.setContactPhone(contactPhone);
+    }
+
+    private void changeStatus(Long id, SiteStatus targetStatus) {
+        InspectionSite site = getRequired(id);
+        if (site.getStatus() == targetStatus) {
+            throw new BusinessException("Site is already " + targetStatus.name().toLowerCase(Locale.ROOT));
+        }
+        site.setStatus(targetStatus);
+        siteRepository.save(site);
     }
 
     private Client requireActiveClient(Long clientId) {
@@ -139,5 +224,13 @@ public class InspectionSiteService {
                 site.getLatitude(), site.getLongitude(), site.getContactName(), site.getContactPhone(),
                 site.getStatus(), equipmentRepository.countBySiteIdAndStatus(site.getId(), EquipmentStatus.ACTIVE),
                 site.getCreatedAt(), site.getUpdatedAt(), site.getVersion());
+    }
+
+    private SiteResponse toLegacyResponse(InspectionSite site) {
+        Client client = site.getClient();
+        return new SiteResponse(site.getId(), client.getId(), client.getName(), site.getName(),
+                site.getDescription(), site.getAddressLine(), site.getCity(), site.getState(), site.getPostalCode(),
+                site.getLatitude(), site.getLongitude(), site.getContactName(), site.getContactPhone(),
+                site.getStatus(), site.getCreatedAt(), site.getUpdatedAt(), site.getVersion());
     }
 }
