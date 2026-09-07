@@ -15,6 +15,7 @@ public record ClientResponse(
         String email,
         String phone,
         ClientStatus status,
+        long activeSitesCount,
         Instant createdAt,
         Instant updatedAt,
         Integer version

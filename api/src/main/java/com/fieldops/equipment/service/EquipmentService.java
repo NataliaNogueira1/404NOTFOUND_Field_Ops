@@ -1,176 +1,173 @@
 package com.fieldops.equipment.service;
 
-import com.fieldops.equipment.dto.CreateEquipmentRequest;
+import com.fieldops.equipment.dto.EquipmentRequest;
 import com.fieldops.equipment.dto.EquipmentResponse;
-import com.fieldops.equipment.dto.UpdateEquipmentRequest;
 import com.fieldops.equipment.model.Equipment;
 import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.shared.exception.BusinessException;
+import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.site.model.InspectionSite;
 import com.fieldops.site.model.SiteStatus;
 import com.fieldops.site.repository.InspectionSiteRepository;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Business logic for the Equipment domain.
- */
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 @Service
 public class EquipmentService {
 
     private final EquipmentRepository equipmentRepository;
     private final InspectionSiteRepository siteRepository;
 
-    public EquipmentService(EquipmentRepository equipmentRepository,
-                            InspectionSiteRepository siteRepository) {
+    public EquipmentService(EquipmentRepository equipmentRepository, InspectionSiteRepository siteRepository) {
         this.equipmentRepository = equipmentRepository;
         this.siteRepository = siteRepository;
     }
 
+    /** Finds equipment using site and lifecycle filters with server-side pagination. */
     @Transactional(readOnly = true)
-    public Page<EquipmentResponse> listBySite(Long siteId, EquipmentStatus status, String search, Pageable pageable) {
-        EquipmentStatus effectiveStatus = status != null ? status : EquipmentStatus.ACTIVE;
-        Page<Equipment> page;
-
-        if (search != null && !search.isBlank()) {
-            page = equipmentRepository.findBySiteIdAndStatusAndSearch(siteId, effectiveStatus, search.trim(), pageable);
-        } else {
-            page = equipmentRepository.findBySiteIdAndStatus(siteId, effectiveStatus, pageable);
-        }
-        return page.map(this::toResponse);
+    public Page<EquipmentResponse> list(String name, Long siteId, EquipmentStatus status, Pageable pageable) {
+        return equipmentRepository.findAll(buildFilters(name, siteId, status), pageable).map(this::toResponse);
     }
 
+    /** Lists every equipment record attached to one inspection site. */
     @Transactional(readOnly = true)
-    public EquipmentResponse findById(Long id) {
-        Equipment equipment = equipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
-        return toResponse(equipment);
+    public List<EquipmentResponse> listBySite(Long siteId) {
+        requireSite(siteId);
+        return equipmentRepository.findAll(buildFilters(null, siteId, null), Sort.by("name"))
+                .stream().map(this::toResponse).toList();
     }
 
+    /** Returns one equipment record by its persistent identifier. */
     @Transactional(readOnly = true)
-    public EquipmentResponse findByQrCode(String qrCode) {
-        Equipment equipment = equipmentRepository.findByQrCode(qrCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found with QR code: " + qrCode));
-        return toResponse(equipment);
+    public EquipmentResponse get(Long id) {
+        return toResponse(getRequired(id));
     }
 
+    /** Resolves the exact unique code submitted by a QR scanner. */
+    @Transactional(readOnly = true)
+    public EquipmentResponse getByQrCode(String qrCode) {
+        String normalized = normalizeQrCode(qrCode);
+        return equipmentRepository.findByQrCode(normalized).map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Equipment QR code not found: " + normalized));
+    }
+
+    /** Creates equipment attached to an active site and enforces QR uniqueness. */
     @Transactional
-    public EquipmentResponse create(CreateEquipmentRequest request) {
-        InspectionSite site = siteRepository.findById(request.siteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Site not found: " + request.siteId()));
-
-        if (site.getStatus() == SiteStatus.INACTIVE) {
-            throw new BusinessException("Cannot add equipment to inactive site");
-        }
-
-        if (request.qrCode() != null && !request.qrCode().isBlank()) {
-            if (equipmentRepository.existsByQrCode(request.qrCode())) {
-                throw new BusinessException("QR code already in use by another equipment");
-            }
-        }
-
+    public EquipmentResponse create(EquipmentRequest request) {
+        String qrCode = normalizeQrCode(request.qrCode());
+        ensureUniqueQrCode(qrCode, null);
         Equipment equipment = new Equipment();
-        equipment.setSite(site);
-        equipment.setName(request.name());
-        equipment.setAssetNumber(request.assetNumber());
-        equipment.setSerialNumber(request.serialNumber());
-        equipment.setManufacturer(request.manufacturer());
-        equipment.setModel(request.model());
-        equipment.setDescription(request.description());
-        equipment.setQrCode(request.qrCode());
+        apply(equipment, request, qrCode);
+        return save(equipment, qrCode);
+    }
+
+    /** Updates all editable equipment fields while retaining the database identity. */
+    @Transactional
+    public EquipmentResponse update(Long id, EquipmentRequest request) {
+        Equipment equipment = getRequired(id);
+        String qrCode = normalizeQrCode(request.qrCode());
+        ensureUniqueQrCode(qrCode, id);
+        apply(equipment, request, qrCode);
+        return save(equipment, qrCode);
+    }
+
+    /** Changes equipment availability without deleting inspection history. */
+    @Transactional
+    public EquipmentResponse updateStatus(Long id, EquipmentStatus status) {
+        Equipment equipment = getRequired(id);
+        equipment.setStatus(status);
+        return toResponse(equipmentRepository.saveAndFlush(equipment));
+    }
+
+    private Specification<Equipment> buildFilters(String name, Long siteId, EquipmentStatus status) {
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (name != null && !name.isBlank()) {
+                String pattern = "%" + name.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(builder.like(builder.lower(root.get("name")), pattern));
+            }
+            if (siteId != null) predicates.add(builder.equal(root.get("site").get("id"), siteId));
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private void apply(Equipment equipment, EquipmentRequest request, String qrCode) {
+        equipment.setSite(requireActiveSite(request.siteId()));
+        equipment.setName(request.name().trim());
+        equipment.setAssetNumber(optional(request.assetNumber()));
+        equipment.setSerialNumber(optional(request.serialNumber()));
+        equipment.setManufacturer(optional(request.manufacturer()));
+        equipment.setModel(optional(request.model()));
+        equipment.setDescription(optional(request.description()));
+        equipment.setQrCode(qrCode);
+        equipment.setStatus(request.status());
         equipment.setInstalledAt(request.installedAt());
-
-        equipment = equipmentRepository.save(equipment);
-        return toResponse(equipment);
     }
 
-    @Transactional
-    public EquipmentResponse update(Long id, UpdateEquipmentRequest request) {
-        Equipment equipment = equipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
-
-        // Check QR code uniqueness if changed
-        if (request.qrCode() != null && !request.qrCode().isBlank()) {
-            equipmentRepository.findByQrCode(request.qrCode())
-                    .filter(existing -> !existing.getId().equals(id))
-                    .ifPresent(existing -> {
-                        throw new BusinessException("QR code already in use by another equipment");
-                    });
+    private InspectionSite requireActiveSite(Long siteId) {
+        InspectionSite site = requireSite(siteId);
+        if (site.getStatus() != SiteStatus.ACTIVE) {
+            throw new BusinessException("Inspection site must be active: " + siteId);
         }
-
-        equipment.setName(request.name());
-        equipment.setAssetNumber(request.assetNumber());
-        equipment.setSerialNumber(request.serialNumber());
-        equipment.setManufacturer(request.manufacturer());
-        equipment.setModel(request.model());
-        equipment.setDescription(request.description());
-        equipment.setQrCode(request.qrCode());
-        equipment.setInstalledAt(request.installedAt());
-
-        equipment = equipmentRepository.save(equipment);
-        return toResponse(equipment);
+        return site;
     }
 
-    @Transactional
-    public void deactivate(Long id) {
-        Equipment equipment = equipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
-
-        if (equipment.getStatus() != EquipmentStatus.ACTIVE) {
-            throw new BusinessException("Equipment is not active");
-        }
-        equipment.setStatus(EquipmentStatus.INACTIVE);
-        equipmentRepository.save(equipment);
+    private InspectionSite requireSite(Long siteId) {
+        return siteRepository.findById(siteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection site not found: " + siteId));
     }
 
-    @Transactional
-    public void decommission(Long id) {
-        Equipment equipment = equipmentRepository.findById(id)
+    private Equipment getRequired(Long id) {
+        return equipmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
-
-        equipment.setStatus(EquipmentStatus.DECOMMISSIONED);
-        equipmentRepository.save(equipment);
     }
 
-    @Transactional
-    public void activate(Long id) {
-        Equipment equipment = equipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
+    private void ensureUniqueQrCode(String qrCode, Long currentId) {
+        boolean duplicate = currentId == null
+                ? equipmentRepository.existsByQrCode(qrCode)
+                : equipmentRepository.existsByQrCodeAndIdNot(qrCode, currentId);
+        if (duplicate) throw duplicateQrCode(qrCode);
+    }
 
-        if (equipment.getStatus() == EquipmentStatus.ACTIVE) {
-            throw new BusinessException("Equipment is already active");
+    private EquipmentResponse save(Equipment equipment, String qrCode) {
+        try {
+            return toResponse(equipmentRepository.saveAndFlush(equipment));
+        } catch (DataIntegrityViolationException exception) {
+            throw duplicateQrCode(qrCode);
         }
-        if (equipment.getStatus() == EquipmentStatus.DECOMMISSIONED) {
-            throw new BusinessException("Cannot reactivate decommissioned equipment");
-        }
-        equipment.setStatus(EquipmentStatus.ACTIVE);
-        equipmentRepository.save(equipment);
+    }
+
+    private ResourceConflictException duplicateQrCode(String qrCode) {
+        return new ResourceConflictException("Equipment QR code already exists: " + qrCode);
+    }
+
+    private String normalizeQrCode(String qrCode) {
+        return qrCode.trim();
+    }
+
+    private String optional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private EquipmentResponse toResponse(Equipment equipment) {
         InspectionSite site = equipment.getSite();
-        return new EquipmentResponse(
-                equipment.getId(),
-                site.getId(),
-                site.getName(),
-                site.getClient().getId(),
-                site.getClient().getName(),
-                equipment.getName(),
-                equipment.getAssetNumber(),
-                equipment.getSerialNumber(),
-                equipment.getManufacturer(),
-                equipment.getModel(),
-                equipment.getDescription(),
-                equipment.getQrCode(),
-                equipment.getStatus(),
-                equipment.getInstalledAt(),
-                equipment.getCreatedAt(),
-                equipment.getUpdatedAt(),
-                equipment.getVersion()
-        );
+        return new EquipmentResponse(equipment.getId(), site.getId(), site.getName(), site.getClient().getId(),
+                equipment.getName(), equipment.getAssetNumber(), equipment.getSerialNumber(),
+                equipment.getManufacturer(), equipment.getModel(), equipment.getDescription(),
+                equipment.getQrCode(), equipment.getStatus(), equipment.getInstalledAt(),
+                equipment.getCreatedAt(), equipment.getUpdatedAt(), equipment.getVersion());
     }
 }

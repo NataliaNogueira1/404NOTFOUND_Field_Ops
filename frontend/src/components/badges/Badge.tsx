@@ -1,5 +1,5 @@
 ﻿import type { HTMLAttributes } from 'react'
-import { InspectionStatus, Priority, Severity, UserRole } from '@/types/domain'
+import { InspectionStatus, Priority, Severity, UserRole, UserStatus } from '@/types/domain'
 import { cn } from '@/utils/cn'
 
 type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
@@ -16,3 +16,6 @@ export function PriorityBadge({ priority }: { priority: Priority }) { return <Ba
 export function SeverityBadge({ severity }: { severity: Severity }) { return <Badge tone={priorityTone[severity]}>{severityLabel[severity]}</Badge> }
 export function RoleBadge({ role }: { role: UserRole }) { return <Badge tone={role === UserRole.ADMIN ? 'danger' : role === UserRole.SUPERVISOR ? 'primary' : 'success'}>{roleLabel[role]}</Badge> }
 export function ActiveBadge({ active }: { active: boolean }) { return <Badge tone={active ? 'success' : 'neutral'}>{active ? 'Ativo' : 'Inativo'}</Badge> }
+const userStatusLabel: Record<UserStatus, string> = { ACTIVE: 'Ativo', INACTIVE: 'Inativo', BLOCKED: 'Bloqueado' }
+const userStatusTone: Record<UserStatus, BadgeTone> = { ACTIVE: 'success', INACTIVE: 'neutral', BLOCKED: 'danger' }
+export function UserStatusBadge({ status }: { status: UserStatus }) { return <Badge tone={userStatusTone[status]}>{userStatusLabel[status]}</Badge> }

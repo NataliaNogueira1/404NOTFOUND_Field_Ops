@@ -1,17 +1,24 @@
 package com.fieldops.client.service;
 
+import com.fieldops.client.dto.ClientRequest;
 import com.fieldops.client.dto.ClientResponse;
-import com.fieldops.client.dto.CreateClientRequest;
-import com.fieldops.client.dto.UpdateClientRequest;
 import com.fieldops.client.model.Client;
 import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.site.model.SiteStatus;
+import com.fieldops.site.repository.InspectionSiteRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Business logic for the Client domain.
@@ -20,78 +27,49 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClientService {
 
     private final ClientRepository clientRepository;
+    private final InspectionSiteRepository siteRepository;
 
-    public ClientService(ClientRepository clientRepository) {
+    public ClientService(ClientRepository clientRepository, InspectionSiteRepository siteRepository) {
         this.clientRepository = clientRepository;
+        this.siteRepository = siteRepository;
     }
 
     @Transactional(readOnly = true)
-    public Page<ClientResponse> list(ClientStatus status, String search, Pageable pageable) {
-        Page<Client> page;
-        if (search != null && !search.isBlank()) {
-            page = clientRepository.findByStatusAndSearch(
-                    status != null ? status : ClientStatus.ACTIVE, search.trim(), pageable);
-        } else {
-            page = clientRepository.findByStatus(
-                    status != null ? status : ClientStatus.ACTIVE, pageable);
-        }
-        return page.map(this::toResponse);
+    public Page<ClientResponse> list(String name, ClientStatus status, Pageable pageable) {
+        return clientRepository.findAll(buildFilters(name, status), pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public ClientResponse findById(Long id) {
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
-        return toResponse(client);
+    public ClientResponse get(Long id) {
+        return toResponse(getRequired(id));
     }
 
     @Transactional
-    public ClientResponse create(CreateClientRequest request) {
-        if (request.document() != null && !request.document().isBlank()) {
-            if (clientRepository.existsByDocument(request.document())) {
-                throw new BusinessException("A client with this document already exists");
-            }
-        }
-
+    public ClientResponse create(ClientRequest request) {
+        ensureDocumentAvailable(request.document(), null);
         Client client = new Client();
-        client.setName(request.name());
-        client.setLegalName(request.legalName());
-        client.setDocument(request.document());
-        client.setEmail(request.email());
-        client.setPhone(request.phone());
-
-        client = clientRepository.save(client);
-        return toResponse(client);
+        apply(client, request);
+        return toResponse(clientRepository.saveAndFlush(client));
     }
 
     @Transactional
-    public ClientResponse update(Long id, UpdateClientRequest request) {
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
+    public ClientResponse update(Long id, ClientRequest request) {
+        Client client = getRequired(id);
+        ensureDocumentAvailable(request.document(), id);
+        apply(client, request);
+        return toResponse(clientRepository.saveAndFlush(client));
+    }
 
-        // Check document uniqueness if changed
-        if (request.document() != null && !request.document().isBlank()) {
-            clientRepository.findByDocument(request.document())
-                    .filter(existing -> !existing.getId().equals(id))
-                    .ifPresent(existing -> {
-                        throw new BusinessException("A client with this document already exists");
-                    });
-        }
-
-        client.setName(request.name());
-        client.setLegalName(request.legalName());
-        client.setDocument(request.document());
-        client.setEmail(request.email());
-        client.setPhone(request.phone());
-
-        client = clientRepository.save(client);
-        return toResponse(client);
+    @Transactional
+    public ClientResponse updateStatus(Long id, ClientStatus status) {
+        Client client = getRequired(id);
+        client.setStatus(status);
+        return toResponse(clientRepository.saveAndFlush(client));
     }
 
     @Transactional
     public void deactivate(Long id) {
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
+        Client client = getRequired(id);
 
         if (client.getStatus() == ClientStatus.INACTIVE) {
             throw new BusinessException("Client is already inactive");
@@ -103,8 +81,7 @@ public class ClientService {
 
     @Transactional
     public void activate(Long id) {
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
+        Client client = getRequired(id);
 
         if (client.getStatus() == ClientStatus.ACTIVE) {
             throw new BusinessException("Client is already active");
@@ -123,9 +100,48 @@ public class ClientService {
                 client.getEmail(),
                 client.getPhone(),
                 client.getStatus(),
+                siteRepository.countByClientIdAndStatus(client.getId(), SiteStatus.ACTIVE),
                 client.getCreatedAt(),
                 client.getUpdatedAt(),
                 client.getVersion()
         );
+    }
+
+    private Specification<Client> buildFilters(String name, ClientStatus status) {
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (name != null && !name.isBlank()) {
+                String pattern = "%" + name.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(builder.like(builder.lower(root.get("name")), pattern));
+            }
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private Client getRequired(Long id) {
+        return clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
+    }
+
+    private void ensureDocumentAvailable(String document, Long currentId) {
+        if (document == null || document.isBlank()) return;
+        clientRepository.findByDocument(document.trim())
+                .filter(existing -> !existing.getId().equals(currentId))
+                .ifPresent(existing -> {
+                    throw new BusinessException("A client with this document already exists");
+                });
+    }
+
+    private void apply(Client client, ClientRequest request) {
+        client.setName(request.name().trim());
+        client.setLegalName(optional(request.legalName()));
+        client.setDocument(optional(request.document()));
+        client.setEmail(optional(request.email()));
+        client.setPhone(optional(request.phone()));
+    }
+
+    private String optional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

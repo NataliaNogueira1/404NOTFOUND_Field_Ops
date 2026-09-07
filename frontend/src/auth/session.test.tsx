@@ -15,7 +15,7 @@ function response(body: unknown, status = 200) {
   return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
 }
 
-function loginBody(user: typeof technicianUser | typeof supervisorUser) {
+function loginBody(user: { id: number; name: string; email: string; role: string }) {
   return { accessToken: `access-${user.role}`, refreshToken: `refresh-${user.role}`, expiresIn: 3600, user }
 }
 
@@ -125,6 +125,15 @@ describe('real auth session and route guards', () => {
 
     await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
     expect(screen.queryByText(/portal do tecnico/i)).toBeNull()
+  })
+
+  it('allows only administrators to access user management', async () => {
+    mockFetch(async url => url.endsWith('/api/v1/auth/login') ? response(loginBody(supervisorUser)) : response(supervisorUser))
+    await authSession.login('marina@fieldops.com', '123456')
+    renderRoute('/app/users')
+
+    await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
+    expect(screen.queryByText(/^usuarios$/i)).toBeNull()
   })
 
   it('logout clears local session data', async () => {
