@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/features/auth';
 import { FieldOpsProvider } from '@/features/fieldops';
+import { ConnectivityProvider } from '@/infrastructure/connectivity';
 import { DatabaseProvider } from '@/infrastructure/database/DatabaseProvider';
 
 export { ErrorBoundary } from 'expo-router';
@@ -47,13 +48,15 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <DatabaseProvider>
-      <AuthProvider>
-        <FieldOpsProvider>
-          <AuthGate />
-        </FieldOpsProvider>
-      </AuthProvider>
-    </DatabaseProvider>
+    <ConnectivityProvider>
+      <DatabaseProvider>
+        <AuthProvider>
+          <FieldOpsProvider>
+            <AuthGate />
+          </FieldOpsProvider>
+        </AuthProvider>
+      </DatabaseProvider>
+    </ConnectivityProvider>
   );
 }
 

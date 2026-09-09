@@ -1,4 +1,4 @@
-﻿import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -6,10 +6,12 @@ import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button, Card } from '@/design-system';
 import { InspectionCard } from '@/components/fieldops';
 import { InspectionStatus, useFieldOps } from '@/features/fieldops';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { inspections, syncNow, isSyncing } = useFieldOps();
+  const { refreshing, onRefresh, notice, clearNotice } = usePullToRefresh(syncNow);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayCount = inspections.filter((item) => item.dueDate === todayStr).length;
@@ -26,11 +28,22 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.greeting}>Minhas inspeções</Text>
           <Text style={styles.date}>{dateLabel}</Text>
         </View>
+        {notice ? (
+          <Pressable onPress={clearNotice} style={styles.notice}>
+            <Text style={styles.noticeText}>{notice}</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.stats}>
           <Stat value={todayCount} label="Hoje" tone="primary" />
@@ -102,6 +115,8 @@ const styles = StyleSheet.create({
   link: { color: Colors.primary, fontWeight: FontWeight.semibold },
   list: { gap: Spacing.sm },
   empty: { color: Colors.textSecondary, textAlign: 'center', padding: Spacing.lg },
+  notice: { backgroundColor: Colors.warningLight, borderRadius: 10, padding: Spacing.sm },
+  noticeText: { color: Colors.warningDark, fontSize: FontSize.sm, textAlign: 'center' },
   fab: { position: 'absolute', right: Spacing.md, bottom: 86, backgroundColor: Colors.primary, minHeight: 52, paddingHorizontal: Spacing.lg, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   fabText: { color: Colors.white, fontWeight: FontWeight.semibold },
 });
