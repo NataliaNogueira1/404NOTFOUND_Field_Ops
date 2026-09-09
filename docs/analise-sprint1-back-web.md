@@ -14,13 +14,13 @@
 | PBI-007 | Autenticação JWT | [#17](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/17) | ✅ Concluído — `POST /api/v1/auth/login` valida senha (BCrypt) e emite JWT |
 | PBI-010 | Refresh token | [#20](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/20) | ✅ Concluído — `POST /api/v1/auth/refresh` + entidade `RefreshToken` + migration V4 |
 | PBI-012 | Autorização por perfil | [#22](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/22) | ✅ Concluído — matriz de roles no `SecurityConfig` + `@PreAuthorize` por método |
-| PBI-011 | CRUD de usuários | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ❌ Aberta — sem `UserController`/service; só o conceito de `UserStatus` (V3) existe |
-| PBI-013 | CRUD de clientes | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ❌ Aberta |
-| PBI-014 | CRUD de locais | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ❌ Aberta |
-| PBI-015 | CRUD de equipamentos | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ❌ Aberta |
-| PBI-016 | QR Code único por equipamento | [#34](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/34) | ❌ Aberta |
-| PBI-017 | Pesquisa, filtros e paginação | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ❌ Aberta |
-| PBI-018 | Modelo de inspeção em rascunho | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ❌ Aberta |
+| PBI-011 | CRUD de usuários | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ✅ Concluído — `UserController` (list/create/update/status) + `UserService` + migration V8 |
+| PBI-013 | CRUD de clientes | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ✅ Concluído — `ClientController` (CRUD + ativar/desativar) + migration V2 |
+| PBI-014 | CRUD de locais | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ✅ Concluído — `InspectionSiteController` (CRUD + status) + migration V5 |
+| PBI-015 | CRUD de equipamentos | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ✅ Concluído — `EquipmentController` (CRUD + status) + migration V6 |
+| PBI-016 | QR Code único por equipamento | [#34](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/34) | ✅ Concluído — `GET /api/v1/equipment/by-qr/{qrCode}` + unicidade de QR (409) |
+| PBI-017 | Pesquisa, filtros e paginação | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ✅ Concluído — filtros + `Pageable` em usuários, clientes, locais, equipamentos e inspeções |
+| PBI-018 | Modelo de inspeção em rascunho | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ✅ Concluído — `InspectionTemplateService.createDraft` + migration V9 |
 | PBI-019 | Seções do checklist | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ❌ Aberta |
 | PBI-020 | Itens com tipos de resposta | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ❌ Aberta |
 | PBI-021 | Obrigatoriedade e regras de evidência | [#38](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/38) | ❌ Aberta |
@@ -36,12 +36,14 @@
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 6 |
-| ❌ Não feito | 17 |
+| ✅ Concluído | 13 |
+| ❌ Não feito | 10 |
 
-**Porcentagem: ~26%** (6/23)
+**Porcentagem: ~57%** (13/23)
 
-> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)** — os três últimos entregues na branch `feat/refresh-token-session-renewal`. Também já existe endpoint de `logout` e o conceito de `UserStatus` (ativo/inativo), mas o CRUD de usuários (PBI-011) ainda não tem endpoint.
+> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)** e agora os CRUDs de catálogo: **PBI-011 (usuários)**, **PBI-013 (clientes)**, **PBI-014 (locais)**, **PBI-015 (equipamentos)**, **PBI-016 (QR único)**, **PBI-017 (pesquisa/filtros/paginação)** e **PBI-018 (modelo em rascunho)**.
+>
+> Ainda em aberto no backend: seções e itens do checklist (PBI-019 a PBI-022), publicação de versão imutável e snapshot (PBI-023/PBI-024) e o ciclo de vida da inspeção — agendar, atribuir, prioridade/prazo e cancelar (PBI-025, PBI-027, PBI-028, PBI-029). O `AdminInspectionTemplateController` cobre apenas metadados do rascunho e o `AdminInspectionController` apenas listagem.
 
 ---
 
