@@ -72,6 +72,6 @@ public class InspectionTemplateService {
         return new InspectionTemplateResponse(template.getId(), template.getTitle(), template.getDescription(),
                 template.getCategory(), template.getStatus(), template.getCurrentVersion(),
                 template.getCreatedBy().getId(), template.getCreatedAt(), template.getUpdatedAt(),
-                template.getRowVersion());
+                template.getRowVersion(), TemplateSectionService.toOrderedResponses(template.getSections()));
     }
 }

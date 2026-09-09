@@ -10,7 +10,7 @@ export interface Client { id: string; name: string; document: string; email: str
 export interface Site { id: string; name: string; clientId: string; city: string; state: string; contact: string; active: boolean }
 export interface Equipment { id: string; name: string; patrimony: string; serialNumber: string; siteId: string; qrCode: string; active: boolean }
 export interface TemplateItem { id: string; question: string; description?: string; responseType: ResponseType; required: boolean; requireObservationOnFailure: boolean; requireEvidenceOnFailure: boolean; options?: string[] }
-export interface TemplateSection { id: string; title: string; items: TemplateItem[] }
+export interface TemplateSection { id: string; title: string; description?: string; displayOrder?: number; items: TemplateItem[] }
 export interface InspectionTemplate { id: string; title: string; category: string; description: string; version: number; status: 'Ativa' | 'Rascunho'; sections: TemplateSection[] }
 export type SyncStatus = 'synced' | 'pending' | 'error'
 export type ChecklistValue = string | number | boolean | 'CONFORME' | 'NAO_CONFORME' | 'NA'

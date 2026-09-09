@@ -9,6 +9,19 @@ export interface InspectionTemplateInput {
   category: string
 }
 
+export interface ManagedTemplateSection {
+  id: string
+  title: string
+  description: string
+  displayOrder: number
+}
+
+export interface TemplateSectionInput {
+  title: string
+  description: string
+  displayOrder: number
+}
+
 export interface ManagedInspectionTemplate extends InspectionTemplateInput {
   id: string
   status: TemplateListStatus
@@ -17,6 +30,7 @@ export interface ManagedInspectionTemplate extends InspectionTemplateInput {
   createdAt?: string
   updatedAt?: string
   version?: number
+  sections: ManagedTemplateSection[]
 }
 
 export interface TemplateSummary {
@@ -55,9 +69,14 @@ interface BackendPage<T> {
 }
 
 interface BackendTemplate extends Omit<TemplateSummary, 'id'> { id: number }
-interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy'> {
+interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy' | 'sections'> {
   id: number
   createdBy: number
+  sections?: BackendTemplateSection[]
+}
+interface BackendTemplateSection extends Omit<ManagedTemplateSection, 'id' | 'description'> {
+  id: number
+  description: string | null
 }
 interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technicianId'> {
   id: number
@@ -81,6 +100,24 @@ export const adminCatalogApi = {
       method: 'PUT', body: JSON.stringify(input),
     })
     return managedTemplate(result)
+  },
+
+  async createTemplateSection(templateId: string, input: TemplateSectionInput) {
+    const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+    return managedSection(result)
+  },
+
+  async updateTemplateSection(templateId: string, sectionId: string, input: TemplateSectionInput) {
+    const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}`, {
+      method: 'PUT', body: JSON.stringify(input),
+    })
+    return managedSection(result)
+  },
+
+  async deleteTemplateSection(templateId: string, sectionId: string) {
+    await apiRequest<void>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}`, { method: 'DELETE' })
   },
 
   async listTemplates(filters: { name: string; status: TemplateListStatus | ''; page: number; size: number; sort: string }) {
@@ -111,7 +148,17 @@ export const adminCatalogApi = {
 }
 
 function managedTemplate(template: BackendManagedTemplate): ManagedInspectionTemplate {
-  return { ...template, id: String(template.id), createdBy: String(template.createdBy) }
+  return {
+    ...template,
+    description: template.description ?? '',
+    id: String(template.id),
+    createdBy: String(template.createdBy),
+    sections: (template.sections ?? []).map(managedSection).sort((a, b) => a.displayOrder - b.displayOrder),
+  }
+}
+
+function managedSection(section: BackendTemplateSection): ManagedTemplateSection {
+  return { ...section, id: String(section.id), description: section.description ?? '' }
 }
 
 function pageParams(page: number, size: number, sort: string) {

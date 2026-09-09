@@ -2,7 +2,9 @@ package com.fieldops.inspection.controller;
 
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
+import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.shared.security.AuthenticatedUser;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
@@ -22,6 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,6 +40,9 @@ class InspectionTemplateControllerTest {
 
     @Autowired
     private InspectionTemplateRepository templateRepository;
+
+    @Autowired
+    private TemplateSectionRepository sectionRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -116,6 +122,101 @@ class InspectionTemplateControllerTest {
                 .andExpect(jsonPath("$.status").value("DRAFT"));
     }
 
+    @Test
+    void createsSectionAtRequestedDisplayOrderAndReturnsOrderedSections() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        persistSection(template, "Funcionamento", null, 1);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections", template.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Seguranca",
+                                  "description": "Itens de protecao",
+                                  "displayOrder": 1
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Seguranca"))
+                .andExpect(jsonPath("$.description").value("Itens de protecao"))
+                .andExpect(jsonPath("$.displayOrder").value(1));
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].title").value("Seguranca"))
+                .andExpect(jsonPath("$.sections[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.sections[1].title").value("Funcionamento"))
+                .andExpect(jsonPath("$.sections[1].displayOrder").value(2));
+    }
+
+    @Test
+    void updatesSectionAndReordersItsSiblings() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection first = persistSection(template, "Primeira", null, 1);
+        persistSection(template, "Segunda", null, 2);
+
+        mockMvc.perform(put("/api/v1/inspection-templates/{id}/sections/{sectionId}",
+                        template.getId(), first.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Primeira editada",
+                                  "description": "Descricao editada",
+                                  "displayOrder": 2
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Primeira editada"))
+                .andExpect(jsonPath("$.description").value("Descricao editada"))
+                .andExpect(jsonPath("$.displayOrder").value(2));
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(jsonPath("$.sections[0].title").value("Segunda"))
+                .andExpect(jsonPath("$.sections[1].title").value("Primeira editada"));
+    }
+
+    @Test
+    void deletesSectionFromDraftAndCompactsDisplayOrder() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection first = persistSection(template, "Primeira", null, 1);
+        persistSection(template, "Segunda", null, 2);
+
+        mockMvc.perform(delete("/api/v1/inspection-templates/{id}/sections/{sectionId}",
+                        template.getId(), first.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(jsonPath("$.sections.length()").value(1))
+                .andExpect(jsonPath("$.sections[0].title").value("Segunda"))
+                .andExpect(jsonPath("$.sections[0].displayOrder").value(1));
+    }
+
+    @Test
+    void rejectsSectionChangesWhenTemplateIsNotDraft() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        template.setStatus(InspectionTemplateStatus.ACTIVE);
+        templateRepository.saveAndFlush(template);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections", template.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Seguranca","displayOrder":1}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE"));
+    }
+
     private UsernamePasswordAuthenticationToken authenticationFor(User user) {
         AuthenticatedUser principal = new AuthenticatedUser(user);
         return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
@@ -138,5 +239,17 @@ class InspectionTemplateControllerTest {
         template.setCurrentVersion(0);
         template.setCreatedBy(creator);
         return templateRepository.saveAndFlush(template);
+    }
+
+    private TemplateSection persistSection(InspectionTemplate template, String title, String description,
+            int displayOrder) {
+        TemplateSection section = new TemplateSection();
+        section.setTemplate(template);
+        section.setTitle(title);
+        section.setDescription(description);
+        section.setDisplayOrder(displayOrder);
+        TemplateSection saved = sectionRepository.saveAndFlush(section);
+        template.getSections().add(saved);
+        return saved;
     }
 }

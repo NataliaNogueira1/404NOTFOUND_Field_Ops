@@ -3,9 +3,12 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateSummary;
+import com.fieldops.inspection.dto.TemplateSectionRequest;
+import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.service.AdminCatalogListService;
 import com.fieldops.inspection.service.InspectionTemplateService;
+import com.fieldops.inspection.service.TemplateSectionService;
 import com.fieldops.shared.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -36,11 +40,13 @@ public class AdminInspectionTemplateController {
 
     private final AdminCatalogListService listService;
     private final InspectionTemplateService templateService;
+    private final TemplateSectionService sectionService;
 
     public AdminInspectionTemplateController(AdminCatalogListService listService,
-            InspectionTemplateService templateService) {
+            InspectionTemplateService templateService, TemplateSectionService sectionService) {
         this.listService = listService;
         this.templateService = templateService;
+        this.sectionService = sectionService;
     }
 
     @Operation(summary = "List inspection templates with filters, sorting, and pagination")
@@ -73,5 +79,31 @@ public class AdminInspectionTemplateController {
     public ResponseEntity<InspectionTemplateResponse> update(@PathVariable Long id,
             @Valid @RequestBody InspectionTemplateRequest request) {
         return ResponseEntity.ok(templateService.updateDraft(id, request));
+    }
+
+    @Operation(summary = "Create a section in a draft inspection template")
+    @ApiResponse(responseCode = "201", description = "Template section created")
+    @PostMapping("/{id}/sections")
+    public ResponseEntity<TemplateSectionResponse> createSection(@PathVariable Long id,
+            @Valid @RequestBody TemplateSectionRequest request) {
+        TemplateSectionResponse response = sectionService.create(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .location(java.net.URI.create("/api/v1/inspection-templates/" + id + "/sections/" + response.id()))
+                .body(response);
+    }
+
+    @Operation(summary = "Update and reorder a section in a draft inspection template")
+    @PutMapping("/{id}/sections/{sectionId}")
+    public ResponseEntity<TemplateSectionResponse> updateSection(@PathVariable Long id,
+            @PathVariable Long sectionId, @Valid @RequestBody TemplateSectionRequest request) {
+        return ResponseEntity.ok(sectionService.update(id, sectionId, request));
+    }
+
+    @Operation(summary = "Delete a section from a draft inspection template")
+    @ApiResponse(responseCode = "204", description = "Template section deleted")
+    @DeleteMapping("/{id}/sections/{sectionId}")
+    public ResponseEntity<Void> deleteSection(@PathVariable Long id, @PathVariable Long sectionId) {
+        sectionService.delete(id, sectionId);
+        return ResponseEntity.noContent().build();
     }
 }
