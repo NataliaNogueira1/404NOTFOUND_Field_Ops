@@ -1,13 +1,15 @@
 ﻿import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InspectionCard } from '@/components/fieldops';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { InspectionStatus, Priority, useFieldOps } from '@/features/fieldops';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function InspectionsScreen() {
-  const { inspections, isLoading } = useFieldOps();
+  const { inspections, isLoading, syncNow } = useFieldOps();
+  const { refreshing, onRefresh, notice, clearNotice } = usePullToRefresh(syncNow);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'Todas' | InspectionStatus>('Todas');
   const [priority, setPriority] = useState<'Todas' | Priority>('Todas');
@@ -41,8 +43,19 @@ export default function InspectionsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
+        }
+      >
         <Text style={styles.title}>Minhas inspeções</Text>
+        {notice ? (
+          <Pressable onPress={clearNotice} style={styles.notice}>
+            <Text style={styles.noticeText}>{notice}</Text>
+          </Pressable>
+        ) : null}
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -127,4 +140,6 @@ const styles = StyleSheet.create({
   chipTextActive: { color: Colors.white },
   list: { gap: Spacing.sm, marginTop: Spacing.sm },
   empty: { color: Colors.textSecondary, textAlign: 'center', padding: Spacing.lg },
+  notice: { backgroundColor: Colors.warningLight, borderRadius: 10, padding: Spacing.sm, marginTop: Spacing.xs },
+  noticeText: { color: Colors.warningDark, fontSize: FontSize.sm, textAlign: 'center' },
 });
