@@ -34,6 +34,12 @@ interface InspectionRow {
   sync_status: string;
   pending_sync_count: number;
   updated_at: string;
+  start_latitude: number | null;
+  start_longitude: number | null;
+  start_accuracy: number | null;
+  rejection_reason: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
 }
 
 interface SectionRow {
@@ -289,6 +295,12 @@ export class InspectionRepository {
     syncStatus: row.sync_status as Inspection['syncStatus'],
     pendingSyncCount: row.pending_sync_count,
     supervisorInstructions: row.supervisor_instructions ?? '',
+    startLatitude: row.start_latitude ?? undefined,
+    startLongitude: row.start_longitude ?? undefined,
+    startAccuracy: row.start_accuracy ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    rejectedBy: row.rejected_by ?? undefined,
+    rejectedAt: row.rejected_at ?? undefined,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

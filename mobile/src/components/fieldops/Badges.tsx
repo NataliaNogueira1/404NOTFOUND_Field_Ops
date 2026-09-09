@@ -25,10 +25,52 @@ export function SectionHeader({ title, meta }: { title: string; meta?: string })
   return <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{title}</Text>{meta ? <Text style={styles.sectionMeta}>{meta}</Text> : null}</View>;
 }
 
+export function RejectionBanner({
+  reason,
+  rejectedBy,
+  rejectedAt,
+  items = [],
+}: {
+  reason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  items?: string[];
+}) {
+  return (
+    <View style={styles.rejection} accessibilityRole="alert">
+      <Text style={styles.rejectionTitle}>⚠️ Inspeção reprovada</Text>
+      {reason ? (
+        <Text style={styles.rejectionBody}>
+          <Text style={styles.rejectionLabel}>Motivo: </Text>
+          {reason}
+        </Text>
+      ) : null}
+      {items.length > 0 ? (
+        <View style={styles.rejectionItems}>
+          <Text style={styles.rejectionLabel}>Itens para correção:</Text>
+          {items.map((item, index) => (
+            <Text key={`${item}-${index}`} style={styles.rejectionBody}>{`\u2022 ${item}`}</Text>
+          ))}
+        </View>
+      ) : null}
+      {rejectedBy ? (
+        <Text style={styles.rejectionMeta}>Reprovada por: {rejectedBy}</Text>
+      ) : null}
+      {rejectedAt ? <Text style={styles.rejectionMeta}>Data: {rejectedAt}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 999, backgroundColor: Colors.gray100, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 999, backgroundColor: Colors.primary },
   sectionHeader: { marginTop: Spacing.lg, marginBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
   sectionMeta: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  rejection: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: Colors.danger, borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
+  rejectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.dangerDark },
+  rejectionBody: { fontSize: FontSize.sm, color: Colors.dangerDark, lineHeight: 20 },
+  rejectionLabel: { fontWeight: FontWeight.semibold, color: Colors.dangerDark },
+  rejectionItems: { marginTop: Spacing.xs, gap: 2 },
+  rejectionMeta: { fontSize: FontSize.xs, color: Colors.dangerDark, marginTop: 2 },
 });
