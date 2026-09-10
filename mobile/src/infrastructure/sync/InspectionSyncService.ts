@@ -260,7 +260,7 @@ export class InspectionSyncService {
         );
         break;
       case 'inspection':
-        if (operation.operationType === 'UPDATE') {
+        if (operation.operationType === 'UPDATE' || operation.operationType === 'TRANSITION') {
           await apiClient.patch(
             `/api/v1/mobile/inspections/${operation.entityId}/status`,
             payload,
@@ -355,6 +355,26 @@ export class InspectionSyncService {
     const id = `status-${inspectionId}-${Date.now()}`;
     await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
       status,
+    });
+  }
+
+  /**
+   * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
+   * carrying the device timestamp and the optional start location (PBI-034).
+   */
+  async enqueueTransition(
+    inspectionId: string,
+    input: {
+      status: string;
+      startedAtDevice: string;
+      location: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ): Promise<void> {
+    const id = `transition-${inspectionId}-${Date.now()}`;
+    await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
+      status: input.status,
+      startedAtDevice: input.startedAtDevice,
+      location: input.location,
     });
   }
 }
