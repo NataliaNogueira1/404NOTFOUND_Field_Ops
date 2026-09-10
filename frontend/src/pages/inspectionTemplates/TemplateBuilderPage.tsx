@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input'
 import { byId, templates } from '@/mocks/domain'
 import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
+import { validateInspectionTemplate, validateTemplateMetadata } from '@/pages/inspectionTemplates/templateValidation'
 
 type SectionDraft = Pick<TemplateSection, 'id' | 'title' | 'description'>
 type OptionDraft = { id: string; value: string }
@@ -31,8 +32,8 @@ export function TemplateBuilderPage() {
   const [publish, setPublish] = useState(false)
   const [toast, setToast] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const metadataValidation = useMemo(() => validateMetadata(title, category), [title, category])
-  const publishValidation = useMemo(() => validateTemplate(title, category, sections), [title, category, sections])
+  const metadataValidation = useMemo(() => validateTemplateMetadata(title, category), [title, category])
+  const publishValidation = useMemo(() => validateInspectionTemplate(title, category, sections), [title, category, sections])
   const persistedTemplate = /^\d+$/.test(id)
 
   useEffect(() => {
@@ -284,24 +285,6 @@ function swap<T>(values: T[], first: number, second: number) {
   const result = [...values]
   ;[result[first], result[second]] = [result[second], result[first]]
   return result
-}
-
-function validateMetadata(title: string, category: string) {
-  if (!title.trim()) return 'Informe o titulo do modelo.'
-  if (title.length > 200) return 'Use no maximo 200 caracteres no titulo.'
-  if (!category.trim()) return 'Informe a categoria do modelo.'
-  return ''
-}
-
-function validateTemplate(title: string, category: string, sections: TemplateSection[]) {
-  const metadataError = validateMetadata(title, category)
-  if (metadataError) return metadataError
-  if (sections.length === 0) return 'Adicione pelo menos uma secao.'
-  if (sections.some(section => !section.title.trim())) return 'Todas as secoes precisam de titulo.'
-  if (sections.some(section => section.items.length === 0)) return 'Todas as secoes precisam de pelo menos um item.'
-  if (sections.some(section => section.items.some(item => !item.question.trim()))) return 'Todos os itens precisam de pergunta.'
-  if (sections.some(section => section.items.some(item => item.responseType === ResponseType.SINGLE_CHOICE && (item.options ?? []).filter(option => option.trim()).length < 2))) return 'Itens SINGLE_CHOICE precisam de pelo menos duas opcoes.'
-  return ''
 }
 
 const responseTypeLabels: Record<ResponseType, string> = {
