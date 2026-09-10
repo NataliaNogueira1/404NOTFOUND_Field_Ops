@@ -164,6 +164,37 @@ describe('TemplateBuilderPage sections', () => {
     ))
     expect(screen.getByText('Segundo').closest('div')?.textContent).toContain('Ordem 1')
   })
+
+  it('confirms and publishes a complete persisted template through the API', async () => {
+    const template = templateResponse()
+    template.sections.forEach((section, index) => {
+      section.items = [{
+        id: 30 + index, title: `Item ${index + 1}`, description: null, responseType: 'BOOLEAN',
+        required: true, observationRequiredOnFailure: false, evidenceRequiredOnFailure: false,
+        optionsJson: null, displayOrder: 1,
+      }]
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(template))
+      .mockResolvedValueOnce(jsonResponse(template))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 501, versionNumber: 1, titleSnapshot: 'Modelo', descriptionSnapshot: '',
+        publishedAt: '2026-09-09T12:00:00Z', publishedBy: 7,
+      }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+    renderBuilder()
+
+    await screen.findByText('Item 1')
+    await userEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+    expect(screen.getByText('Ao publicar, a versao nao podera ser alterada. Continuar?')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar e publicar' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/v1/inspection-templates/42/publish'),
+      expect.objectContaining({ method: 'POST' }),
+    ))
+    expect(await screen.findByText('Ativo')).not.toBeNull()
+  })
 })
 
 function renderBuilder() {

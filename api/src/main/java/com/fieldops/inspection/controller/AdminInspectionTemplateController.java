@@ -3,6 +3,7 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateSummary;
+import com.fieldops.inspection.dto.InspectionTemplateVersionResponse;
 import com.fieldops.inspection.dto.TemplateSectionRequest;
 import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.inspection.dto.TemplateItemRequest;
@@ -10,6 +11,7 @@ import com.fieldops.inspection.dto.TemplateItemResponse;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.service.AdminCatalogListService;
 import com.fieldops.inspection.service.InspectionTemplateService;
+import com.fieldops.inspection.service.InspectionTemplateVersionService;
 import com.fieldops.inspection.service.TemplateSectionService;
 import com.fieldops.inspection.service.TemplateItemService;
 import com.fieldops.shared.security.AuthenticatedUser;
@@ -18,14 +20,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -45,14 +48,16 @@ public class AdminInspectionTemplateController {
     private final InspectionTemplateService templateService;
     private final TemplateSectionService sectionService;
     private final TemplateItemService itemService;
+    private final InspectionTemplateVersionService versionService;
 
     public AdminInspectionTemplateController(AdminCatalogListService listService,
             InspectionTemplateService templateService, TemplateSectionService sectionService,
-            TemplateItemService itemService) {
+            TemplateItemService itemService, InspectionTemplateVersionService versionService) {
         this.listService = listService;
         this.templateService = templateService;
         this.sectionService = sectionService;
         this.itemService = itemService;
+        this.versionService = versionService;
     }
 
     @Operation(summary = "List inspection templates with filters, sorting, and pagination")
@@ -130,5 +135,22 @@ public class AdminInspectionTemplateController {
     public ResponseEntity<TemplateItemResponse> updateItem(@PathVariable Long id, @PathVariable Long sectionId,
             @PathVariable Long itemId, @Valid @RequestBody TemplateItemRequest request) {
         return ResponseEntity.ok(itemService.update(id, sectionId, itemId, request));
+    }
+
+    @Operation(summary = "Publish an immutable inspection template version")
+    @ApiResponse(responseCode = "201", description = "Inspection template version published")
+    @PostMapping("/{id}/publish")
+    public ResponseEntity<InspectionTemplateVersionResponse> publish(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        InspectionTemplateVersionResponse response = versionService.publish(id, user.getId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .location(java.net.URI.create("/api/v1/inspection-templates/" + id + "/versions/" + response.id()))
+                .body(response);
+    }
+
+    @Operation(summary = "List published versions of an inspection template")
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<List<InspectionTemplateVersionResponse>> listVersions(@PathVariable Long id) {
+        return ResponseEntity.ok(versionService.list(id));
     }
 }

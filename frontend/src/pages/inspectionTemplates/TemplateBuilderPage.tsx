@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { byId, templates } from '@/mocks/domain'
+import { PublicationIssuesDialog } from '@/pages/inspectionTemplates/PublicationIssuesDialog'
 import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
-import { validateInspectionTemplate, validateTemplateMetadata } from '@/pages/inspectionTemplates/templateValidation'
+import { inspectionTemplatePendingIssues, validateTemplateMetadata } from '@/pages/inspectionTemplates/templateValidation'
 
 type SectionDraft = Pick<TemplateSection, 'id' | 'title' | 'description'>
 type OptionDraft = { id: string; value: string }
@@ -32,8 +33,10 @@ export function TemplateBuilderPage() {
   const [publish, setPublish] = useState(false)
   const [toast, setToast] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [showPublicationIssues, setShowPublicationIssues] = useState(false)
   const metadataValidation = useMemo(() => validateTemplateMetadata(title, category), [title, category])
-  const publishValidation = useMemo(() => validateInspectionTemplate(title, category, sections), [title, category, sections])
+  const publicationIssues = useMemo(() => inspectionTemplatePendingIssues(title, category, sections), [title, category, sections])
   const persistedTemplate = /^\d+$/.test(id)
 
   useEffect(() => {
@@ -80,7 +83,7 @@ export function TemplateBuilderPage() {
       } else {
         const created = persistedTemplate
           ? await adminCatalogApi.createTemplateSection(id, input)
-          : { ...input, id: `sec-${Date.now()}` }
+          : { ...input, id: localSectionId() }
         setSections(current => [...current, { ...created, items: [] }])
       }
       setSectionDraft(null)
@@ -171,6 +174,29 @@ export function TemplateBuilderPage() {
     }
   }
 
+  async function publishTemplate() {
+    if (publicationIssues.length > 0 || publishing) return
+    setPublishing(true)
+    setSaveError('')
+    try {
+      let publishedVersion = source.version + 1
+      if (persistedTemplate) {
+        await adminCatalogApi.updateTemplate(id, {
+          title: title.trim(), category: category.trim(), description: description.trim(),
+        })
+        publishedVersion = (await adminCatalogApi.publishTemplate(id)).versionNumber
+      }
+      setIsDraft(false)
+      templateDraftStore.set({ ...draft(), version: publishedVersion, status: 'Ativa' })
+      setPublish(false)
+      showSuccess()
+    } catch {
+      setSaveError('Nao foi possivel publicar o modelo.')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   function showSuccess() {
     setToast(true)
     setTimeout(() => setToast(false), 1800)
@@ -185,10 +211,10 @@ export function TemplateBuilderPage() {
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => { void saveDraft(false).then(() => navigate(`/app/inspection-templates/${id}/preview`)) }}>Previa</Button>
         <Button variant="secondary" onClick={() => void saveDraft(true)} disabled={!isDraft || Boolean(metadataValidation)}>Salvar</Button>
-        <Button onClick={() => setPublish(true)} disabled={!isDraft || Boolean(publishValidation)}>Publicar</Button>
+        <Button onClick={() => setPublish(true)} disabled={!isDraft || publicationIssues.length > 0 || publishing}>{publishing ? 'Publicando...' : 'Publicar'}</Button>
       </div>
     </div>
-    {publishValidation && <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark">{publishValidation}</Card>}
+    {publicationIssues.length > 0 && <Card className="flex flex-wrap items-center justify-between gap-3 border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark" role="alert"><p>O modelo possui {publicationIssues.length} pendencia(s) para publicacao.</p><Button variant="secondary" onClick={() => setShowPublicationIssues(true)}>Ver pendencias</Button></Card>}
     {saveError && <p role="alert" className="text-sm font-medium text-danger">{saveError}</p>}
     <Card className="grid gap-4 p-5 md:grid-cols-2">
       <Input label="Titulo" id="tpl-title" maxLength={200} value={title} disabled={!isDraft} onChange={event => setTitle(event.target.value)} />
@@ -208,7 +234,8 @@ export function TemplateBuilderPage() {
     {sectionDraft && <SectionModal key={sectionDraft.id || 'new'} draft={sectionDraft} onClose={() => setSectionDraft(null)} onSave={section => void saveSection(section)} />}
     {editingItem && <ItemModal key={editingItem.item.id} data={editingItem} onClose={() => setEditingItem(null)} onSave={saveItem} />}
     <ConfirmDialog open={Boolean(deletingSection)} title="Excluir secao?" description="Esta acao tambem exclui os itens vinculados a secao." confirmLabel="Excluir secao" variant="danger" onCancel={() => setDeletingSection(null)} onConfirm={() => void deleteSection()} />
-    <ConfirmDialog open={publish} title="Publicar modelo?" description="Validacao simulada concluida. Uma nova versao ficara disponivel para agendamento." confirmLabel="Publicar" onCancel={() => setPublish(false)} onConfirm={() => { void saveDraft(false); setPublish(false); showSuccess() }} />
+    <ConfirmDialog open={publish} title="Publicar modelo?" description="Ao publicar, a versao nao podera ser alterada. Continuar?" confirmLabel="Continuar e publicar" onCancel={() => setPublish(false)} onConfirm={() => void publishTemplate()} />
+    <PublicationIssuesDialog issues={publicationIssues} open={showPublicationIssues} onClose={() => setShowPublicationIssues(false)} />
     <Toast show={toast} message="Alteracao salva com sucesso" />
   </div>
 }
@@ -298,6 +325,8 @@ const responseTypeLabels: Record<ResponseType, string> = {
 }
 
 function blankItem(): TemplateItem { return { id: `item-${Date.now()}`, question: '', responseType: ResponseType.CONFORMITY, required: true, requireObservationOnFailure: false, requireEvidenceOnFailure: false } }
+
+function localSectionId(): string { return `sec-${Date.now()}` }
 
 function ItemModal({ data, onClose, onSave }: { data: { sectionId: string; item: TemplateItem }; onClose: () => void; onSave: (sectionId: string, item: TemplateItem) => void }) {
   const [draft, setDraft] = useState<TemplateItem>(data.item)

@@ -2,9 +2,11 @@ package com.fieldops.inspection.controller;
 
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
+import com.fieldops.inspection.model.InspectionTemplateVersion;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.InspectionTemplateVersionRepository;
 import com.fieldops.inspection.repository.TemplateItemRepository;
 import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.shared.security.AuthenticatedUser;
@@ -42,6 +44,9 @@ class InspectionTemplateControllerTest {
 
     @Autowired
     private InspectionTemplateRepository templateRepository;
+
+    @Autowired
+    private InspectionTemplateVersionRepository versionRepository;
 
     @Autowired
     private TemplateSectionRepository sectionRepository;
@@ -313,6 +318,86 @@ class InspectionTemplateControllerTest {
                         .with(authentication(authenticationFor(supervisor))))
                 .andExpect(jsonPath("$.sections[0].items[0].title").value("Segundo item"))
                 .andExpect(jsonPath("$.sections[0].items[1].title").value("Primeiro item"));
+    }
+
+    @Test
+    void publishesImmutableSequentialVersionsAndListsTheirHistory() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        template.setDescription("Primeira descricao");
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+        persistItem(section, "Aterramento conforme?", 1);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/publish", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.versionNumber").value(1))
+                .andExpect(jsonPath("$.publishedBy").value(supervisor.getId()))
+                .andExpect(jsonPath("$.publishedAt").isNotEmpty());
+
+        InspectionTemplate published = templateRepository.findById(template.getId()).orElseThrow();
+        assertThat(published.getStatus()).isEqualTo(InspectionTemplateStatus.ACTIVE);
+        assertThat(published.getCurrentVersion()).isEqualTo(1);
+        InspectionTemplateVersion firstVersion = versionRepository.findAll().get(0);
+        assertThat(firstVersion.getTitleSnapshot()).isEqualTo("Rascunho");
+        assertThat(firstVersion.getDescriptionSnapshot()).isEqualTo("Primeira descricao");
+
+        mockMvc.perform(put("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Alterado\",\"category\":\"Eletrica\"}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        published.setStatus(InspectionTemplateStatus.DRAFT);
+        published.setTitle("Segunda versao");
+        templateRepository.saveAndFlush(published);
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/publish", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.versionNumber").value(2));
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}/versions", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].versionNumber").value(1))
+                .andExpect(jsonPath("$[0].titleSnapshot").value("Rascunho"))
+                .andExpect(jsonPath("$[1].versionNumber").value(2))
+                .andExpect(jsonPath("$[1].titleSnapshot").value("Segunda versao"));
+    }
+
+    @Test
+    void rejectsPublishingAnIncompleteTemplate() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/publish", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                        "At least one section is required")));
+
+        assertThat(versionRepository.findAll()).isEmpty();
+        assertThat(templateRepository.findById(template.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionTemplateStatus.DRAFT);
+    }
+
+    @Test
+    void rejectsPublishingSingleChoiceItemWithoutTwoOptions() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+        TemplateItem item = persistItem(section, "Estado do equipamento", 1);
+        item.setResponseType(com.fieldops.inspection.model.ResponseType.SINGLE_CHOICE);
+        item.setOptionsJson("[\"Unica opcao\"]");
+        itemRepository.saveAndFlush(item);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/publish", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                        "requires at least two options")));
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(User user) {

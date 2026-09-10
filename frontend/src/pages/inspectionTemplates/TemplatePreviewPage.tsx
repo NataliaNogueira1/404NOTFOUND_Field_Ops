@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { byId, templates } from '@/mocks/domain'
-import { validateInspectionTemplate } from '@/pages/inspectionTemplates/templateValidation'
+import { PublicationIssuesDialog } from '@/pages/inspectionTemplates/PublicationIssuesDialog'
+import { inspectionTemplatePendingIssues } from '@/pages/inspectionTemplates/templateValidation'
 import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
 
@@ -22,9 +23,12 @@ export function TemplatePreviewPage() {
   const [loading, setLoading] = useState(persistedTemplate)
   const [loadError, setLoadError] = useState('')
   const [confirmPublish, setConfirmPublish] = useState(false)
-  const validation = useMemo(() => template
-    ? validateInspectionTemplate(template.title, template.category, template.sections)
-    : '', [template])
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState('')
+  const [showPublicationIssues, setShowPublicationIssues] = useState(false)
+  const publicationIssues = useMemo(() => template
+    ? inspectionTemplatePendingIssues(template.title, template.category, template.sections)
+    : [], [template])
 
   useEffect(() => {
     if (!persistedTemplate) return
@@ -34,11 +38,22 @@ export function TemplatePreviewPage() {
       .finally(() => setLoading(false))
   }, [id, persistedTemplate])
 
-  function publishLocally() {
-    if (!template || validation) return
-    templateDraftStore.set({ ...template, status: 'Ativa', version: template.version + 1 })
-    setConfirmPublish(false)
-    navigate('/app/inspection-templates')
+  async function publishTemplate() {
+    if (!template || publicationIssues.length > 0 || publishing) return
+    setPublishing(true)
+    setPublishError('')
+    try {
+      const versionNumber = persistedTemplate
+        ? (await adminCatalogApi.publishTemplate(id)).versionNumber
+        : template.version + 1
+      templateDraftStore.set({ ...template, status: 'Ativa', version: versionNumber })
+      setConfirmPublish(false)
+      navigate('/app/inspection-templates')
+    } catch {
+      setPublishError('Nao foi possivel publicar o modelo.')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   if (loading) return <Card className="p-8 text-center text-sm text-muted">Carregando previa...</Card>
@@ -57,7 +72,8 @@ export function TemplatePreviewPage() {
       </div>
     </Card>
 
-    {validation && <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark" role="alert">{validation}</Card>}
+    {publicationIssues.length > 0 && <Card className="flex flex-wrap items-center justify-between gap-3 border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark" role="alert"><p>O modelo possui {publicationIssues.length} pendencia(s) para publicacao.</p><Button variant="secondary" onClick={() => setShowPublicationIssues(true)}>Ver pendencias</Button></Card>}
+    {publishError && <p role="alert" className="text-sm font-medium text-danger">{publishError}</p>}
 
     <div className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-slate-100 p-3 shadow-fieldops" aria-label="Previa do aplicativo do tecnico">
       <div className="overflow-hidden rounded-[22px] bg-app-bg">
@@ -85,10 +101,11 @@ export function TemplatePreviewPage() {
 
     <div className="flex flex-wrap justify-between gap-3">
       <Link to={`/app/inspection-templates/${template.id}/edit`}><Button variant="secondary"><ArrowLeft size={16} />Voltar para edicao</Button></Link>
-      <Button disabled={template.status !== 'Rascunho' || Boolean(validation)} onClick={() => setConfirmPublish(true)}>Publicar versao</Button>
+      <Button disabled={template.status !== 'Rascunho' || publicationIssues.length > 0 || publishing} onClick={() => setConfirmPublish(true)}>{publishing ? 'Publicando...' : 'Publicar versao'}</Button>
     </div>
 
-    <ConfirmDialog open={confirmPublish} title="Publicar modelo?" description="Depois de publicada, esta versao nao podera ser editada." confirmLabel="Publicar versao" onCancel={() => setConfirmPublish(false)} onConfirm={publishLocally} />
+    <ConfirmDialog open={confirmPublish} title="Publicar modelo?" description="Ao publicar, a versao nao podera ser alterada. Continuar?" confirmLabel="Continuar e publicar" onCancel={() => setConfirmPublish(false)} onConfirm={() => void publishTemplate()} />
+    <PublicationIssuesDialog issues={publicationIssues} open={showPublicationIssues} onClose={() => setShowPublicationIssues(false)} />
   </div>
 }
 

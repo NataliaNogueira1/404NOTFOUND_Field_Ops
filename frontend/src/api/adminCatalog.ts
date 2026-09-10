@@ -55,6 +55,15 @@ export interface TemplateSummary {
   status: TemplateListStatus
 }
 
+export interface InspectionTemplateVersion {
+  id: string
+  versionNumber: number
+  titleSnapshot: string
+  descriptionSnapshot: string | null
+  publishedAt: string
+  publishedBy: string
+}
+
 export interface AdminInspectionSummary {
   id: string
   title: string
@@ -98,6 +107,10 @@ interface BackendTemplateItem extends Omit<TemplateItemInput, 'description'> {
 interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technicianId'> {
   id: number
   technicianId: number
+}
+interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 'publishedBy'> {
+  id: number
+  publishedBy: number
 }
 
 export const adminCatalogApi = {
@@ -149,6 +162,18 @@ export const adminCatalogApi = {
       method: 'PUT', body: JSON.stringify(input),
     })
     return managedItem(result)
+  },
+
+  async publishTemplate(templateId: string) {
+    const version = await apiRequest<BackendTemplateVersion>(`/api/v1/inspection-templates/${templateId}/publish`, {
+      method: 'POST',
+    })
+    return managedVersion(version)
+  },
+
+  async listTemplateVersions(templateId: string) {
+    const versions = await apiRequest<BackendTemplateVersion[]>(`/api/v1/inspection-templates/${templateId}/versions`)
+    return versions.map(managedVersion)
   },
 
   async listTemplates(filters: { name: string; status: TemplateListStatus | ''; page: number; size: number; sort: string }) {
@@ -209,6 +234,10 @@ function managedItem(item: BackendTemplateItem): TemplateItem {
     requireObservationOnFailure: item.observationRequiredOnFailure ?? false,
     requireEvidenceOnFailure: item.evidenceRequiredOnFailure ?? false,
   }
+}
+
+function managedVersion(version: BackendTemplateVersion): InspectionTemplateVersion {
+  return { ...version, id: String(version.id), publishedBy: String(version.publishedBy) }
 }
 
 function pageParams(page: number, size: number, sort: string) {

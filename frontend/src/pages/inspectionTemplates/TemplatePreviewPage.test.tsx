@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TemplatePreviewPage } from '@/pages/inspectionTemplates/TemplatePreviewPage'
@@ -10,7 +11,13 @@ afterEach(() => {
 
 describe('TemplatePreviewPage', () => {
   it('renders the persisted checklist in order with read-only response controls', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(validTemplate())))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(validTemplate()))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 501, versionNumber: 1, titleSnapshot: 'Modelo de campo', descriptionSnapshot: 'Checklist eletrico',
+        publishedAt: '2026-09-09T12:00:00Z', publishedBy: 7,
+      }, 201))
+    vi.stubGlobal('fetch', fetchMock)
     renderPreview('99')
 
     expect(await screen.findByRole('heading', { name: 'Previa: Modelo de campo' })).not.toBeNull()
@@ -38,6 +45,13 @@ describe('TemplatePreviewPage', () => {
       'href', '/app/inspection-templates/99/edit',
     )
     expect(screen.getByRole('button', { name: 'Publicar versao' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Publicar versao' }))
+    expect(screen.getByText('Ao publicar, a versao nao podera ser alterada. Continuar?')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar e publicar' }))
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/v1/inspection-templates/99/publish'),
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 
   it('disables publishing when the template is invalid', async () => {
@@ -47,7 +61,9 @@ describe('TemplatePreviewPage', () => {
     renderPreview('100')
 
     expect(await screen.findByRole('button', { name: 'Publicar versao' })).toBeDisabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Todas as secoes precisam de pelo menos um item.')
+    await userEvent.click(screen.getByRole('button', { name: 'Ver pendencias' }))
+    expect(screen.getByRole('heading', { name: 'Pendencias para publicacao' })).not.toBeNull()
+    expect(screen.getByText('Todas as secoes precisam de pelo menos um item.')).not.toBeNull()
   })
 })
 
@@ -100,6 +116,6 @@ function item(id: number, title: string, responseType: string, displayOrder: num
   }
 }
 
-function jsonResponse(body: unknown) {
-  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
