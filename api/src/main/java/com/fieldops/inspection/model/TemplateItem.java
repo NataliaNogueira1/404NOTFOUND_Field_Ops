@@ -34,11 +34,11 @@ public class TemplateItem {
     private boolean requireEvidenceOnFailure;
 
     /** JSON array of options for SINGLE_CHOICE type */
-    @Column(columnDefinition = "TEXT")
-    private String options;
+    @Column(name = "options_json", columnDefinition = "TEXT")
+    private String optionsJson;
 
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder;
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder;
 
     public Long getId() { return id; }
     public TemplateSection getSection() { return section; }
@@ -55,8 +55,12 @@ public class TemplateItem {
     public void setRequireObservationOnFailure(boolean v) { this.requireObservationOnFailure = v; }
     public boolean isRequireEvidenceOnFailure() { return requireEvidenceOnFailure; }
     public void setRequireEvidenceOnFailure(boolean v) { this.requireEvidenceOnFailure = v; }
-    public String getOptions() { return options; }
-    public void setOptions(String options) { this.options = options; }
-    public Integer getSortOrder() { return sortOrder; }
-    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public String getOptionsJson() { return optionsJson; }
+    public void setOptionsJson(String optionsJson) { this.optionsJson = optionsJson; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+    public String getOptions() { return optionsJson; }
+    public void setOptions(String options) { this.optionsJson = options; }
+    public Integer getSortOrder() { return displayOrder; }
+    public void setSortOrder(Integer sortOrder) { this.displayOrder = sortOrder; }
 }

@@ -3,7 +3,9 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.TemplateSection;
+import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateItemRepository;
 import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.shared.security.AuthenticatedUser;
 import com.fieldops.user.model.Role;
@@ -43,6 +45,9 @@ class InspectionTemplateControllerTest {
 
     @Autowired
     private TemplateSectionRepository sectionRepository;
+
+    @Autowired
+    private TemplateItemRepository itemRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -217,6 +222,91 @@ class InspectionTemplateControllerTest {
                 .andExpect(jsonPath("$.code").value("BUSINESS_RULE"));
     }
 
+    @Test
+    void createsSingleChoiceItemLinkedToRequestedSection() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections/{sectionId}/items",
+                        template.getId(), section.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Qual o estado da placa?",
+                                  "description": "Verifique fixacao e danos",
+                                  "responseType": "SINGLE_CHOICE",
+                                  "required": true,
+                                  "optionsJson": ["Legivel", "Danificada"],
+                                  "displayOrder": 1
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Qual o estado da placa?"))
+                .andExpect(jsonPath("$.responseType").value("SINGLE_CHOICE"))
+                .andExpect(jsonPath("$.optionsJson[0]").value("Legivel"))
+                .andExpect(jsonPath("$.optionsJson[1]").value("Danificada"))
+                .andExpect(jsonPath("$.displayOrder").value(1));
+
+        TemplateItem saved = itemRepository.findAll().get(0);
+        assertThat(saved.getSection().getId()).isEqualTo(section.getId());
+        assertThat(saved.getOptionsJson()).isEqualTo("[\"Legivel\",\"Danificada\"]");
+    }
+
+    @Test
+    void rejectsSingleChoiceItemWithFewerThanTwoOptions() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections/{sectionId}/items",
+                        template.getId(), section.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Qual o estado?",
+                                  "responseType": "SINGLE_CHOICE",
+                                  "required": true,
+                                  "optionsJson": ["Legivel"],
+                                  "displayOrder": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void reordersItemsAndReturnsThemInDisplayOrder() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+        TemplateItem first = persistItem(section, "Primeiro item", 1);
+        persistItem(section, "Segundo item", 2);
+
+        mockMvc.perform(put("/api/v1/inspection-templates/{id}/sections/{sectionId}/items/{itemId}",
+                        template.getId(), section.getId(), first.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Primeiro item",
+                                  "responseType": "BOOLEAN",
+                                  "required": true,
+                                  "optionsJson": null,
+                                  "displayOrder": 2
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayOrder").value(2));
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(jsonPath("$.sections[0].items[0].title").value("Segundo item"))
+                .andExpect(jsonPath("$.sections[0].items[1].title").value("Primeiro item"));
+    }
+
     private UsernamePasswordAuthenticationToken authenticationFor(User user) {
         AuthenticatedUser principal = new AuthenticatedUser(user);
         return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
@@ -250,6 +340,18 @@ class InspectionTemplateControllerTest {
         section.setDisplayOrder(displayOrder);
         TemplateSection saved = sectionRepository.saveAndFlush(section);
         template.getSections().add(saved);
+        return saved;
+    }
+
+    private TemplateItem persistItem(TemplateSection section, String title, int displayOrder) {
+        TemplateItem item = new TemplateItem();
+        item.setSection(section);
+        item.setQuestion(title);
+        item.setResponseType(com.fieldops.inspection.model.ResponseType.BOOLEAN);
+        item.setRequired(true);
+        item.setDisplayOrder(displayOrder);
+        TemplateItem saved = itemRepository.saveAndFlush(item);
+        section.getItems().add(saved);
         return saved;
     }
 }

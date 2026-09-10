@@ -70,6 +70,64 @@ describe('TemplateBuilderPage sections', () => {
       expect.stringContaining('/sections/11'), expect.objectContaining({ method: 'DELETE' }),
     ))
   })
+
+  it('creates a single-choice item with two dynamic options', async () => {
+    const template = templateResponse()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(template))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 21, title: 'Estado da placa', description: 'Verifique danos', responseType: 'SINGLE_CHOICE',
+        required: true, optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
+      }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+    renderBuilder()
+
+    await screen.findByRole('heading', { name: 'Seguranca' })
+    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item a secao' })[0])
+    expect(screen.getAllByRole('option')).toHaveLength(7)
+    await userEvent.type(screen.getByLabelText('Titulo (pergunta)'), 'Estado da placa')
+    await userEvent.type(screen.getByLabelText('Descricao (ajuda)'), 'Verifique danos')
+    await userEvent.selectOptions(screen.getByLabelText('Tipo de resposta'), 'SINGLE_CHOICE')
+    const options = screen.getAllByLabelText(/Opcao \d/)
+    await userEvent.type(options[0], 'Legivel')
+    await userEvent.type(options[1], 'Danificada')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar item' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/sections/11/items'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Estado da placa', description: 'Verifique danos', responseType: 'SINGLE_CHOICE',
+          required: true, optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
+        }),
+      }),
+    ))
+    expect(await screen.findByText('Estado da placa')).not.toBeNull()
+    expect(screen.getByText('Selecao unica')).not.toBeNull()
+    expect(screen.getByText('Ordem 1')).not.toBeNull()
+  })
+
+  it('persists item reordering inside its section', async () => {
+    const template = templateResponse()
+    template.sections[0].items = [
+      { id: 21, title: 'Primeiro', description: null, responseType: 'BOOLEAN', required: true, optionsJson: [], displayOrder: 1 },
+      { id: 22, title: 'Segundo', description: null, responseType: 'DATE', required: false, optionsJson: [], displayOrder: 2 },
+    ]
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(template))
+      .mockResolvedValueOnce(jsonResponse({ ...template.sections[0].items[1], displayOrder: 1 }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderBuilder()
+
+    await screen.findByText('Segundo')
+    await userEvent.click(screen.getByRole('button', { name: 'Mover Segundo para cima' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/sections/11/items/22'),
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining('"displayOrder":1') }),
+    ))
+    expect(screen.getByText('Segundo').closest('div')?.textContent).toContain('Ordem 1')
+  })
 })
 
 function renderBuilder() {
@@ -85,8 +143,8 @@ function templateResponse() {
     id: 42, title: 'Modelo', description: '', category: 'Seguranca', status: 'DRAFT',
     currentVersion: 0, createdBy: 7, version: 0,
     sections: [
-      { id: 11, title: 'Seguranca', description: null, displayOrder: 1 },
-      { id: 12, title: 'Eletrica', description: null, displayOrder: 2 },
+      { id: 11, title: 'Seguranca', description: null, displayOrder: 1, items: [] as Array<Record<string, unknown>> },
+      { id: 12, title: 'Eletrica', description: null, displayOrder: 2, items: [] as Array<Record<string, unknown>> },
     ],
   }
 }

@@ -17,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemplateSectionService {
 
     private final InspectionTemplateRepository templateRepository;
+    private final TemplateItemService itemService;
 
-    public TemplateSectionService(InspectionTemplateRepository templateRepository) {
+    public TemplateSectionService(InspectionTemplateRepository templateRepository, TemplateItemService itemService) {
         this.templateRepository = templateRepository;
+        this.itemService = itemService;
     }
 
     /** Creates a section at the requested one-based position and shifts following sections. */
@@ -111,15 +113,15 @@ public class TemplateSectionService {
         return description == null || description.isBlank() ? null : description.trim();
     }
 
-    public static List<TemplateSectionResponse> toOrderedResponses(List<TemplateSection> sections) {
+    public List<TemplateSectionResponse> toOrderedResponses(List<TemplateSection> sections) {
         return sections.stream()
                 .sorted(Comparator.comparing(TemplateSection::getDisplayOrder))
-                .map(TemplateSectionService::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
-    private static TemplateSectionResponse toResponse(TemplateSection section) {
+    private TemplateSectionResponse toResponse(TemplateSection section) {
         return new TemplateSectionResponse(section.getId(), section.getTitle(), section.getDescription(),
-                section.getDisplayOrder(), section.getCreatedAt());
+                section.getDisplayOrder(), section.getCreatedAt(), itemService.toOrderedResponses(section.getItems()));
     }
 }

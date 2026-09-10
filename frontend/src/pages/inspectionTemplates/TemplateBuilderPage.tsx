@@ -14,6 +14,7 @@ import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
 
 type SectionDraft = Pick<TemplateSection, 'id' | 'title' | 'description'>
+type OptionDraft = { id: string; value: string }
 
 export function TemplateBuilderPage() {
   const navigate = useNavigate()
@@ -41,7 +42,7 @@ export function TemplateBuilderPage() {
       setCategory(template.category)
       setDescription(template.description)
       setIsDraft(template.status === 'DRAFT')
-      setSections(template.sections.map(section => ({ ...section, items: [] })))
+      setSections(template.sections.map(section => ({ ...section, items: orderedItems(section.items) })))
     }).catch(() => setSaveError('Nao foi possivel carregar o modelo.'))
   }, [id, persistedTemplate])
 
@@ -122,24 +123,51 @@ export function TemplateBuilderPage() {
     }
   }
 
-  function moveItem(sectionId: string, itemId: string, direction: -1 | 1) {
-    setSections(current => current.map(section => {
-      if (section.id !== sectionId) return section
-      const index = section.items.findIndex(item => item.id === itemId)
-      const target = index + direction
-      return target < 0 || target >= section.items.length
-        ? section
-        : { ...section, items: swap(section.items, index, target) }
-    }))
+  async function moveItem(sectionId: string, itemId: string, direction: -1 | 1) {
+    const section = sections.find(candidate => candidate.id === sectionId)
+    if (!section) return
+    const currentIndex = section.items.findIndex(item => item.id === itemId)
+    const targetIndex = currentIndex + direction
+    if (targetIndex < 0 || targetIndex >= section.items.length) return
+    const original = sections
+    const reorderedItems = normalizeItemOrder(swap(section.items, currentIndex, targetIndex))
+    const moved = reorderedItems[targetIndex]
+    setSections(current => current.map(candidate => candidate.id === sectionId
+      ? { ...candidate, items: reorderedItems }
+      : candidate))
+    setSaveError('')
+    try {
+      if (persistedTemplate) {
+        await adminCatalogApi.updateTemplateItem(id, sectionId, moved.id, itemInput(moved, targetIndex + 1))
+      }
+    } catch {
+      setSections(original)
+      setSaveError('Nao foi possivel reordenar o item.')
+    }
   }
 
-  function saveItem(sectionId: string, item: TemplateItem) {
-    setSections(current => current.map(section => section.id === sectionId
-      ? { ...section, items: section.items.some(candidate => candidate.id === item.id)
-          ? section.items.map(candidate => candidate.id === item.id ? item : candidate)
-          : [...section.items, item] }
-      : section))
-    setEditingItem(null)
+  async function saveItem(sectionId: string, item: TemplateItem) {
+    const section = sections.find(candidate => candidate.id === sectionId)
+    if (!section) return
+    const existingIndex = section.items.findIndex(candidate => candidate.id === item.id)
+    const displayOrder = existingIndex >= 0 ? existingIndex + 1 : section.items.length + 1
+    setSaveError('')
+    try {
+      const saved = persistedTemplate
+        ? existingIndex >= 0
+          ? await adminCatalogApi.updateTemplateItem(id, sectionId, item.id, itemInput(item, displayOrder))
+          : await adminCatalogApi.createTemplateItem(id, sectionId, itemInput(item, displayOrder))
+        : { ...item, displayOrder }
+      setSections(current => current.map(candidate => candidate.id === sectionId
+        ? { ...candidate, items: existingIndex >= 0
+            ? candidate.items.map(currentItem => currentItem.id === item.id ? saved : currentItem)
+            : [...candidate.items, saved] }
+        : candidate))
+      setEditingItem(null)
+      showSuccess()
+    } catch {
+      setSaveError('Nao foi possivel salvar o item.')
+    }
   }
 
   function showSuccess() {
@@ -171,7 +199,7 @@ export function TemplateBuilderPage() {
         onMove={direction => void moveSection(section.id, direction)}
         onEdit={() => setSectionDraft(section)} onDelete={() => setDeletingSection(section)}
         onAddItem={() => setEditingItem({ sectionId: section.id, item: blankItem() })}
-        onMoveItem={(itemId, direction) => moveItem(section.id, itemId, direction)}
+        onMoveItem={(itemId, direction) => void moveItem(section.id, itemId, direction)}
         onEditItem={item => setEditingItem({ sectionId: section.id, item })}
         onDeleteItem={itemId => setSections(current => current.map(candidate => candidate.id === section.id ? { ...candidate, items: candidate.items.filter(item => item.id !== itemId) } : candidate))} />)}
       <Button variant="secondary" disabled={!isDraft} onClick={() => setSectionDraft({ id: '', title: '', description: '' })}><Plus size={17} />Adicionar secao</Button>
@@ -202,8 +230,8 @@ function SectionCard({ section, index, count, editable, onMove, onEdit, onDelete
     <div className="space-y-3">
       {section.items.map((item, itemIndex) => <div key={item.id} className="rounded-fieldops border border-border bg-slate-50 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div><p className="font-medium">{itemIndex + 1}. {item.question || 'Item sem pergunta'}</p><div className="mt-2 flex flex-wrap gap-2"><Badge tone="primary">{item.responseType}</Badge>{item.required && <Badge tone="warning">Obrigatorio</Badge>}{item.requireObservationOnFailure && <Badge tone="danger">Observacao na falha</Badge>}{item.requireEvidenceOnFailure && <Badge tone="danger">Evidencia na falha</Badge>}</div></div>
-          <div className="flex gap-1"><Button variant="ghost" className="h-8 px-2" onClick={() => onMoveItem(item.id, -1)}><ArrowUp size={16} /></Button><Button variant="ghost" className="h-8 px-2" onClick={() => onMoveItem(item.id, 1)}><ArrowDown size={16} /></Button><Button variant="ghost" className="h-8 px-2" onClick={() => onEditItem(item)}><Pencil size={16} /></Button><Button variant="ghost" className="h-8 px-2" onClick={() => onDeleteItem(item.id)}><Trash2 size={16} /></Button></div>
+          <div><p className="font-medium">{item.question || 'Item sem pergunta'}</p><div className="mt-2 flex flex-wrap gap-2"><Badge tone="primary">{responseTypeLabels[item.responseType]}</Badge><Badge tone="primary">Ordem {itemIndex + 1}</Badge>{item.required && <Badge tone="warning">Obrigatorio</Badge>}{item.requireObservationOnFailure && <Badge tone="danger">Observacao na falha</Badge>}{item.requireEvidenceOnFailure && <Badge tone="danger">Evidencia na falha</Badge>}</div></div>
+          <div className="flex gap-1"><Button variant="ghost" className="h-8 px-2" aria-label={`Mover ${item.question} para cima`} disabled={itemIndex === 0} onClick={() => onMoveItem(item.id, -1)}><ArrowUp size={16} /></Button><Button variant="ghost" className="h-8 px-2" aria-label={`Mover ${item.question} para baixo`} disabled={itemIndex === section.items.length - 1} onClick={() => onMoveItem(item.id, 1)}><ArrowDown size={16} /></Button><Button variant="ghost" className="h-8 px-2" aria-label={`Editar ${item.question}`} onClick={() => onEditItem(item)}><Pencil size={16} /></Button><Button variant="ghost" className="h-8 px-2" aria-label={`Excluir ${item.question}`} onClick={() => onDeleteItem(item.id)}><Trash2 size={16} /></Button></div>
         </div>
       </div>)}
       {section.items.length === 0 && <p className="rounded-fieldops border border-dashed border-border p-4 text-sm text-muted">Itens serao adicionados aqui.</p>}
@@ -231,6 +259,25 @@ function normalizeDisplayOrder(sections: TemplateSection[]) {
   return sections.map((section, index) => ({ ...section, displayOrder: index + 1 }))
 }
 
+function normalizeItemOrder(items: TemplateItem[]) {
+  return items.map((item, index) => ({ ...item, displayOrder: index + 1 }))
+}
+
+function orderedItems(items: TemplateItem[]) {
+  return normalizeItemOrder([...items].sort((first, second) => (first.displayOrder ?? 0) - (second.displayOrder ?? 0)))
+}
+
+function itemInput(item: TemplateItem, displayOrder: number) {
+  return {
+    title: item.question.trim(),
+    description: item.description?.trim() ?? '',
+    responseType: item.responseType,
+    required: item.required,
+    optionsJson: item.responseType === ResponseType.SINGLE_CHOICE ? item.options ?? [] : null,
+    displayOrder,
+  }
+}
+
 function swap<T>(values: T[], first: number, second: number) {
   const result = [...values]
   ;[result[first], result[second]] = [result[second], result[first]]
@@ -251,14 +298,73 @@ function validateTemplate(title: string, category: string, sections: TemplateSec
   if (sections.some(section => !section.title.trim())) return 'Todas as secoes precisam de titulo.'
   if (sections.some(section => section.items.length === 0)) return 'Todas as secoes precisam de pelo menos um item.'
   if (sections.some(section => section.items.some(item => !item.question.trim()))) return 'Todos os itens precisam de pergunta.'
-  if (sections.some(section => section.items.some(item => item.responseType === ResponseType.SINGLE_CHOICE && (!item.options || item.options.length === 0)))) return 'Itens SINGLE_CHOICE precisam de opcoes.'
+  if (sections.some(section => section.items.some(item => item.responseType === ResponseType.SINGLE_CHOICE && (item.options ?? []).filter(option => option.trim()).length < 2))) return 'Itens SINGLE_CHOICE precisam de pelo menos duas opcoes.'
   return ''
+}
+
+const responseTypeLabels: Record<ResponseType, string> = {
+  [ResponseType.TEXT_SHORT]: 'Texto curto',
+  [ResponseType.TEXT_LONG]: 'Texto longo',
+  [ResponseType.NUMBER]: 'Numero',
+  [ResponseType.BOOLEAN]: 'Sim/Nao',
+  [ResponseType.CONFORMITY]: 'Conforme/Nao Conforme',
+  [ResponseType.SINGLE_CHOICE]: 'Selecao unica',
+  [ResponseType.DATE]: 'Data',
 }
 
 function blankItem(): TemplateItem { return { id: `item-${Date.now()}`, question: '', responseType: ResponseType.CONFORMITY, required: true, requireObservationOnFailure: false, requireEvidenceOnFailure: false } }
 
 function ItemModal({ data, onClose, onSave }: { data: { sectionId: string; item: TemplateItem }; onClose: () => void; onSave: (sectionId: string, item: TemplateItem) => void }) {
   const [draft, setDraft] = useState<TemplateItem>(data.item)
-  const error = !draft.question.trim() ? 'Informe a pergunta do item.' : draft.responseType === ResponseType.SINGLE_CHOICE && (!draft.options || draft.options.length === 0) ? 'Informe pelo menos uma opcao.' : ''
-  return <Modal open title="Item do checklist" onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button disabled={Boolean(error)} onClick={() => onSave(data.sectionId, draft)}>Salvar item</Button></>}><div className="space-y-4"><Input label="Pergunta" id="item-question" value={draft.question} onChange={event => setDraft({ ...draft, question: event.target.value })} /><Textarea label="Descricao" id="item-desc" value={draft.description ?? ''} onChange={event => setDraft({ ...draft, description: event.target.value })} /><Select label="Tipo de resposta" id="item-type" value={draft.responseType} onChange={event => setDraft({ ...draft, responseType: event.target.value as ResponseType })}>{Object.values(ResponseType).map(value => <option key={value}>{value}</option>)}</Select><div className="grid gap-3 sm:grid-cols-3">{[['required','Item obrigatorio'], ['requireObservationOnFailure','Observacao obrigatoria na falha'], ['requireEvidenceOnFailure','Evidencia obrigatoria na falha']].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm"><input type="checkbox" checked={Boolean(draft[key as keyof TemplateItem])} onChange={event => setDraft({ ...draft, [key]: event.target.checked })} />{label}</label>)}</div>{draft.responseType === ResponseType.SINGLE_CHOICE && <Input label="Opcoes" id="item-options" value={(draft.options ?? []).join(', ')} onChange={event => setDraft({ ...draft, options: event.target.value.split(',').map(value => value.trim()).filter(Boolean) })} />}{error && <p className="text-sm font-medium text-danger">{error}</p>}</div></Modal>
+  const [optionDrafts, setOptionDrafts] = useState<OptionDraft[]>(() => (data.item.options ?? []).map((value, index) => ({ id: `${data.item.id}-option-${index}`, value })))
+  const validOptions = (draft.options ?? []).filter(option => option.trim()).length >= 2
+  const error = !draft.question.trim()
+    ? 'Informe a pergunta do item.'
+    : draft.responseType === ResponseType.SINGLE_CHOICE && !validOptions
+      ? 'Informe pelo menos duas opcoes.'
+      : ''
+
+  function changeResponseType(responseType: ResponseType) {
+    const choices = optionDrafts.length > 0 ? optionDrafts : newOptions(2)
+    if (responseType === ResponseType.SINGLE_CHOICE && optionDrafts.length === 0) setOptionDrafts(choices)
+    setDraft({ ...draft, responseType, options: responseType === ResponseType.SINGLE_CHOICE ? choices.map(option => option.value) : undefined })
+  }
+
+  function changeOption(optionId: string, value: string) {
+    const choices = optionDrafts.map(option => option.id === optionId ? { ...option, value } : option)
+    setOptionDrafts(choices)
+    setDraft({ ...draft, options: choices.map(option => option.value) })
+  }
+
+  function removeOption(optionId: string) {
+    const choices = optionDrafts.filter(option => option.id !== optionId)
+    setOptionDrafts(choices)
+    setDraft({ ...draft, options: choices.map(option => option.value) })
+  }
+
+  function addOption() {
+    const choices = [...optionDrafts, ...newOptions(1)]
+    setOptionDrafts(choices)
+    setDraft({ ...draft, options: choices.map(option => option.value) })
+  }
+
+  return <Modal open title="Item do checklist" onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button disabled={Boolean(error)} onClick={() => onSave(data.sectionId, draft)}>Salvar item</Button></>}>
+    <div className="space-y-4">
+      <Input label="Titulo (pergunta)" id="item-question" maxLength={500} value={draft.question} onChange={event => setDraft({ ...draft, question: event.target.value })} />
+      <Textarea label="Descricao (ajuda)" id="item-desc" maxLength={1000} value={draft.description ?? ''} onChange={event => setDraft({ ...draft, description: event.target.value })} />
+      <Select label="Tipo de resposta" id="item-type" value={draft.responseType} onChange={event => changeResponseType(event.target.value as ResponseType)}>{Object.values(ResponseType).map(value => <option key={value} value={value}>{responseTypeLabels[value]}</option>)}</Select>
+      <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm"><input type="checkbox" checked={draft.required} onChange={event => setDraft({ ...draft, required: event.target.checked })} />Item obrigatorio</label>
+      {draft.responseType === ResponseType.SINGLE_CHOICE && <div className="space-y-3">
+        <p className="text-sm font-medium">Opcoes de resposta</p>
+        {optionDrafts.map((option, index) => <div key={option.id} className="flex items-end gap-2"><div className="flex-1"><Input label={`Opcao ${index + 1}`} id={`item-option-${option.id}`} value={option.value} onChange={event => changeOption(option.id, event.target.value)} /></div><Button variant="ghost" className="mb-0.5 px-2" aria-label={`Remover opcao ${index + 1}`} onClick={() => removeOption(option.id)}><Trash2 size={16} /></Button></div>)}
+        <Button variant="secondary" onClick={addOption}><Plus size={16} />Adicionar opcao</Button>
+      </div>}
+      {error && <p role="alert" className="text-sm font-medium text-danger">{error}</p>}
+    </div>
+  </Modal>
+}
+
+let optionSequence = 0
+function newOptions(count: number): OptionDraft[] {
+  return Array.from({ length: count }, () => ({ id: `new-option-${optionSequence++}`, value: '' }))
 }

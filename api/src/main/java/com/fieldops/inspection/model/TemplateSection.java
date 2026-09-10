@@ -30,7 +30,7 @@ public class TemplateSection {
     private Instant createdAt;
 
     @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sortOrder ASC")
+    @OrderBy("displayOrder ASC")
     private List<TemplateItem> items = new ArrayList<>();
 
     @PrePersist
