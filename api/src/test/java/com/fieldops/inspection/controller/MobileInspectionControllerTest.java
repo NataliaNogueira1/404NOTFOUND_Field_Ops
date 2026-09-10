@@ -3,6 +3,7 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplate;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
@@ -71,6 +72,8 @@ class MobileInspectionControllerTest {
 
     private User otherTechnician;
 
+    private InspectionTemplate template;
+
     @BeforeEach
     void seedTechnicianWithTwoActionableInspections() {
         inspectionRepository.deleteAll();
@@ -82,7 +85,7 @@ class MobileInspectionControllerTest {
         technician = persistUser("tech@fieldops.com", Role.TECHNICIAN);
         otherTechnician = persistUser("other-tech@fieldops.com", Role.TECHNICIAN);
         User supervisor = persistUser("sup@fieldops.com", Role.SUPERVISOR);
-        InspectionTemplate template = persistTemplate(supervisor);
+        template = persistTemplate(supervisor);
 
         saveInspection(template, technician, supervisor, InspectionStatus.ASSIGNED, Priority.HIGH);
         saveInspection(template, technician, supervisor, InspectionStatus.IN_PROGRESS, Priority.LOW);
@@ -109,6 +112,19 @@ class MobileInspectionControllerTest {
                 .allSatisfy(snapshot -> assertThat(snapshot.getRulesJson()).isEqualTo(
                         "{\"required\":true,\"observationRequiredOnFailure\":true,"
                                 + "\"evidenceRequiredOnFailure\":true}"));
+    }
+
+    @Test
+    void rendersChecklistFromSnapshotsAfterTheTemplateChanges() throws Exception {
+        TemplateItem sourceItem = template.getSections().get(0).getItems().get(0);
+        sourceItem.setQuestion("Changed template question");
+        templateRepository.saveAndFlush(template);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections")
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].template.sections[0].items[0].question")
+                        .value("Is the equipment grounded?"));
     }
 
     @Test
@@ -143,6 +159,7 @@ class MobileInspectionControllerTest {
     private InspectionTemplate persistTemplate(User creator) {
         TemplateItem item = new TemplateItem();
         item.setQuestion("Is the equipment grounded?");
+        item.setCode("SAFE-001");
         item.setResponseType(ResponseType.BOOLEAN);
         item.setRequired(true);
         item.setObservationRequiredOnFailure(true);
@@ -180,6 +197,8 @@ class MobileInspectionControllerTest {
         inspection.setStatus(status);
         inspection.setPriority(priority);
         inspection.setDueDate(LocalDate.now().plusDays(1));
+        template.getSections().forEach(section -> section.getItems().forEach(item ->
+                inspection.addItemSnapshot(InspectionItemSnapshot.from(inspection, section, item))));
         inspectionRepository.save(inspection);
     }
 

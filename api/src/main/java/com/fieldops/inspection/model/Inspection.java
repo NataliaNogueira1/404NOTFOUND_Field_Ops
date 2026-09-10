@@ -23,6 +23,10 @@ public class Inspection {
     @JoinColumn(name = "template_id", nullable = false)
     private InspectionTemplate template;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "template_version_id")
+    private InspectionTemplateVersion templateVersion;
+
     @Column(name = "client_name", nullable = false, length = 200)
     private String clientName;
 
@@ -77,12 +81,6 @@ public class Inspection {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (itemSnapshots.isEmpty() && template != null) {
-            template.getSections().stream()
-                    .flatMap(section -> section.getItems().stream())
-                    .map(item -> InspectionItemSnapshot.from(this, item))
-                    .forEach(itemSnapshots::add);
-        }
     }
 
     @PreUpdate
@@ -96,6 +94,8 @@ public class Inspection {
     public void setTitle(String title) { this.title = title; }
     public InspectionTemplate getTemplate() { return template; }
     public void setTemplate(InspectionTemplate template) { this.template = template; }
+    public InspectionTemplateVersion getTemplateVersion() { return templateVersion; }
+    public void setTemplateVersion(InspectionTemplateVersion templateVersion) { this.templateVersion = templateVersion; }
     public String getClientName() { return clientName; }
     public void setClientName(String clientName) { this.clientName = clientName; }
     public String getSiteName() { return siteName; }
@@ -123,4 +123,5 @@ public class Inspection {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<InspectionItemSnapshot> getItemSnapshots() { return itemSnapshots; }
+    public void addItemSnapshot(InspectionItemSnapshot snapshot) { itemSnapshots.add(snapshot); }
 }

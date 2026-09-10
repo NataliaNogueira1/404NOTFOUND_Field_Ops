@@ -14,6 +14,9 @@ public class TemplateItem {
     @JoinColumn(name = "section_id", nullable = false)
     private TemplateSection section;
 
+    @Column(length = 100)
+    private String code;
+
     @Column(nullable = false, length = 500)
     private String question;
 
@@ -43,6 +46,8 @@ public class TemplateItem {
     public Long getId() { return id; }
     public TemplateSection getSection() { return section; }
     public void setSection(TemplateSection section) { this.section = section; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
     public String getQuestion() { return question; }
     public void setQuestion(String question) { this.question = question; }
     public String getDescription() { return description; }
