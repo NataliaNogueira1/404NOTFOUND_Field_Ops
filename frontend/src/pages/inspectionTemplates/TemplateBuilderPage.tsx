@@ -273,6 +273,8 @@ function itemInput(item: TemplateItem, displayOrder: number) {
     description: item.description?.trim() ?? '',
     responseType: item.responseType,
     required: item.required,
+    observationRequiredOnFailure: item.requireObservationOnFailure,
+    evidenceRequiredOnFailure: item.requireEvidenceOnFailure,
     optionsJson: item.responseType === ResponseType.SINGLE_CHOICE ? item.options ?? [] : null,
     displayOrder,
   }
@@ -354,6 +356,8 @@ function ItemModal({ data, onClose, onSave }: { data: { sectionId: string; item:
       <Textarea label="Descricao (ajuda)" id="item-desc" maxLength={1000} value={draft.description ?? ''} onChange={event => setDraft({ ...draft, description: event.target.value })} />
       <Select label="Tipo de resposta" id="item-type" value={draft.responseType} onChange={event => changeResponseType(event.target.value as ResponseType)}>{Object.values(ResponseType).map(value => <option key={value} value={value}>{responseTypeLabels[value]}</option>)}</Select>
       <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm"><input type="checkbox" checked={draft.required} onChange={event => setDraft({ ...draft, required: event.target.checked })} />Item obrigatorio</label>
+      <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm"><input type="checkbox" checked={draft.requireObservationOnFailure} onChange={event => setDraft({ ...draft, requireObservationOnFailure: event.target.checked })} />Observacao obrigatoria na falha</label>
+      <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm"><input type="checkbox" checked={draft.requireEvidenceOnFailure} onChange={event => setDraft({ ...draft, requireEvidenceOnFailure: event.target.checked })} />Evidencia obrigatoria na falha</label>
       {draft.responseType === ResponseType.SINGLE_CHOICE && <div className="space-y-3">
         <p className="text-sm font-medium">Opcoes de resposta</p>
         {optionDrafts.map((option, index) => <div key={option.id} className="flex items-end gap-2"><div className="flex-1"><Input label={`Opcao ${index + 1}`} id={`item-option-${option.id}`} value={option.value} onChange={event => changeOption(option.id, event.target.value)} /></div><Button variant="ghost" className="mb-0.5 px-2" aria-label={`Remover opcao ${index + 1}`} onClick={() => removeOption(option.id)}><Trash2 size={16} /></Button></div>)}

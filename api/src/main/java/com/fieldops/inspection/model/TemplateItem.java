@@ -27,11 +27,11 @@ public class TemplateItem {
     @Column(nullable = false)
     private boolean required;
 
-    @Column(name = "require_observation_on_failure", nullable = false)
-    private boolean requireObservationOnFailure;
+    @Column(name = "observation_required_on_failure", nullable = false)
+    private boolean observationRequiredOnFailure;
 
-    @Column(name = "require_evidence_on_failure", nullable = false)
-    private boolean requireEvidenceOnFailure;
+    @Column(name = "evidence_required_on_failure", nullable = false)
+    private boolean evidenceRequiredOnFailure;
 
     /** JSON array of options for SINGLE_CHOICE type */
     @Column(name = "options_json", columnDefinition = "TEXT")
@@ -51,10 +51,10 @@ public class TemplateItem {
     public void setResponseType(ResponseType responseType) { this.responseType = responseType; }
     public boolean isRequired() { return required; }
     public void setRequired(boolean required) { this.required = required; }
-    public boolean isRequireObservationOnFailure() { return requireObservationOnFailure; }
-    public void setRequireObservationOnFailure(boolean v) { this.requireObservationOnFailure = v; }
-    public boolean isRequireEvidenceOnFailure() { return requireEvidenceOnFailure; }
-    public void setRequireEvidenceOnFailure(boolean v) { this.requireEvidenceOnFailure = v; }
+    public boolean isObservationRequiredOnFailure() { return observationRequiredOnFailure; }
+    public void setObservationRequiredOnFailure(boolean value) { this.observationRequiredOnFailure = value; }
+    public boolean isEvidenceRequiredOnFailure() { return evidenceRequiredOnFailure; }
+    public void setEvidenceRequiredOnFailure(boolean value) { this.evidenceRequiredOnFailure = value; }
     public String getOptionsJson() { return optionsJson; }
     public void setOptionsJson(String optionsJson) { this.optionsJson = optionsJson; }
     public Integer getDisplayOrder() { return displayOrder; }
@@ -63,4 +63,8 @@ public class TemplateItem {
     public void setOptions(String options) { this.optionsJson = options; }
     public Integer getSortOrder() { return displayOrder; }
     public void setSortOrder(Integer sortOrder) { this.displayOrder = sortOrder; }
+    public boolean isRequireObservationOnFailure() { return observationRequiredOnFailure; }
+    public void setRequireObservationOnFailure(boolean value) { this.observationRequiredOnFailure = value; }
+    public boolean isRequireEvidenceOnFailure() { return evidenceRequiredOnFailure; }
+    public void setRequireEvidenceOnFailure(boolean value) { this.evidenceRequiredOnFailure = value; }
 }

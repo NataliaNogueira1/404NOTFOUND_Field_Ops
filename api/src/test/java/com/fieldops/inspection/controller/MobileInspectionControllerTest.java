@@ -9,6 +9,7 @@ import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,6 +57,9 @@ class MobileInspectionControllerTest {
 
     @Autowired
     private InspectionRepository inspectionRepository;
+
+    @Autowired
+    private InspectionItemSnapshotRepository snapshotRepository;
 
     @Autowired
     private InspectionTemplateRepository templateRepository;
@@ -98,6 +103,15 @@ class MobileInspectionControllerTest {
     }
 
     @Test
+    void preservesTemplateItemRulesWhenInspectionIsCreated() {
+        assertThat(snapshotRepository.findAll())
+                .hasSize(3)
+                .allSatisfy(snapshot -> assertThat(snapshot.getRulesJson()).isEqualTo(
+                        "{\"required\":true,\"observationRequiredOnFailure\":true,"
+                                + "\"evidenceRequiredOnFailure\":true}"));
+    }
+
+    @Test
     void doesNotListInspectionsAssignedToAnotherTechnician() throws Exception {
         // Three inspections exist, but one belongs to the other technician: each
         // technician must see only their own assignments.
@@ -131,7 +145,8 @@ class MobileInspectionControllerTest {
         item.setQuestion("Is the equipment grounded?");
         item.setResponseType(ResponseType.BOOLEAN);
         item.setRequired(true);
-        item.setRequireObservationOnFailure(false);
+        item.setObservationRequiredOnFailure(true);
+        item.setEvidenceRequiredOnFailure(true);
         item.setSortOrder(0);
 
         TemplateSection section = new TemplateSection();

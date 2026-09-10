@@ -110,6 +110,8 @@ public class TemplateItemService {
         item.setDescription(normalizeDescription(request.description()));
         item.setResponseType(request.responseType());
         item.setRequired(request.required());
+        item.setObservationRequiredOnFailure(request.observationRequiredOnFailure());
+        item.setEvidenceRequiredOnFailure(request.evidenceRequiredOnFailure());
         item.setOptionsJson(serializeOptions(request));
         item.setDisplayOrder(request.displayOrder());
     }
@@ -146,7 +148,7 @@ public class TemplateItemService {
 
     private TemplateItemResponse toResponse(TemplateItem item) {
         return new TemplateItemResponse(item.getId(), item.getQuestion(), item.getDescription(),
-                item.getResponseType(), item.isRequired(), deserializeOptions(item.getOptionsJson()),
-                item.getDisplayOrder());
+                item.getResponseType(), item.isRequired(), item.isObservationRequiredOnFailure(),
+                item.isEvidenceRequiredOnFailure(), deserializeOptions(item.getOptionsJson()), item.getDisplayOrder());
     }
 }

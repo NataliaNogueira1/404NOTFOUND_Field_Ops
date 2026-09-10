@@ -77,7 +77,8 @@ describe('TemplateBuilderPage sections', () => {
       .mockResolvedValueOnce(jsonResponse(template))
       .mockResolvedValueOnce(jsonResponse({
         id: 21, title: 'Estado da placa', description: 'Verifique danos', responseType: 'SINGLE_CHOICE',
-        required: true, optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
+        required: true, observationRequiredOnFailure: false, evidenceRequiredOnFailure: false,
+        optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
       }, 201))
     vi.stubGlobal('fetch', fetchMock)
     renderBuilder()
@@ -99,13 +100,48 @@ describe('TemplateBuilderPage sections', () => {
         method: 'POST',
         body: JSON.stringify({
           title: 'Estado da placa', description: 'Verifique danos', responseType: 'SINGLE_CHOICE',
-          required: true, optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
+          required: true, observationRequiredOnFailure: false, evidenceRequiredOnFailure: false,
+          optionsJson: ['Legivel', 'Danificada'], displayOrder: 1,
         }),
       }),
     ))
     expect(await screen.findByText('Estado da placa')).not.toBeNull()
     expect(screen.getByText('Selecao unica')).not.toBeNull()
     expect(screen.getByText('Ordem 1')).not.toBeNull()
+  })
+
+  it('persists and displays required observation and evidence rules', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(templateResponse()))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 23, title: 'Cabos eletricos integros?', description: null, responseType: 'CONFORMITY',
+        required: true, observationRequiredOnFailure: true, evidenceRequiredOnFailure: true,
+        optionsJson: null, displayOrder: 1,
+      }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+    renderBuilder()
+
+    await screen.findByRole('heading', { name: 'Seguranca' })
+    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item a secao' })[0])
+    await userEvent.type(screen.getByLabelText('Titulo (pergunta)'), 'Cabos eletricos integros?')
+    await userEvent.click(screen.getByLabelText('Observacao obrigatoria na falha'))
+    await userEvent.click(screen.getByLabelText('Evidencia obrigatoria na falha'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar item' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/sections/11/items'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Cabos eletricos integros?', description: '', responseType: 'CONFORMITY',
+          required: true, observationRequiredOnFailure: true, evidenceRequiredOnFailure: true,
+          optionsJson: null, displayOrder: 1,
+        }),
+      }),
+    ))
+    expect(await screen.findByText('Obrigatorio')).not.toBeNull()
+    expect(screen.getByText('Observacao na falha')).not.toBeNull()
+    expect(screen.getByText('Evidencia na falha')).not.toBeNull()
   })
 
   it('persists item reordering inside its section', async () => {

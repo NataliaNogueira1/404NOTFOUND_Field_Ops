@@ -92,8 +92,8 @@ public class MobileInspectionService {
                 item.getDescription(),
                 item.getResponseType().name(),
                 item.isRequired(),
-                item.isRequireObservationOnFailure(),
-                item.isRequireEvidenceOnFailure(),
+                item.isObservationRequiredOnFailure(),
+                item.isEvidenceRequiredOnFailure(),
                 options
         );
     }

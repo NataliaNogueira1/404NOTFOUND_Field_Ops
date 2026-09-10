@@ -28,6 +28,8 @@ export interface TemplateItemInput {
   description: string
   responseType: ResponseType
   required: boolean
+  observationRequiredOnFailure: boolean
+  evidenceRequiredOnFailure: boolean
   optionsJson: string[] | null
   displayOrder: number
 }
@@ -204,8 +206,8 @@ function managedItem(item: BackendTemplateItem): TemplateItem {
     required: item.required,
     options: item.optionsJson ?? undefined,
     displayOrder: item.displayOrder,
-    requireObservationOnFailure: false,
-    requireEvidenceOnFailure: false,
+    requireObservationOnFailure: item.observationRequiredOnFailure ?? false,
+    requireEvidenceOnFailure: item.evidenceRequiredOnFailure ?? false,
   }
 }
 

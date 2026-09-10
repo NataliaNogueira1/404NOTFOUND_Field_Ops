@@ -17,6 +17,8 @@ public record TemplateItemRequest(
         @NotNull(message = "Response type is required")
         ResponseType responseType,
         boolean required,
+        boolean observationRequiredOnFailure,
+        boolean evidenceRequiredOnFailure,
         List<String> optionsJson,
         @NotNull(message = "Display order is required")
         @Min(value = 1, message = "Display order must be at least 1")

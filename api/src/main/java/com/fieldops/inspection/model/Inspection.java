@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "inspections")
@@ -67,11 +69,20 @@ public class Inspection {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @OneToMany(mappedBy = "inspection", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<InspectionItemSnapshot> itemSnapshots = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+        if (itemSnapshots.isEmpty() && template != null) {
+            template.getSections().stream()
+                    .flatMap(section -> section.getItems().stream())
+                    .map(item -> InspectionItemSnapshot.from(this, item))
+                    .forEach(itemSnapshots::add);
+        }
     }
 
     @PreUpdate
@@ -111,4 +122,5 @@ public class Inspection {
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public List<InspectionItemSnapshot> getItemSnapshots() { return itemSnapshots; }
 }

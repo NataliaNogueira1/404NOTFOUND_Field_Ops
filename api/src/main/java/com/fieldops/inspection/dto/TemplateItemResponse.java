@@ -9,6 +9,8 @@ public record TemplateItemResponse(
         String description,
         ResponseType responseType,
         boolean required,
+        boolean observationRequiredOnFailure,
+        boolean evidenceRequiredOnFailure,
         List<String> optionsJson,
         Integer displayOrder) {
 }

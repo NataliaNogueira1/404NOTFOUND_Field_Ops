@@ -238,6 +238,8 @@ class InspectionTemplateControllerTest {
                                   "description": "Verifique fixacao e danos",
                                   "responseType": "SINGLE_CHOICE",
                                   "required": true,
+                                  "observationRequiredOnFailure": true,
+                                  "evidenceRequiredOnFailure": true,
                                   "optionsJson": ["Legivel", "Danificada"],
                                   "displayOrder": 1
                                 }
@@ -245,6 +247,9 @@ class InspectionTemplateControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Qual o estado da placa?"))
                 .andExpect(jsonPath("$.responseType").value("SINGLE_CHOICE"))
+                .andExpect(jsonPath("$.required").value(true))
+                .andExpect(jsonPath("$.observationRequiredOnFailure").value(true))
+                .andExpect(jsonPath("$.evidenceRequiredOnFailure").value(true))
                 .andExpect(jsonPath("$.optionsJson[0]").value("Legivel"))
                 .andExpect(jsonPath("$.optionsJson[1]").value("Danificada"))
                 .andExpect(jsonPath("$.displayOrder").value(1));
@@ -252,6 +257,9 @@ class InspectionTemplateControllerTest {
         TemplateItem saved = itemRepository.findAll().get(0);
         assertThat(saved.getSection().getId()).isEqualTo(section.getId());
         assertThat(saved.getOptionsJson()).isEqualTo("[\"Legivel\",\"Danificada\"]");
+        assertThat(saved.isRequired()).isTrue();
+        assertThat(saved.isObservationRequiredOnFailure()).isTrue();
+        assertThat(saved.isEvidenceRequiredOnFailure()).isTrue();
     }
 
     @Test
