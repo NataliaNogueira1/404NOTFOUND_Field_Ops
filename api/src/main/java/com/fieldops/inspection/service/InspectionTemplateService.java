@@ -2,6 +2,7 @@ package com.fieldops.inspection.service;
 
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
+import com.fieldops.inspection.dto.TemplateVersionSummary;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
@@ -11,6 +12,8 @@ import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class InspectionTemplateService {
@@ -51,6 +54,35 @@ public class InspectionTemplateService {
         }
         applyMetadata(template, request);
         return toResponse(template);
+    }
+
+    /**
+     * Returns the published versions available for scheduling a new inspection.
+     *
+     * <p>The current model stores a single {@code currentVersion} integer per template.
+     * An ACTIVE template exposes exactly one entry. A non-ACTIVE template has no schedulable
+     * versions, so the list is empty when {@code activeForNewInspections=true}.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<TemplateVersionSummary> listVersions(Long templateId, Boolean activeForNewInspections) {
+        InspectionTemplate template = findById(templateId);
+        boolean isActive = template.getStatus() == InspectionTemplateStatus.ACTIVE;
+
+        // When the caller only wants versions active for new inspections, return empty for non-ACTIVE templates
+        if (Boolean.TRUE.equals(activeForNewInspections) && !isActive) {
+            return List.of();
+        }
+
+        if (!isActive) {
+            return List.of();
+        }
+
+        TemplateVersionSummary version = new TemplateVersionSummary(
+                template.getId(),
+                template.getCurrentVersion(),
+                true,
+                template.getUpdatedAt());
+        return List.of(version);
     }
 
     private InspectionTemplate findById(Long id) {

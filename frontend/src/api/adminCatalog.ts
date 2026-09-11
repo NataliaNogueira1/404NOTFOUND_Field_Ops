@@ -3,6 +3,50 @@ import { InspectionStatus, Priority } from '@/types/domain'
 
 export type TemplateListStatus = 'ACTIVE' | 'DRAFT'
 
+// ── Template versions ────────────────────────────────────────────────────────
+
+export interface TemplateVersionSummary {
+  templateId: string
+  versionNumber: number
+  activeForNewInspections: boolean
+  publishedAt: string
+}
+
+// ── Schedule inspection ──────────────────────────────────────────────────────
+
+export interface ScheduleInspectionRequest {
+  templateId: number
+  technicianId: number
+  clientName: string
+  siteName: string
+  equipmentName: string
+  priority: Priority
+  dueDate: string        // ISO date: YYYY-MM-DD
+  dueTime?: string       // ISO time: HH:mm:ss (optional)
+  supervisorInstructions?: string
+}
+
+export interface ScheduleInspectionResponse {
+  id: string
+  title: string
+  templateId: string
+  templateTitle: string
+  clientName: string
+  siteName: string
+  equipmentName: string
+  technicianId: string
+  technicianName: string
+  supervisorId: string
+  supervisorName: string
+  priority: Priority
+  dueDate: string
+  dueTime?: string
+  supervisorInstructions?: string
+  status: InspectionStatus
+  progress: number
+  createdAt: string
+}
+
 export interface InspectionTemplateInput {
   title: string
   description: string
@@ -63,6 +107,15 @@ interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technic
   id: number
   technicianId: number
 }
+interface BackendScheduleResponse extends Omit<ScheduleInspectionResponse, 'id' | 'templateId' | 'technicianId' | 'supervisorId'> {
+  id: number
+  templateId: number
+  technicianId: number
+  supervisorId: number
+}
+interface BackendTemplateVersion extends Omit<TemplateVersionSummary, 'templateId'> {
+  templateId: number
+}
 
 export const adminCatalogApi = {
   async createTemplate(input: InspectionTemplateInput) {
@@ -107,6 +160,29 @@ export const adminCatalogApi = {
     if (filters.review) params.set('review', 'true')
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
     return { ...result, content: result.content.map(item => ({ ...item, id: String(item.id), technicianId: String(item.technicianId) })) }
+  },
+
+  /** Fetches published versions of a template eligible for scheduling new inspections. */
+  async listTemplateVersions(templateId: string): Promise<TemplateVersionSummary[]> {
+    const result = await apiRequest<BackendTemplateVersion[]>(
+      `/api/v1/inspection-templates/${templateId}/versions?activeForNewInspections=true`,
+    )
+    return result.map(v => ({ ...v, templateId: String(v.templateId) }))
+  },
+
+  /** Schedules a new inspection from a published template. Returns HTTP 201 on success. */
+  async scheduleInspection(request: ScheduleInspectionRequest): Promise<ScheduleInspectionResponse> {
+    const result = await apiRequest<BackendScheduleResponse>('/api/v1/inspections', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+    return {
+      ...result,
+      id: String(result.id),
+      templateId: String(result.templateId),
+      technicianId: String(result.technicianId),
+      supervisorId: String(result.supervisorId),
+    }
   },
 }
 

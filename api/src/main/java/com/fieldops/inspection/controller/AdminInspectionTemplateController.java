@@ -3,6 +3,7 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateSummary;
+import com.fieldops.inspection.dto.TemplateVersionSummary;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.service.AdminCatalogListService;
 import com.fieldops.inspection.service.InspectionTemplateService;
@@ -26,6 +27,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/inspection-templates")
@@ -73,5 +76,17 @@ public class AdminInspectionTemplateController {
     public ResponseEntity<InspectionTemplateResponse> update(@PathVariable Long id,
             @Valid @RequestBody InspectionTemplateRequest request) {
         return ResponseEntity.ok(templateService.updateDraft(id, request));
+    }
+
+    @Operation(summary = "List versions available for scheduling a new inspection",
+            description = "Returns the published versions of a template. "
+                    + "Use activeForNewInspections=true to restrict to versions eligible for new inspections.")
+    @ApiResponse(responseCode = "200", description = "Version list (empty if template has no published versions)")
+    @ApiResponse(responseCode = "404", description = "Template not found")
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<List<TemplateVersionSummary>> listVersions(
+            @PathVariable Long id,
+            @RequestParam(required = false) Boolean activeForNewInspections) {
+        return ResponseEntity.ok(templateService.listVersions(id, activeForNewInspections));
     }
 }
