@@ -7,15 +7,20 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 /**
  * Creates intentionally fictitious accounts for the local dev profile only.
  * Production never loads this runner because of {@link Profile}.
+ *
+ * <p>Runs before {@link DevInspectionsBootstrapRunner} (lower {@link Order}) so
+ * that the technician/supervisor accounts exist before inspections are seeded.
  */
 @Component
 @Profile("dev")
+@Order(10)
 public class DevUsersBootstrapRunner implements ApplicationRunner {
 
     private final DevUsersProperties properties;
