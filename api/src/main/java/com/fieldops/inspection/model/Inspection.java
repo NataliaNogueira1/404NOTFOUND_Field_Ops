@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "inspections")
@@ -20,6 +22,10 @@ public class Inspection {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
     private InspectionTemplate template;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "template_version_id")
+    private InspectionTemplateVersion templateVersion;
 
     @Column(name = "client_name", nullable = false, length = 200)
     private String clientName;
@@ -67,6 +73,9 @@ public class Inspection {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @OneToMany(mappedBy = "inspection", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<InspectionItemSnapshot> itemSnapshots = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -85,6 +94,8 @@ public class Inspection {
     public void setTitle(String title) { this.title = title; }
     public InspectionTemplate getTemplate() { return template; }
     public void setTemplate(InspectionTemplate template) { this.template = template; }
+    public InspectionTemplateVersion getTemplateVersion() { return templateVersion; }
+    public void setTemplateVersion(InspectionTemplateVersion templateVersion) { this.templateVersion = templateVersion; }
     public String getClientName() { return clientName; }
     public void setClientName(String clientName) { this.clientName = clientName; }
     public String getSiteName() { return siteName; }
@@ -111,4 +122,6 @@ public class Inspection {
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public List<InspectionItemSnapshot> getItemSnapshots() { return itemSnapshots; }
+    public void addItemSnapshot(InspectionItemSnapshot snapshot) { itemSnapshots.add(snapshot); }
 }

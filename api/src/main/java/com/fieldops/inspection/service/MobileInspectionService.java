@@ -9,8 +9,12 @@ import com.fieldops.inspection.repository.InspectionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MobileInspectionService {
@@ -42,13 +46,14 @@ public class MobileInspectionService {
 
     private MobileInspectionResponse toResponse(Inspection inspection) {
         InspectionTemplate tpl = inspection.getTemplate();
+        InspectionTemplateVersion version = inspection.getTemplateVersion();
 
         TemplateDto templateDto = new TemplateDto(
                 String.valueOf(tpl.getId()),
-                tpl.getTitle(),
+                version != null ? version.getTitleSnapshot() : tpl.getTitle(),
                 tpl.getCategory(),
-                tpl.getVersion(),
-                tpl.getSections().stream().map(this::toSectionDto).toList()
+                version != null ? version.getVersionNumber() : tpl.getVersion(),
+                toSectionDtos(inspection.getItemSnapshots())
         );
 
         return new MobileInspectionResponse(
@@ -76,26 +81,40 @@ public class MobileInspectionService {
         );
     }
 
-    private SectionDto toSectionDto(TemplateSection section) {
-        return new SectionDto(
-                String.valueOf(section.getId()),
-                section.getTitle(),
-                section.getItems().stream().map(this::toItemDto).toList()
+    private List<SectionDto> toSectionDtos(List<InspectionItemSnapshot> snapshots) {
+        Map<SectionKey, List<InspectionItemSnapshot>> sections = new LinkedHashMap<>();
+        snapshots.stream()
+                .sorted(Comparator.comparing(InspectionItemSnapshot::getSectionOrder)
+                        .thenComparing(InspectionItemSnapshot::getItemOrder))
+                .forEach(snapshot -> sections.computeIfAbsent(
+                        new SectionKey(snapshot.getSectionOrder(), snapshot.getSectionTitle()), ignored -> new ArrayList<>())
+                        .add(snapshot));
+        return sections.entrySet().stream()
+                .map(entry -> new SectionDto(String.valueOf(entry.getKey().order()), entry.getKey().title(),
+                        entry.getValue().stream().map(this::toItemDto).toList()))
+                .toList();
+    }
+
+    private ItemDto toItemDto(InspectionItemSnapshot snapshot) {
+        List<String> options = parseOptions(snapshot.getOptionsJson());
+        return new ItemDto(
+                String.valueOf(snapshot.getSourceTemplateItemId()),
+                snapshot.getItemTitle(),
+                snapshot.getItemDescription(),
+                snapshot.getResponseType().name(),
+                snapshot.isRequired(),
+                parseRule(snapshot.getRulesJson(), "observationRequiredOnFailure"),
+                parseRule(snapshot.getRulesJson(), "evidenceRequiredOnFailure"),
+                options
         );
     }
 
-    private ItemDto toItemDto(TemplateItem item) {
-        List<String> options = parseOptions(item.getOptions());
-        return new ItemDto(
-                String.valueOf(item.getId()),
-                item.getQuestion(),
-                item.getDescription(),
-                item.getResponseType().name(),
-                item.isRequired(),
-                item.isRequireObservationOnFailure(),
-                item.isRequireEvidenceOnFailure(),
-                options
-        );
+    private boolean parseRule(String rulesJson, String rule) {
+        try {
+            return objectMapper.readTree(rulesJson).path(rule).asBoolean(false);
+        } catch (Exception exception) {
+            return false;
+        }
     }
 
     private List<String> parseOptions(String optionsJson) {
@@ -107,5 +126,8 @@ public class MobileInspectionService {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    private record SectionKey(Integer order, String title) {
     }
 }
