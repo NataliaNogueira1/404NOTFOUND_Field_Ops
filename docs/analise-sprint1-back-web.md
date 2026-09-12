@@ -186,3 +186,66 @@ Backend
 ```
 
 > Nota sobre a stack de testes: havia dois configs de Vitest conflitantes (um em `node`, outro em `jsdom`) trazidos pelo merge. Foram unificados em `jsdom` (`vite.config.ts`), removendo o `vitest.config.ts` duplicado, para que tanto os testes de componente quanto os de serviço rodem no mesmo ambiente.
+---
+
+## Sprint 1 Mobile (Rodrigo, Natália e Cutiur)
+
+> Verificado no **código real** do módulo `mobile/` (Expo Router + React Native + TypeScript, SQLite via `expo-sqlite`, stores por Context e camada de sincronização com outbox). O status prevalece sobre o quadro Kanban.
+
+| PBI | Título | Issue | Veredicto |
+|-----|--------|-------|-----------|
+| PBI-001 | Repositórios e convenções (participação) | [#11](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/11) | 🟡 Parcial — `eslint.config.js` + estrutura por feature (`src/features/*`), mas sem `README` próprio do mobile nem convenções de commit/PR documentadas |
+| PBI-002 | Projeto Expo com TypeScript e estrutura por features | [#12](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/12) | ✅ Concluído — Expo ~57 + expo-router, TypeScript, `src/features/*` e `src/infrastructure/*` |
+| PBI-008 | Login e sessão no aplicativo mobile | [#18](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/18) | ✅ Concluído — `AuthContext.signIn` → `POST /api/v1/auth/login`, tokens no SecureStore, restauração via `GET /api/v1/auth/me` + interceptor de refresh |
+| PBI-031 | Download e visualização das inspeções atribuídas | [#48](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/48) | ✅ Concluído — `InspectionSyncService.pullInspections` (`GET /api/v1/mobile/inspections`) persiste no SQLite; lista em `(tabs)/inspections.tsx` |
+| PBI-032 | Filtrar inspeções por estado, data e prioridade | [#49](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/49) | ✅ Concluído — filtros de estado/prioridade/período + busca em `inspections.tsx` (useMemo `filtered`) |
+| PBI-033 | Detalhes da inspeção no mobile | [#50](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/50) | ✅ Concluído — `inspections/[id]/index.tsx` (info, instruções, progresso, contagem de NCs/evidências, ações por status) |
+| PBI-034 | Iniciar inspeção com registro de horário | [#51](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/51) | 🟡 Parcial — `markStarted` grava `started_at` e muda status para IN_PROGRESS, mas o GPS de início **não é capturado** (sem `expo-location`, colunas de localização ficam vazias) |
+| PBI-035 | Checklist dinâmico a partir do snapshot | [#52](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/52) | ✅ Concluído — `checklist.tsx` renderiza seções/itens do snapshot lido do SQLite (`inspection_sections`/`inspection_items`) |
+| PBI-036 | Componentes de resposta para cada tipo de item | [#53](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/53) | ✅ Concluído — `ChecklistItemCard` cobre CONFORMITY, BOOLEAN, SINGLE_CHOICE, DATE, NUMBER e TEXT_SHORT/LONG |
+| PBI-037 | Salvar cada resposta localmente (SQLite) | [#54](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/54) | ✅ Concluído — `useDebouncedSave` → `AnswerRepository.save` (`INSERT OR REPLACE`) + enfileiramento no `sync_queue` |
+| PBI-038 | Visualizar progresso e itens pendentes | [#55](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/55) | ✅ Concluído — barra de progresso "X de Y itens", `updateProgress` no SQLite, `SyncBadge`/`pendingSyncCount` |
+| PBI-039 | Registrar observações em itens | [#56](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/56) | 🟡 Parcial — observação é persistida (`answers.observation`), mas o campo só aparece em itens marcados como não conformidade, não como observação livre por item |
+| PBI-048 | Acesso offline a inspeções baixadas | [#65](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/65) | ✅ Concluído — todas as telas leem do SQLite; fallback local quando a API falha; `ConnectivityContext`/`OfflineBanner` e modo "offline-limited" na sessão |
+
+### Resumo Sprint 1 Mobile (13 itens)
+
+| Categoria | Qtd |
+|-----------|-----|
+| ✅ Concluído | 10 |
+| 🟡 Parcial | 3 |
+| ❌ Não feito | 0 |
+
+**Porcentagem: ~77%** (10/13 concluídos; 13/13 com os parciais incluídos)
+
+> Concluídos: **PBI-002 (Expo + TS)**, **PBI-008 (login/sessão)**, **PBI-031 (download de inspeções)**, **PBI-032 (filtros)**, **PBI-033 (detalhes)**, **PBI-035 (checklist dinâmico)**, **PBI-036 (tipos de resposta)**, **PBI-037 (salvamento local)**, **PBI-038 (progresso)** e **PBI-048 (acesso offline)**.
+>
+> Parciais: **PBI-001** (falta README/convenções no mobile), **PBI-034** (registra horário, mas não captura GPS de início) e **PBI-039** (observação existe, porém restrita a não conformidades).
+
+### Infraestrutura offline e sincronização
+
+O mobile já possui a espinha dorsal de sincronização implementada:
+
+- SQLite versionado (`migrations.ts` v1/v2) com tabelas `inspections`, `inspection_sections`, `inspection_items`, `answers`, `evidences`, `non_conformities`, `sync_queue` (outbox) e `sync_metadata`;
+- padrão outbox via `sync_queue` + `SyncQueueRepository`, orquestrado por `InspectionSyncService` (`enqueue*`, `pushPendingOperations`, `pullInspections`, `fullSync`);
+- `sync_status` por linha (synced/pending/error) e contagem de tentativas/erros;
+- conectividade via `ConnectivityContext` (NetInfo) e `OfflineBanner`.
+
+### Funcionalidades presentes fora do escopo do Sprint 1
+
+Também já existem no código, embora pertençam a PBIs de sprints seguintes:
+
+- captura de evidências (câmera/galeria) em `(protected)/evidence.tsx`;
+- leitor de QR Code em `(protected)/scanner.tsx`;
+- criação automática de não conformidade ao responder `NAO_CONFORME`;
+- fluxo de inspeção reprovada (`RejectionBanner`, colunas `rejection_reason`/`rejected_by`/`rejected_at`, ação "Corrigir");
+- tela de conclusão/resumo (`inspections/[id]/summary.tsx`).
+
+### Qualidade e validação (Mobile)
+
+> ⚠️ Diferentemente do Frontend Web, o módulo mobile **ainda não possui testes automatizados**: não há Jest nem Testing Library configurados e não existe script `test` no `package.json` (apenas `start`, `android`, `ios`, `web`, `lint`, `lint:fix`). Há apenas ESLint configurado.
+
+### Pequenos ajustes pendentes identificados no código
+
+- `sync.tsx` exibe métricas fixas de demonstração (ex.: "128 MB", data e "Inspeções atualizadas: 3") em vez de dados reais;
+- em `ChecklistItemCard`, o botão "Adicionar foto" de itens em falha usa `inspectionId=ins-compressor` fixo na rota de evidência, ignorando o id real da inspeção.
