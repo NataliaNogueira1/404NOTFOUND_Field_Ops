@@ -3,8 +3,11 @@
 > Documento de **controle de execução**. Cada PBI possui uma caixa de status para
 > acompanhar o que já foi concluído. Marque `[x]` quando o item for finalizado.
 >
-> Fonte da verdade do status: **quadro Kanban do projeto** (`kanban-fieldops`).
-> Última sincronização com o quadro: **11/09/2026**.
+> Fonte do status:
+> - **Backend** — verificado no **código real** do módulo `api/` (controllers, services,
+>   entidades e migrações Flyway V1–V14) em **11/09/2026**. Prevalece sobre o quadro Kanban.
+> - **Frontend Web / Mobile** — status do **quadro Kanban** (`kanban-fieldops`), ainda não
+>   auditado linha a linha no código.
 
 ## Legenda de status
 
@@ -40,7 +43,7 @@
 | [x] | PBI-012 | Autorização por perfil na API | ✅ Concluído |
 | [x] | PBI-011 | CRUD de usuários pelo administrador | ✅ Concluído |
 | [x] | PBI-013 | CRUD de clientes | ✅ Concluído |
-| [ ] | PBI-014 | CRUD de locais vinculados a clientes | 🔄 Em andamento |
+| [x] | PBI-014 | CRUD de locais vinculados a clientes | ✅ Concluído — `InspectionSiteController` (CRUD + status), migration V5 |
 | [x] | PBI-015 | CRUD de equipamentos com QR Code único | ✅ Concluído |
 | [x] | PBI-016 | QR Code único por equipamento | ✅ Concluído |
 | [x] | PBI-017 | Pesquisa, filtros e paginação nos cadastros | ✅ Concluído |
@@ -48,13 +51,13 @@
 | [x] | PBI-019 | Criar e ordenar seções do checklist | ✅ Concluído |
 | [x] | PBI-020 | Criar itens com tipos de resposta | ✅ Concluído |
 | [x] | PBI-021 | Definir obrigatoriedade e regras de evidência | ✅ Concluído |
-| [x] | PBI-022 | Validação e prévia do checklist antes de publicar | ✅ Concluído |
+| [ ] | PBI-022 | Validação e prévia do checklist antes de publicar | ❌ Não feito — sem endpoint de prévia; validação só no publish |
 | [x] | PBI-023 | Publicar versão imutável do modelo | ✅ Concluído |
 | [x] | PBI-024 | Snapshot dos itens ao criar inspeção | ✅ Concluído |
-| [ ] | PBI-025 | Agendar inspeção a partir de modelo publicado | 🔄 Em andamento |
-| [ ] | PBI-027 | Atribuir inspeção a técnico ativo | 🔄 Em andamento |
-| [ ] | PBI-028 | Definir prioridade, prazo e instruções na inspeção | 📋 Pronto p/ iniciar |
-| [ ] | PBI-029 | Cancelar inspeção com justificativa | 🔄 Em andamento |
+| [x] | PBI-025 | Agendar inspeção a partir de modelo publicado | ✅ Concluído — `POST /api/v1/inspections` exige versão publicada |
+| [ ] | PBI-027 | Atribuir inspeção a técnico ativo | 🟡 Parcial — valida role TECHNICIAN, mas não valida status ATIVO |
+| [x] | PBI-028 | Definir prioridade, prazo e instruções na inspeção | ✅ Concluído — campos em `CreateInspectionRequest`, migration V7 |
+| [ ] | PBI-029 | Cancelar inspeção com justificativa | ❌ Não feito — sem endpoint/serviço nem campo de justificativa |
 
 ### Frontend Web (Andressa, Ian, Júlia e Carol)
 
@@ -169,43 +172,66 @@
 
 ## Resumo de progresso (Sprint 1)
 
-> Contagem por status conforme o quadro Kanban (11/09/2026). Itens repetidos entre
-> equipes (ex.: PBI-011, PBI-013, PBI-014) compartilham o mesmo card de status.
+> Backend contado a partir da **auditoria do código** (11/09/2026). Frontend/Mobile
+> a partir do quadro Kanban. Itens repetidos entre equipes (ex.: PBI-011, PBI-013)
+> compartilham o mesmo PBI.
+
+**Backend (verificado no código):**
+
+| Total | ✅ Concluído | 🟡 Parcial | ❌ Não feito |
+|-------|-------------|-----------|-------------|
+| 23 | 20 | 1 (PBI-027) | 2 (PBI-022, PBI-029) |
+
+> Concluídos: PBI-001, 004, 006, 007, 010, 011, 012, 013, 014, 015, 016, 017, 018, 019, 020,
+> 021, 023, 024, 025, 028. Parcial: PBI-027 (falta validar técnico ATIVO). Não feito no
+> backend: PBI-022 (prévia) e PBI-029 (cancelamento com justificativa).
+
+**Frontend Web / Mobile (status do quadro, ainda não auditado no código):**
 
 | Frente | Total | Concluído | Em revisão | Em andamento | Pronto | Backlog |
 |--------|-------|-----------|------------|--------------|--------|---------|
-| Backend | 23 | 18 | 0 | 4 | 1 | 0 |
 | Frontend Web | 16 | 12 | 0 | 3 | 1 | 0 |
 | Mobile | 13 | 5 | 2 | 1 | 4 | 1 |
 
 ---
 
-## Comparação e checagem (cronograma × análise × quadro)
+## Comparação e checagem (código × cronograma × análise × quadro)
 
-> Esta seção registra as divergências encontradas ao cruzar três fontes:
-> **(A)** este cronograma, **(B)** `analise-sprint1-back-web.md` e **(C)** o quadro Kanban do projeto.
+> Esta seção registra as divergências encontradas ao cruzar quatro fontes:
+> **(A)** o **código real** do backend (`api/`), **(B)** este cronograma,
+> **(C)** `analise-sprint1-back-web.md` e **(D)** o quadro Kanban do projeto.
+>
+> **Regra adotada: para o backend, o código é a fonte da verdade.** Onde o quadro e o
+> código divergem, o cronograma segue o código.
 
-### Divergências de status
+### Backend — status real no código vs. quadro Kanban
 
-| PBI | Cronograma (antes) | Análise (`analise-sprint1`) | Quadro Kanban | Ação tomada aqui |
-|-----|--------------------|-----------------------------|---------------|------------------|
-| PBI-014 | sem status | ✅ Concluído | 🔄 In progress | Marcado **Em andamento** (segue o quadro) |
-| PBI-019 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** (segue o quadro) |
-| PBI-020 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** |
-| PBI-021 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** |
-| PBI-022 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** |
-| PBI-023 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** |
-| PBI-024 | sem status | ❌ Aberta (backend) | ✅ Done | Marcado **Concluído** |
-| PBI-025 | sem status | ❌ Aberta (backend) | 🔄 In progress | Marcado **Em andamento** |
-| PBI-027 | sem status | ❌ Aberta (backend) | 🔄 In progress | Marcado **Em andamento** |
-| PBI-028 | sem status | ❌ Aberta (backend) | 📋 Ready | Marcado **Pronto** |
-| PBI-029 | sem status | ✅ front / ❌ back | 🔄 In progress | Marcado **Em andamento** |
-| PBI-030 | sem status | ✅ front | 📋 Ready | Marcado **Pronto** |
-| PBI-026 | sem status | ✅ front | 🔄 In progress | Marcado **Em andamento** |
+| PBI | Quadro Kanban | Código (`api/`) | Evidência no código |
+|-----|---------------|-----------------|---------------------|
+| PBI-014 | 🔄 In progress | ✅ **Concluído** | `InspectionSiteController` (CRUD + status) + migration V5 |
+| PBI-019 | ✅ Done | ✅ Concluído | `TemplateSectionService` (criar/ordenar) + migration V10 |
+| PBI-020 | ✅ Done | ✅ Concluído | `TemplateItemService` + enum `ResponseType` + migrations V7/V11 |
+| PBI-021 | ✅ Done | ✅ Concluído | flags `required`/`evidenceRequiredOnFailure` + migration V12 |
+| PBI-022 | ✅ Done | ❌ **Não feito** | não há endpoint de prévia; validação só ocorre no publish |
+| PBI-023 | ✅ Done | ✅ Concluído | `InspectionTemplateVersionService.publish` (imutável) + V13 |
+| PBI-024 | ✅ Done | ✅ Concluído | `InspectionService.copyChecklist` → `InspectionItemSnapshot` + V14 |
+| PBI-025 | 🔄 In progress | ✅ **Concluído** | `POST /api/v1/inspections` exige `templateVersionId` publicado |
+| PBI-027 | 🔄 In progress | 🟡 **Parcial** | valida role TECHNICIAN, **não** valida status ATIVO do técnico |
+| PBI-028 | 📋 Ready | ✅ **Concluído** | `CreateInspectionRequest` (priority/dueDate/instructions) + V7 |
+| PBI-029 | 🔄 In progress | ❌ **Não feito** | sem endpoint/serviço de cancelamento nem campo de justificativa |
 
-> Observação: o quadro está **mais atualizado** que o documento de análise no bloco de
-> Modelos de Inspeção (PBI-019 a PBI-024), que a análise ainda listava como "Aberta".
-> O `analise-sprint1-back-web.md` deve ser atualizado para refletir esses itens como concluídos.
+> Conclusões da auditoria de código:
+> - O **quadro subestima** o backend em PBI-014, PBI-025 e PBI-028 (marcados como não
+>   concluídos no quadro, mas já implementados no código).
+> - O **quadro superestima** o backend em PBI-022 e PBI-029 (aparecem adiantados, mas
+>   não existem no código).
+> - PBI-027 está **parcial**: falta apenas validar que o técnico atribuído está ATIVO.
+
+### Divergência com o documento de análise
+
+O `analise-sprint1-back-web.md` lista PBI-019 a PBI-024 como "❌ Aberta" no backend, porém
+o código mostra PBI-019, 020, 021, 023 e 024 **implementados** (só PBI-022 realmente falta).
+Esse documento precisa ser atualizado para refletir o código.
 
 ### Divergências de escopo/numeração
 
