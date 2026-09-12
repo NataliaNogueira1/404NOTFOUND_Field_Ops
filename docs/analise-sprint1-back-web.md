@@ -21,29 +21,34 @@
 | PBI-016 | QR Code único por equipamento | [#34](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/34) | ✅ Concluído — `GET /api/v1/equipment/by-qr/{qrCode}` + unicidade de QR (409) |
 | PBI-017 | Pesquisa, filtros e paginação | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ✅ Concluído — filtros + `Pageable` em usuários, clientes, locais, equipamentos e inspeções |
 | PBI-018 | Modelo de inspeção em rascunho | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ✅ Concluído — `InspectionTemplateService.createDraft` + migration V9 |
-| PBI-019 | Seções do checklist | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ❌ Aberta |
-| PBI-020 | Itens com tipos de resposta | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ❌ Aberta |
-| PBI-021 | Obrigatoriedade e regras de evidência | [#38](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/38) | ❌ Aberta |
-| PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ❌ Aberta |
-| PBI-023 | Publicar versão imutável | [#40](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/40) | ❌ Aberta |
-| PBI-024 | Snapshot ao criar inspeção | [#41](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/41) | ❌ Aberta |
-| PBI-025 | Agendar inspeção | [#42](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/42) | ❌ Aberta |
-| PBI-027 | Atribuir inspeção a técnico | [#44](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/44) | ❌ Aberta |
-| PBI-028 | Prioridade, prazo e instruções | [#45](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/45) | ❌ Aberta |
-| PBI-029 | Cancelar inspeção | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ❌ Aberta |
+| PBI-019 | Seções do checklist | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ✅ Concluído — `TemplateSectionService` (criar/editar/ordenar seções, DRAFT-only) + migration V10 |
+| PBI-020 | Itens com tipos de resposta | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ✅ Concluído — `TemplateItemService` + enum `ResponseType` (TEXT/NUMBER/BOOLEAN/CONFORMITY/SINGLE_CHOICE/DATE) + migrations V7/V11 |
+| PBI-021 | Obrigatoriedade e regras de evidência | [#38](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/38) | ✅ Concluído — flags `required`, `observationRequiredOnFailure`, `evidenceRequiredOnFailure` + migration V12 |
+| PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ❌ Aberta — não há endpoint de prévia; a validação (`InspectionTemplatePublicationValidator`) só roda no publish |
+| PBI-023 | Publicar versão imutável | [#40](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/40) | ✅ Concluído — `POST /api/v1/inspection-templates/{id}/publish` → `InspectionTemplateVersionService.publish` (versão imutável) + migration V13 |
+| PBI-024 | Snapshot ao criar inspeção | [#41](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/41) | ✅ Concluído — `InspectionService.copyChecklist` → `InspectionItemSnapshot` (colunas `updatable=false`) + migrations V12/V14 |
+| PBI-025 | Agendar inspeção | [#42](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/42) | ✅ Concluído — `POST /api/v1/inspections` exige `templateVersionId` publicado (status ASSIGNED) + migration V14 |
+| PBI-027 | Atribuir inspeção a técnico | [#44](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/44) | 🟡 Parcial — `validateAssignment` exige role TECHNICIAN, mas **não** valida se o técnico está ATIVO |
+| PBI-028 | Prioridade, prazo e instruções | [#45](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/45) | ✅ Concluído — `CreateInspectionRequest` (priority/dueDate/dueTime/supervisorInstructions) + enum `Priority` + migration V7 |
+| PBI-029 | Cancelar inspeção | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ❌ Aberta — só existe o enum `InspectionStatus.CANCELED`; sem endpoint/serviço de cancelamento nem campo de justificativa |
 
 ### Resumo Sprint 1 Backend (23 itens)
 
+> Verificado no **código real** do módulo `api/` (controllers, services, entidades e migrações Flyway V1–V14).
+
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 13 |
-| ❌ Não feito | 10 |
+| ✅ Concluído | 20 |
+| 🟡 Parcial | 1 |
+| ❌ Não feito | 2 |
 
-**Porcentagem: ~57%** (13/23)
+**Porcentagem: ~87%** (20/23 concluídos; 21/23 se contar o parcial)
 
-> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)** e agora os CRUDs de catálogo: **PBI-011 (usuários)**, **PBI-013 (clientes)**, **PBI-014 (locais)**, **PBI-015 (equipamentos)**, **PBI-016 (QR único)**, **PBI-017 (pesquisa/filtros/paginação)** e **PBI-018 (modelo em rascunho)**.
+> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)**, os CRUDs de catálogo — **PBI-011 (usuários)**, **PBI-013 (clientes)**, **PBI-014 (locais)**, **PBI-015 (equipamentos)**, **PBI-016 (QR único)**, **PBI-017 (pesquisa/filtros/paginação)** — e todo o fluxo de modelos de inspeção: **PBI-018 (rascunho)**, **PBI-019 (seções)**, **PBI-020 (itens/tipos)**, **PBI-021 (obrigatoriedade/evidência)**, **PBI-023 (publicar versão imutável)**, **PBI-024 (snapshot)**, além de **PBI-025 (agendar)** e **PBI-028 (prioridade/prazo/instruções)**.
 >
-> Ainda em aberto no backend: seções e itens do checklist (PBI-019 a PBI-022), publicação de versão imutável e snapshot (PBI-023/PBI-024) e o ciclo de vida da inspeção — agendar, atribuir, prioridade/prazo e cancelar (PBI-025, PBI-027, PBI-028, PBI-029). O `AdminInspectionTemplateController` cobre apenas metadados do rascunho e o `AdminInspectionController` apenas listagem.
+> Parcial: **PBI-027 (atribuir a técnico)** — falta apenas validar que o técnico atribuído está ATIVO (hoje valida só a role TECHNICIAN).
+>
+> Ainda em aberto no backend: **PBI-022 (prévia do checklist)** — não há endpoint de prévia, a validação só roda no momento do publish — e **PBI-029 (cancelar inspeção com justificativa)** — existe apenas o valor `CANCELED` no enum, sem endpoint/serviço de transição nem campo de justificativa.
 
 ---
 
