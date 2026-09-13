@@ -1,5 +1,7 @@
 package com.fieldops.inspection.controller;
 
+import com.fieldops.audit.dto.AuditEventResponse;
+import com.fieldops.audit.service.AuditService;
 import com.fieldops.inspection.dto.AdminInspectionSummary;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
@@ -19,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/inspections")
@@ -38,10 +42,13 @@ public class AdminInspectionController {
 
     private final AdminCatalogListService listService;
     private final InspectionService inspectionService;
+    private final AuditService auditService;
 
-    public AdminInspectionController(AdminCatalogListService listService, InspectionService inspectionService) {
+    public AdminInspectionController(AdminCatalogListService listService, InspectionService inspectionService,
+            AuditService auditService) {
         this.listService = listService;
         this.inspectionService = inspectionService;
+        this.auditService = auditService;
     }
 
     @Operation(summary = "Schedule an inspection from an immutable template version")
@@ -53,6 +60,13 @@ public class AdminInspectionController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .location(java.net.URI.create("/api/v1/inspections/" + response.id()))
                 .body(response);
+    }
+
+    @Operation(summary = "Get the audit timeline (state-change history) of an inspection")
+    @ApiResponse(responseCode = "200", description = "Chronological audit events")
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<AuditEventResponse>> history(@PathVariable Long id) {
+        return ResponseEntity.ok(auditService.timeline(AuditService.ENTITY_INSPECTION, id));
     }
 
     @Operation(summary = "List inspections with filters, sorting, and pagination")

@@ -56,6 +56,9 @@ class InspectionServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.fieldops.audit.service.AuditService auditService;
+
     @InjectMocks
     private InspectionService inspectionService;
 

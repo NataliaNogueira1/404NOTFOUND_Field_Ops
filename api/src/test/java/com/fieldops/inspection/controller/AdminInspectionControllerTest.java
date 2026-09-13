@@ -33,6 +33,9 @@ class AdminInspectionControllerTest {
     @Mock
     private InspectionService inspectionService;
 
+    @Mock
+    private com.fieldops.audit.service.AuditService auditService;
+
     @InjectMocks
     private AdminInspectionController controller;
 
