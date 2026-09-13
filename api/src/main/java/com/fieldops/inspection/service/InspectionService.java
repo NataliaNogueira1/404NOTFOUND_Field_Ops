@@ -20,6 +20,7 @@ import com.fieldops.site.model.InspectionSite;
 import com.fieldops.site.repository.InspectionSiteRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.repository.UserRepository;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
@@ -99,6 +100,10 @@ public class InspectionService {
         }
         if (technician.getRole() != Role.TECHNICIAN) {
             throw new BusinessException("Assigned user must have TECHNICIAN role: " + technician.getId());
+        }
+        if (technician.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException("TECHNICIAN_NOT_ACTIVE",
+                    "Assigned technician must be active: " + technician.getId());
         }
     }
 
