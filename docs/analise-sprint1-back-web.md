@@ -1,6 +1,8 @@
 # Análise PBI a PBI — Backend e Frontend Web (Sprint 1)
 
 > Análise baseada no código real do repositório. Frontend Web considerado apenas funcionalidade integrada com a API (não mocks).
+>
+> **Atualização (setembro):** os veredictos de backend foram revisados após os merges dos PRs #128–#135. Concluídos desde a última versão: Sprint 1 — PBI-027 (técnico ativo) e PBI-029 (cancelar); Sprint 2 — PBI-051, PBI-052, PBI-060, PBI-061 e PBI-063.
 
 ---
 
@@ -28,27 +30,25 @@
 | PBI-023 | Publicar versão imutável | [#40](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/40) | ✅ Concluído — `POST /api/v1/inspection-templates/{id}/publish` → `InspectionTemplateVersionService.publish` (versão imutável) + migration V13 |
 | PBI-024 | Snapshot ao criar inspeção | [#41](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/41) | ✅ Concluído — `InspectionService.copyChecklist` → `InspectionItemSnapshot` (colunas `updatable=false`) + migrations V12/V14 |
 | PBI-025 | Agendar inspeção | [#42](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/42) | ✅ Concluído — `POST /api/v1/inspections` exige `templateVersionId` publicado (status ASSIGNED) + migration V14 |
-| PBI-027 | Atribuir inspeção a técnico | [#44](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/44) | 🟡 Parcial — `validateAssignment` exige role TECHNICIAN, mas **não** valida se o técnico está ATIVO |
-| PBI-028 | Prioridade, prazo e instruções | [#45](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/45) | ✅ Concluído — `CreateInspectionRequest` (priority/dueDate/dueTime/supervisorInstructions) + enum `Priority` + migration V7 |
-| PBI-029 | Cancelar inspeção | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ❌ Aberta — só existe o enum `InspectionStatus.CANCELED`; sem endpoint/serviço de cancelamento nem campo de justificativa |
+| PBI-027 | Atribuir inspeção a técnico | [#44](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/44) | ✅ Concluído — `validateAssignment` agora valida role TECHNICIAN **e** status ATIVO; técnico inativo → 422 `TECHNICIAN_NOT_ACTIVE` (PR #129) |
+| PBI-028 | Prioridade, prazo e instruções | [#45](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/45) | ✅ Concluído — `CreateInspectionRequest` (priority/dueDate/dueTime/supervisorInstructions) + enum `Priority`; instruções limitadas a 2000 chars (PR #130) |
+| PBI-029 | Cancelar inspeção | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ✅ Concluído — `POST /api/v1/inspections/{id}/cancel` com motivo obrigatório (min 10), state machine (bloqueia APPROVED → 422), campos `canceled_at/by/reason` + migration V15, auditoria (PR #128) |
 
 ### Resumo Sprint 1 Backend (23 itens)
 
-> Verificado no **código real** do módulo `api/` (controllers, services, entidades e migrações Flyway V1–V14).
+> Verificado no **código real** do módulo `api/` (controllers, services, entidades e migrações Flyway V1–V18).
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 20 |
-| 🟡 Parcial | 1 |
-| ❌ Não feito | 2 |
+| ✅ Concluído | 22 |
+| 🟡 Parcial | 0 |
+| ❌ Não feito | 1 |
 
-**Porcentagem: ~87%** (20/23 concluídos; 21/23 se contar o parcial)
+**Porcentagem: ~96%** (22/23 concluídos)
 
-> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)**, os CRUDs de catálogo — **PBI-011 (usuários)**, **PBI-013 (clientes)**, **PBI-014 (locais)**, **PBI-015 (equipamentos)**, **PBI-016 (QR único)**, **PBI-017 (pesquisa/filtros/paginação)** — e todo o fluxo de modelos de inspeção: **PBI-018 (rascunho)**, **PBI-019 (seções)**, **PBI-020 (itens/tipos)**, **PBI-021 (obrigatoriedade/evidência)**, **PBI-023 (publicar versão imutável)**, **PBI-024 (snapshot)**, além de **PBI-025 (agendar)** e **PBI-028 (prioridade/prazo/instruções)**.
+> Concluídos: PBI-001, PBI-004, PBI-006, **PBI-007 (auth JWT)**, **PBI-010 (refresh token)**, **PBI-012 (autorização por perfil)**, os CRUDs de catálogo — **PBI-011 (usuários)**, **PBI-013 (clientes)**, **PBI-014 (locais)**, **PBI-015 (equipamentos)**, **PBI-016 (QR único)**, **PBI-017 (pesquisa/filtros/paginação)** — e todo o fluxo de modelos de inspeção: **PBI-018 (rascunho)**, **PBI-019 (seções)**, **PBI-020 (itens/tipos)**, **PBI-021 (obrigatoriedade/evidência)**, **PBI-023 (publicar versão imutável)**, **PBI-024 (snapshot)**, **PBI-025 (agendar)**, **PBI-028 (prioridade/prazo/instruções)**, além de **PBI-027 (atribuir a técnico ativo)** e **PBI-029 (cancelar inspeção)**, concluídos após os merges de setembro.
 >
-> Parcial: **PBI-027 (atribuir a técnico)** — falta apenas validar que o técnico atribuído está ATIVO (hoje valida só a role TECHNICIAN).
->
-> Ainda em aberto no backend: **PBI-022 (prévia do checklist)** — não há endpoint de prévia, a validação só roda no momento do publish — e **PBI-029 (cancelar inspeção com justificativa)** — existe apenas o valor `CANCELED` no enum, sem endpoint/serviço de transição nem campo de justificativa.
+> Ainda em aberto no backend: **PBI-022 (prévia do checklist)** — não há endpoint de prévia, a validação só roda no momento do publish.
 
 ---
 
@@ -261,11 +261,11 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
-| PBI-051 | Envio em lote respeitando dependências | [#71](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/71) | ❌ Não feito — envio é por operação (`InspectionSyncService`); não há endpoint de lote no backend |
-| PBI-052 | Idempotência — impedir duplicidade no reenvio | [#72](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/72) | ❌ Não feito — sem chave de idempotência/dedup no servidor |
-| PBI-060 | Aprovar inspeção | [#81](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/81) | ❌ Não feito — `AdminInspectionController` só tem criar/listar; sem transição para APPROVED |
-| PBI-061 | Reprovar inspeção com motivo obrigatório | [#82](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/82) | ❌ Não feito — sem endpoint de reprovação no backend |
-| PBI-063 | Auditoria de mudanças de estado | [#83](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/83) | ❌ Não feito — sem tabela/entidade de auditoria |
+| PBI-051 | Envio em lote respeitando dependências | [#71](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/71) | ✅ Concluído — `POST /api/v1/mobile/sync/push` (`SyncBatchService`) ordena por `dependencyIds`, resultado por operação (APPLIED/ALREADY_APPLIED/DEFERRED/FAILED), idempotente (PR #135) |
+| PBI-052 | Idempotência — impedir duplicidade no reenvio | [#72](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/72) | ✅ Concluído — store `processed_operations` (migration V18) + `IdempotencyService`; `POST /api/v1/mobile/inspections/{id}/status` retorna ALREADY_APPLIED no reenvio (PR #133) |
+| PBI-060 | Aprovar inspeção | [#81](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/81) | ✅ Concluído — `POST /api/v1/inspections/{id}/approve`; UNDER_REVIEW → APPROVED, comentário opcional, auditoria (PR #131) |
+| PBI-061 | Reprovar inspeção com motivo obrigatório | [#82](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/82) | ✅ Concluído — `POST /api/v1/inspections/{id}/reject`; motivo obrigatório (min 10), UNDER_REVIEW → REJECTED, auditoria (PR #131) |
+| PBI-063 | Auditoria de mudanças de estado | [#83](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/83) | ✅ Concluído — tabela imutável `audit_events` (migration V17) + `AuditService`; `GET /api/v1/inspections/{id}/history`; eventos de criar/atribuir/aprovar/reprovar/cancelar (PRs #132/#134) |
 | PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ❌ Não feito — existem bootstrap runners de admin/usuários dev, mas não um seed reproduzível de demonstração |
 | PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | 🟡 Parcial — há `Dockerfile` e `docker-compose.yml`; falta validar/publicar o build de demonstração |
 | PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | 🟡 Parcial — OpenAPI gerado via springdoc + `OpenApiConfig`; falta contrato completo revisado e diagramas |
@@ -280,13 +280,15 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 0 |
+| ✅ Concluído | 5 |
 | 🟡 Parcial | 2 |
-| ❌ Não feito | 12 |
+| ❌ Não feito | 7 |
 
-**Porcentagem: 0%** concluído (2 parciais: PBI-070 Docker e PBI-071 OpenAPI).
+**Porcentagem: ~36%** concluído (5/14; 2 parciais: PBI-070 Docker e PBI-071 OpenAPI).
 
-> Nenhum item de revisão/aprovação (PBI-060/061), sincronização em lote/idempotência (PBI-051/052) ou auditoria (PBI-063) tem código ainda. Os endpoints que o cliente mobile já chama para sync (`/answers`, `/evidences`, `/non-conformities`, `/status`) **ainda não existem no backend**. Os itens P1 (073–082) não têm código nem issue correspondente (os números 073–076 no GitHub são de outras tarefas — ver ressalva ao final).
+> Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**) e auditoria de mudanças de estado (**PBI-063**).
+>
+> Ainda em aberto: os endpoints de escrita de conteúdo que o mobile chama no sync (`/answers`, `/evidences`, `/non-conformities`) **ainda não existem** — hoje o único tipo de operação aplicada no batch/idempotência é a transição de status (`/inspections/{id}/status`); os demais tipos podem reutilizar o `IdempotencyService` e o `SyncBatchService`. O seed de demonstração (PBI-066) e os itens P1 (073–082) seguem sem código; os P1 também não têm issue correspondente (os números 073–076 no GitHub são de outras tarefas — ver ressalva ao final).
 
 ---
 
