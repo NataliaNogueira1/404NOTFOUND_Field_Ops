@@ -7,6 +7,7 @@ import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
+import com.fieldops.inspection.dto.ReviewDecisionResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
@@ -77,6 +78,71 @@ public class InspectionService {
         Inspection inspection = buildInspection(request, version, client, site, equipment, technician, supervisor);
         copyChecklist(version, inspection);
         return toResponse(inspectionRepository.save(inspection));
+    }
+
+    /**
+     * Approves an inspection under review (PBI-060). Only an UNDER_REVIEW inspection can be
+     * approved (state machine); the optional comment is stored. APPROVED is terminal, so the
+     * frozen responses are effectively protected from further edits.
+     */
+    @Transactional
+    public ReviewDecisionResponse approve(Long inspectionId, String comment, Long reviewerId) {
+        Inspection inspection = requireReviewable(inspectionId);
+        User reviewer = findUser(reviewerId);
+
+        inspection.setStatus(InspectionStatus.APPROVED);
+        inspection.setReviewedAt(Instant.now());
+        inspection.setReviewedBy(reviewer);
+        inspection.setReviewComment(trimToNull(comment));
+        Inspection saved = inspectionRepository.save(inspection);
+
+        auditLog.info("INSPECTION_APPROVED inspectionId={} reviewedBy={} at={}",
+                saved.getId(), reviewer.getId(), saved.getReviewedAt());
+
+        return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
+                reviewer.getId(), saved.getReviewComment(), null);
+    }
+
+    /**
+     * Rejects an inspection under review with a mandatory reason (PBI-061). Only an
+     * UNDER_REVIEW inspection can be rejected (state machine).
+     */
+    @Transactional
+    public ReviewDecisionResponse reject(Long inspectionId, String reason, Long reviewerId) {
+        Inspection inspection = requireReviewable(inspectionId);
+        User reviewer = findUser(reviewerId);
+
+        inspection.setStatus(InspectionStatus.REJECTED);
+        inspection.setReviewedAt(Instant.now());
+        inspection.setReviewedBy(reviewer);
+        inspection.setRejectionReason(reason.trim());
+        Inspection saved = inspectionRepository.save(inspection);
+
+        auditLog.info("INSPECTION_REJECTED inspectionId={} reviewedBy={} at={}",
+                saved.getId(), reviewer.getId(), saved.getReviewedAt());
+
+        return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
+                reviewer.getId(), null, saved.getRejectionReason());
+    }
+
+    /** Loads an inspection and enforces that it is currently UNDER_REVIEW (RN state machine). */
+    private Inspection requireReviewable(Long inspectionId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (inspection.getStatus() != InspectionStatus.UNDER_REVIEW) {
+            throw new BusinessException(
+                    "Inspection must be under review to be approved or rejected, but was "
+                            + inspection.getStatus());
+        }
+        return inspection;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**
