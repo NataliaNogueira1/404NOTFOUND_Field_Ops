@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,6 +20,9 @@ export default function StartInspectionScreen() {
   const location = useLocation();
   const [cameraPermission] = useCameraPermissions();
   const [confirming, setConfirming] = useState(false);
+  // Per-inspection opt-out: the technician may start without recording the
+  // start location even when the device permission is granted (RN-059).
+  const [registerLocation, setRegisterLocation] = useState(true);
 
   const inspection = inspections.find((item) => item.id === id);
 
@@ -49,8 +52,9 @@ export default function StartInspectionScreen() {
       // Device timestamp — records when the activity effectively began.
       const startedAtDevice = new Date().toISOString();
 
-      // One-shot location capture. If denied/unavailable, continue anyway (RN-059).
-      const captured = await location.capture();
+      // One-shot location capture, unless the technician opted out for this
+      // inspection. If denied/unavailable, continue anyway (RN-059).
+      const captured = registerLocation ? await location.capture() : null;
 
       startInspection(inspection.id, {
         startedAtDevice,
@@ -93,6 +97,21 @@ export default function StartInspectionScreen() {
             <Text style={styles.warning}>
               ⚠️ Sem permissão de localização a inspeção inicia normalmente, mas o local de
               início não será registrado.
+            </Text>
+          ) : (
+            <View style={styles.row}>
+              <Text style={styles.muted}>📍 Registrar localização de início</Text>
+              <Switch
+                value={registerLocation}
+                onValueChange={setRegisterLocation}
+                disabled={confirming}
+                trackColor={{ true: Colors.primary, false: Colors.gray400 }}
+              />
+            </View>
+          )}
+          {location.permission !== 'denied' && !registerLocation ? (
+            <Text style={styles.warning}>
+              ⚠️ Esta inspeção será iniciada sem registrar o local de início.
             </Text>
           ) : null}
         </Card>
