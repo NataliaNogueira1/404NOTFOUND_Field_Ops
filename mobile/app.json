@@ -48,6 +48,12 @@
           "cameraPermission": "O FieldOps precisa acessar a câmera para registrar evidências fotográficas das inspeções."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "O FieldOps usa sua localização para registrar onde a inspeção foi iniciada."
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-font",

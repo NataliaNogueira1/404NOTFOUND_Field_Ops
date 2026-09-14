@@ -36,10 +36,14 @@ import java.net.URI;
 @Validated
 @RestController
 @RequestMapping("/api/v1/users")
-@PreAuthorize("hasAuthority('ADMINISTRATOR')")
 @Tag(name = "Users")
 @SecurityRequirement(name = "bearer-jwt")
 public class UserController {
+
+    /** Reading the user directory (e.g. the technician picker for scheduling, UC-06). */
+    private static final String READ_USERS = "hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')";
+    /** Managing users (create/update/deactivate) is reserved for administrators (UC-02). */
+    private static final String MANAGE_USERS = "hasAuthority('ADMINISTRATOR')";
 
     private final UserService userService;
 
@@ -51,8 +55,9 @@ public class UserController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paginated user list"),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Administrator profile required")
+            @ApiResponse(responseCode = "403", description = "Administrator or supervisor profile required")
     })
+    @PreAuthorize(READ_USERS)
     @GetMapping
     public ResponseEntity<Page<UserResponse>> list(
             @RequestParam(required = false) String name,
@@ -68,6 +73,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Invalid email"),
             @ApiResponse(responseCode = "403", description = "Administrator profile required")
     })
+    @PreAuthorize(MANAGE_USERS)
     @GetMapping("/email-availability")
     public ResponseEntity<EmailAvailabilityResponse> emailAvailability(
             @RequestParam @NotBlank(message = "email is required")
@@ -84,6 +90,7 @@ public class UserController {
             @ApiResponse(responseCode = "403", description = "Administrator profile required"),
             @ApiResponse(responseCode = "422", description = "Email already in use")
     })
+    @PreAuthorize(MANAGE_USERS)
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
         UserResponse created = userService.create(request);
@@ -97,6 +104,7 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "User not found"),
             @ApiResponse(responseCode = "422", description = "Email already in use")
     })
+    @PreAuthorize(MANAGE_USERS)
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> update(@PathVariable Long id,
                                                @Valid @RequestBody UpdateUserRequest request) {
@@ -110,6 +118,7 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "User not found"),
             @ApiResponse(responseCode = "422", description = "Unsupported status transition")
     })
+    @PreAuthorize(MANAGE_USERS)
     @PatchMapping("/{id}/status")
     public ResponseEntity<UserResponse> updateStatus(@PathVariable Long id,
             @Valid @RequestBody UpdateUserStatusRequest request) {

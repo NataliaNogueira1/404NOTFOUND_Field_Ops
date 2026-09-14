@@ -1,6 +1,7 @@
 package com.fieldops.inspection.model;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,19 +20,35 @@ public class TemplateSection {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder;
+    @Column
+    private String description;
+
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
     @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sortOrder ASC")
+    @OrderBy("displayOrder ASC")
     private List<TemplateItem> items = new ArrayList<>();
+
+    @PrePersist
+    void onCreate() {
+        this.createdAt = Instant.now();
+    }
 
     public Long getId() { return id; }
     public InspectionTemplate getTemplate() { return template; }
     public void setTemplate(InspectionTemplate template) { this.template = template; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
-    public Integer getSortOrder() { return sortOrder; }
-    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Integer getSortOrder() { return displayOrder; }
+    public void setSortOrder(Integer sortOrder) { this.displayOrder = sortOrder; }
     public List<TemplateItem> getItems() { return items; }
 }

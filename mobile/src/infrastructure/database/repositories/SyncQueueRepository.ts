@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type OperationType = 'CREATE' | 'UPDATE' | 'DELETE';
+export type OperationType = 'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSITION';
 export type EntityType = 'inspection' | 'answer' | 'evidence' | 'non_conformity';
 export type SyncOperationStatus = 'pending' | 'in_progress' | 'sent' | 'error';
 

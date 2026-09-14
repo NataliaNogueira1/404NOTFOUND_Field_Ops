@@ -31,3 +31,6 @@ fieldops:
         name: ${FIELDOPS_DEV_TECHNICIAN_NAME:Tecnico Dev}
         email: ${FIELDOPS_DEV_TECHNICIAN_EMAIL:technician@fieldops.local}
         password: ${FIELDOPS_DEV_TECHNICIAN_PASSWORD:fieldops-technician-dev}
+    demo-seed:
+      # Reproducible demonstration dataset (PBI-066). Reuses the dev users above.
+      enabled: ${FIELDOPS_DEMO_SEED_ENABLED:true}

@@ -37,6 +37,18 @@ export interface Inspection {
   pendingSyncCount: number;
   supervisorInstructions: string;
   startedAt?: string;
+  /** GPS latitude captured when the inspection was started (offline). */
+  startLatitude?: number;
+  /** GPS longitude captured when the inspection was started (offline). */
+  startLongitude?: number;
+  /** GPS accuracy (in metres) captured when the inspection was started. */
+  startAccuracy?: number;
+  /** Supervisor's reason when the inspection was REJECTED. */
+  rejectionReason?: string;
+  /** Who rejected the inspection (supervisor name). */
+  rejectedBy?: string;
+  /** When the inspection was rejected (ISO date/time). */
+  rejectedAt?: string;
 }
 export interface Evidence { id: string; inspectionId: string; itemId: string; description: string; uri?: string; capturedAt: string; syncStatus: SyncStatus }
 export interface ChecklistAnswer { itemId: string; value: ChecklistValue; observation?: string; savedAt: string }

@@ -31,7 +31,13 @@ interface FieldOpsContextValue {
   evidences: Evidence[];
   nonConformities: NonConformity[];
   syncOperations: SyncOperation[];
-  startInspection: (inspectionId: string) => void;
+  startInspection: (
+    inspectionId: string,
+    options?: {
+      startedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
@@ -158,21 +164,51 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
-  const startInspection = useCallback((inspectionId: string) => {
-    setInspections((current) =>
-      current.map((inspection) =>
-        inspection.id === inspectionId
-          ? { ...inspection, status: InspectionStatus.IN_PROGRESS, startedAt: inspection.startedAt ?? new Date().toISOString(), syncStatus: 'pending' as const }
-          : inspection,
-      ),
-    );
-    const repos = getRepos();
-    const sync = getSyncService();
-    if (repos && sync) {
-      repos.inspection.markStarted(inspectionId).catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
-    }
-  }, [getRepos, getSyncService]);
+  const startInspection = useCallback(
+    (
+      inspectionId: string,
+      options?: {
+        startedAtDevice?: string;
+        location?: { latitude: number; longitude: number; accuracy?: number } | null;
+      },
+    ) => {
+      const startedAtDevice = options?.startedAtDevice ?? new Date().toISOString();
+      const location = options?.location ?? null;
+
+      setInspections((current) =>
+        current.map((inspection) =>
+          inspection.id === inspectionId
+            ? {
+                ...inspection,
+                status: InspectionStatus.IN_PROGRESS,
+                startedAt: inspection.startedAt ?? startedAtDevice,
+                startLatitude: location?.latitude ?? inspection.startLatitude,
+                startLongitude: location?.longitude ?? inspection.startLongitude,
+                startAccuracy: location?.accuracy ?? inspection.startAccuracy,
+                syncStatus: 'pending' as const,
+                pendingSyncCount: Math.max(inspection.pendingSyncCount, 1),
+              }
+            : inspection,
+        ),
+      );
+      const repos = getRepos();
+      const sync = getSyncService();
+      if (repos && sync) {
+        repos.inspection
+          .markStartedWithDevice(inspectionId, startedAtDevice, location)
+          .catch(console.warn);
+        // Outbox: TRANSITION carrying device timestamp + optional location (PBI-034).
+        sync
+          .enqueueTransition(inspectionId, {
+            status: 'IN_PROGRESS',
+            startedAtDevice,
+            location,
+          })
+          .catch(console.warn);
+      }
+    },
+    [getRepos, getSyncService],
+  );
 
   const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string) => {
     setAnswers((current) => {

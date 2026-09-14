@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
+import { randomUuidV4 } from './uuid';
 import {
   InspectionRepository,
   AnswerRepository,
@@ -67,6 +68,28 @@ interface ApiItem {
   requireObservationOnFailure: boolean;
   requireEvidenceOnFailure: boolean;
   options?: string[];
+}
+
+// ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
+
+/** One operation in a sync batch. Only INSPECTION_STATUS is supported server-side today. */
+interface SyncPushOperation {
+  operationId: string;
+  type: 'INSPECTION_STATUS';
+  dependencyIds: string[];
+  payload: { inspectionId: string; status: string };
+}
+
+interface SyncPushBody {
+  operations: SyncPushOperation[];
+}
+
+interface SyncPushResult {
+  results: Array<{
+    operationId: string;
+    status: 'APPLIED' | 'ALREADY_APPLIED' | 'DEFERRED' | 'FAILED';
+    detail?: string | null;
+  }>;
 }
 
 // ─── Service ───────────────────────────────────────────────────────────────────
@@ -238,38 +261,58 @@ export class InspectionSyncService {
     const payload = JSON.parse(operation.payload);
 
     switch (operation.entityType) {
-      case 'answer':
-        await apiClient.post(
-          `/api/v1/mobile/inspections/${payload.inspectionId}/answers`,
-          payload,
-          token,
-        );
-        break;
-      case 'evidence':
-        await apiClient.post(
-          `/api/v1/mobile/inspections/${payload.inspectionId}/evidences`,
-          payload,
-          token,
-        );
-        break;
-      case 'non_conformity':
-        await apiClient.post(
-          `/api/v1/mobile/inspections/${payload.inspectionId}/non-conformities`,
-          payload,
-          token,
-        );
-        break;
       case 'inspection':
-        if (operation.operationType === 'UPDATE') {
-          await apiClient.patch(
-            `/api/v1/mobile/inspections/${operation.entityId}/status`,
-            payload,
-            token,
-          );
+        if (operation.operationType === 'UPDATE' || operation.operationType === 'TRANSITION') {
+          await this.pushInspectionStatus(token, operation.entityId, payload);
         }
         break;
+      // answer/evidence/non_conformity have no server endpoint yet: only
+      // INSPECTION_STATUS is implemented in POST /mobile/sync/push (PBI-051/052).
+      // They stay queued (marked error → retried) until their endpoints exist.
+      case 'answer':
+      case 'evidence':
+      case 'non_conformity':
+        throw new Error(
+          `Sync for '${operation.entityType}' is not supported by the API yet; keeping it queued.`,
+        );
       default:
         throw new Error(`Unknown entity type: ${operation.entityType}`);
+    }
+  }
+
+  /**
+   * Push a single inspection status transition through the batch endpoint
+   * (POST /api/v1/mobile/sync/push, PBI-051/052). The server is idempotent on
+   * {@code operationId}, so re-sending the same queued row never applies twice.
+   * A FAILED result (e.g. illegal transition) is surfaced as an error so the
+   * outbox can flag it instead of silently dropping the operation.
+   */
+  private async pushInspectionStatus(
+    token: string,
+    inspectionId: string,
+    payload: { operationId?: string; status: string },
+  ): Promise<void> {
+    const operationId = payload.operationId ?? randomUuidV4();
+    const body: SyncPushBody = {
+      operations: [
+        {
+          operationId,
+          type: 'INSPECTION_STATUS',
+          dependencyIds: [],
+          payload: { inspectionId, status: payload.status },
+        },
+      ],
+    };
+
+    const response = await apiClient.post<SyncPushResult>(
+      '/api/v1/mobile/sync/push',
+      body,
+      token,
+    );
+
+    const result = response.results?.[0];
+    if (result && result.status === 'FAILED') {
+      throw new Error(result.detail ?? `Inspection status transition failed for ${inspectionId}`);
     }
   }
 
@@ -355,6 +398,31 @@ export class InspectionSyncService {
     const id = `status-${inspectionId}-${Date.now()}`;
     await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
       status,
+    });
+  }
+
+  /**
+   * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
+   * carrying the device timestamp and the optional start location (PBI-034).
+   */
+  async enqueueTransition(
+    inspectionId: string,
+    input: {
+      status: string;
+      startedAtDevice: string;
+      location: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ): Promise<void> {
+    const id = `transition-${inspectionId}-${Date.now()}`;
+    // operationId is the server-side idempotency key (PBI-052): a stable UUID kept
+    // in the payload so a resend of this same outbox row never applies twice.
+    // startedAtDevice/location are kept locally for now; the batch endpoint only
+    // consumes {inspectionId, status} today — location persistence is PBI-045.
+    await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
+      operationId: randomUuidV4(),
+      status: input.status,
+      startedAtDevice: input.startedAtDevice,
+      location: input.location,
     });
   }
 }

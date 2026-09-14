@@ -138,8 +138,16 @@ class UserControllerTest {
 
     @Test
     @WithMockUser(authorities = "SUPERVISOR")
-    void forbidsSupervisor() throws Exception {
+    void allowsSupervisorToListButNotCreateUsers() throws Exception {
+        // UC-06: a supervisor reads the user directory to pick a technician when scheduling.
         mockMvc.perform(get("/api/v1/users"))
+                .andExpect(status().isOk());
+
+        // UC-02: creating users stays administrator-only.
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"New Tech\",\"email\":\"new.tech@example.com\","
+                                + "\"password\":\"secret1\",\"role\":\"TECHNICIAN\"}"))
                 .andExpect(status().isForbidden());
     }
 

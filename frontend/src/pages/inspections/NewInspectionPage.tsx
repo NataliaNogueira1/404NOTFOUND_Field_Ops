@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminCatalogApi, type TemplateSummary, type TemplateVersionSummary } from '@/api/adminCatalog'
+import { adminCatalogApi, type InspectionTemplateVersion, type TemplateSummary } from '@/api/adminCatalog'
 import { ClientStatus, clientsApi } from '@/api/clients'
 import { EquipmentStatus, equipmentApi } from '@/api/equipment'
 import { InspectionSiteStatus, sitesApi } from '@/api/sites'
@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { clients, equipment, sites, users } from '@/mocks/domain'
 import { Priority, UserRole, UserStatus } from '@/types/domain'
 
-function formatVersionLabel(v: TemplateVersionSummary): string {
+function formatVersionLabel(v: InspectionTemplateVersion): string {
   const date = new Date(v.publishedAt).toLocaleDateString('pt-BR')
   return `Versão ${v.versionNumber} (publicada em ${date})`
 }
@@ -25,8 +25,8 @@ export function NewInspectionPage() {
   // ── Template & version ─────────────────────────────────────────────────────
   const [availableTemplates, setAvailableTemplates] = useState<TemplateSummary[]>([])
   const [templateId, setTemplateId] = useState('')
-  const [availableVersions, setAvailableVersions] = useState<TemplateVersionSummary[]>([])
-  const [selectedVersion, setSelectedVersion] = useState<TemplateVersionSummary | null>(null)
+  const [availableVersions, setAvailableVersions] = useState<InspectionTemplateVersion[]>([])
+  const [selectedVersion, setSelectedVersion] = useState<InspectionTemplateVersion | null>(null)
   const [templatesLoading, setTemplatesLoading] = useState(true)
   const [versionsLoading, setVersionsLoading] = useState(false)
 
@@ -35,10 +35,8 @@ export function NewInspectionPage() {
     clients.filter(c => c.active).map(c => ({ id: c.id, name: c.name })),
   )
   const [clientId, setClientId] = useState('')
-  const [clientName, setClientName] = useState('')
   const [availableSites, setAvailableSites] = useState<{ id: string; clientId: string; name: string }[]>([])
   const [siteId, setSiteId] = useState('')
-  const [siteName, setSiteName] = useState('')
   const [availableEquipment, setAvailableEquipment] = useState<{ id: string; siteId: string; name: string }[]>([])
   const [equipmentId, setEquipmentId] = useState('')
   const [equipmentName, setEquipmentName] = useState('')
@@ -140,12 +138,15 @@ export function NewInspectionPage() {
     setError('')
     setSubmitting(true)
     try {
-      await adminCatalogApi.scheduleInspection({
-        templateId: Number(templateId),
+      const templateTitle = availableTemplates.find(t => t.id === templateId)?.title ?? 'Inspeção'
+      const title = `${templateTitle} — ${equipmentName}`.slice(0, 300)
+      await adminCatalogApi.createInspection({
+        title,
+        templateVersionId: Number(selectedVersion.id),
+        clientId: Number(clientId),
+        siteId: Number(siteId),
+        equipmentId: Number(equipmentId),
         technicianId: Number(technicianId),
-        clientName,
-        siteName,
-        equipmentName,
         priority,
         dueDate,
         supervisorInstructions: instructions || undefined,
@@ -190,11 +191,11 @@ export function NewInspectionPage() {
           <Select
             label="Versão"
             id="new-version"
-            value={selectedVersion?.versionNumber ?? ''}
+            value={selectedVersion?.id ?? ''}
             disabled={versionsLoading || availableVersions.length === 0}
             onChange={e => {
-              const num = Number(e.target.value)
-              setSelectedVersion(availableVersions.find(v => v.versionNumber === num) ?? null)
+              const id = e.target.value
+              setSelectedVersion(availableVersions.find(v => v.id === id) ?? null)
             }}
           >
             {versionsLoading
@@ -202,7 +203,7 @@ export function NewInspectionPage() {
               : availableVersions.length === 0
                 ? <option value="">—</option>
                 : availableVersions.map(v => (
-                    <option key={v.versionNumber} value={v.versionNumber}>
+                    <option key={v.id} value={v.id}>
                       {formatVersionLabel(v)}
                     </option>
                   ))
@@ -220,10 +221,8 @@ export function NewInspectionPage() {
             value={clientId}
             onChange={e => {
               const id = e.target.value
-              const name = selectableClients.find(c => c.id === id)?.name ?? ''
               setClientId(id)
-              setClientName(name)
-              setSiteId(''); setSiteName('')
+              setSiteId('')
               setEquipmentId(''); setEquipmentName('')
               setError('')
             }}
@@ -239,9 +238,7 @@ export function NewInspectionPage() {
             disabled={!clientId}
             onChange={e => {
               const id = e.target.value
-              const name = availableSites.find(s => s.id === id)?.name ?? ''
               setSiteId(id)
-              setSiteName(name)
               setEquipmentId(''); setEquipmentName('')
               setError('')
             }}

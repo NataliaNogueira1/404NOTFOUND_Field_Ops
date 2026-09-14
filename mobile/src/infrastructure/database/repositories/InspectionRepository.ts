@@ -34,6 +34,12 @@ interface InspectionRow {
   sync_status: string;
   pending_sync_count: number;
   updated_at: string;
+  start_latitude: number | null;
+  start_longitude: number | null;
+  start_accuracy: number | null;
+  rejection_reason: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
 }
 
 interface SectionRow {
@@ -147,6 +153,34 @@ export class InspectionRepository {
     await this.db.runAsync(
       `UPDATE inspections SET status = 'IN_PROGRESS', started_at = datetime('now'),
        sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
+      id,
+    );
+  }
+
+  /**
+   * Mark an inspection as started using the device's own timestamp and,
+   * optionally, the GPS location captured at start time. Location may be null
+   * when permission was denied (RN-059) — the inspection still starts.
+   */
+  async markStartedWithDevice(
+    id: string,
+    startedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET
+         status = 'IN_PROGRESS',
+         started_at = ?,
+         start_latitude = ?,
+         start_longitude = ?,
+         start_accuracy = ?,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      startedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
       id,
     );
   }
@@ -289,6 +323,12 @@ export class InspectionRepository {
     syncStatus: row.sync_status as Inspection['syncStatus'],
     pendingSyncCount: row.pending_sync_count,
     supervisorInstructions: row.supervisor_instructions ?? '',
+    startLatitude: row.start_latitude ?? undefined,
+    startLongitude: row.start_longitude ?? undefined,
+    startAccuracy: row.start_accuracy ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    rejectedBy: row.rejected_by ?? undefined,
+    rejectedAt: row.rejected_at ?? undefined,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

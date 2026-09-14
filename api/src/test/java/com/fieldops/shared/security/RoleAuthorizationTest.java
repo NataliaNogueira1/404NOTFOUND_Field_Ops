@@ -2,6 +2,7 @@ package com.fieldops.shared.security;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
@@ -62,13 +63,18 @@ class RoleAuthorizationTest {
     private InspectionRepository inspectionRepository;
 
     @Autowired
+    private InspectionTemplateRepository templateRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void seedOneUserPerRole() {
         // The shared in-memory DB may carry rows from a previous test class. Clear children
-        // before users, respecting FK order: inspections and refresh tokens both reference users.
+        // before users, respecting FK order: inspections and templates reference users, and
+        // refresh tokens reference users too.
         inspectionRepository.deleteAll();
+        templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         persistUser("admin@fieldops.com", Role.ADMINISTRATOR);
@@ -134,6 +140,23 @@ class RoleAuthorizationTest {
         mockMvc.perform(get("/api/v1/users")
                         .header("Authorization", bearer("admin@fieldops.com")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void allowsSupervisorToReadUsersButNotManageThem() throws Exception {
+        // UC-06: a supervisor lists technicians to schedule an inspection.
+        mockMvc.perform(get("/api/v1/users?role=TECHNICIAN&status=ACTIVE")
+                        .header("Authorization", bearer("sup@fieldops.com")))
+                .andExpect(status().isOk());
+
+        // UC-02: user management (writes) remains administrator-only.
+        mockMvc.perform(post("/api/v1/users")
+                        .header("Authorization", bearer("sup@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"New Tech\",\"email\":\"new.tech@fieldops.com\","
+                                + "\"password\":\"pass1234\",\"role\":\"TECHNICIAN\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     /**

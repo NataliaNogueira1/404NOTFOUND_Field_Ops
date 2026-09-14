@@ -35,7 +35,7 @@ public class InspectionTemplate {
     private User createdBy;
 
     @OneToMany(mappedBy = "template", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sortOrder ASC")
+    @OrderBy("displayOrder ASC")
     private List<TemplateSection> sections = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
