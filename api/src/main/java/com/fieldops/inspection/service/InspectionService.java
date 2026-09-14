@@ -1,5 +1,7 @@
 package com.fieldops.inspection.service;
 
+import com.fieldops.audit.model.AuditAction;
+import com.fieldops.audit.service.AuditService;
 import com.fieldops.client.model.Client;
 import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.model.Equipment;
@@ -51,17 +53,19 @@ public class InspectionService {
     private final InspectionSiteRepository siteRepository;
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     public InspectionService(InspectionRepository inspectionRepository,
             InspectionTemplateVersionRepository versionRepository, ClientRepository clientRepository,
             InspectionSiteRepository siteRepository, EquipmentRepository equipmentRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository, AuditService auditService) {
         this.inspectionRepository = inspectionRepository;
         this.versionRepository = versionRepository;
         this.clientRepository = clientRepository;
         this.siteRepository = siteRepository;
         this.equipmentRepository = equipmentRepository;
         this.userRepository = userRepository;
+        this.auditService = auditService;
     }
 
     /** Creates an assigned inspection and freezes every checklist item from the selected version. */
@@ -77,7 +81,14 @@ public class InspectionService {
 
         Inspection inspection = buildInspection(request, version, client, site, equipment, technician, supervisor);
         copyChecklist(version, inspection);
-        return toResponse(inspectionRepository.save(inspection));
+        Inspection saved = inspectionRepository.save(inspection);
+
+        // Scheduling creates an inspection already ASSIGNED to a technician: record both events.
+        auditService.recordInspection(supervisorId, AuditAction.INSPECTION_CREATED, saved.getId(), null);
+        auditService.recordInspection(supervisorId, AuditAction.INSPECTION_ASSIGNED, saved.getId(),
+                "technicianId=" + technician.getId());
+
+        return toResponse(saved);
     }
 
     /**
