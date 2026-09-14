@@ -18,6 +18,7 @@ public record CreateInspectionRequest(
         @NotNull Priority priority,
         @NotNull @FutureOrPresent LocalDate dueDate,
         LocalTime dueTime,
+        @Size(max = 2000, message = "Instructions must have at most 2000 characters")
         String supervisorInstructions
 ) {
 }

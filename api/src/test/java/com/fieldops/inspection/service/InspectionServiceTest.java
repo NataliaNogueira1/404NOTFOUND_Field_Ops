@@ -1,6 +1,7 @@
 package com.fieldops.inspection.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -21,8 +22,10 @@ import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.repository.InspectionTemplateVersionRepository;
 import com.fieldops.site.model.InspectionSite;
 import com.fieldops.site.repository.InspectionSiteRepository;
+import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -55,6 +58,9 @@ class InspectionServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private com.fieldops.audit.service.AuditService auditService;
 
     @InjectMocks
     private InspectionService inspectionService;
@@ -111,6 +117,40 @@ class InspectionServiceTest {
         source.setQuestion("Changed after scheduling");
         InspectionItemSnapshot snapshot = inspection.getItemSnapshots().get(0);
         assertThat(snapshot.getItemTitle()).isEqualTo("Are the cables intact?");
+    }
+
+    @Test
+    void rejectsInactiveTechnicianWithSpecificBusinessCode() {
+        User supervisor = user("Supervisor", Role.SUPERVISOR);
+        User technician = user("Technician", Role.TECHNICIAN);
+        technician.setStatus(UserStatus.INACTIVE);
+        InspectionTemplateVersion version = publishedVersion(supervisor);
+        Client client = new Client();
+        client.setName("Acme");
+        InspectionSite site = new InspectionSite();
+        site.setName("Plant 1");
+        site.setClient(client);
+        Equipment equipment = new Equipment();
+        equipment.setName("Compressor A");
+        equipment.setSite(site);
+
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+        when(clientRepository.findById(11L)).thenReturn(Optional.of(client));
+        when(siteRepository.findById(12L)).thenReturn(Optional.of(site));
+        when(equipmentRepository.findById(13L)).thenReturn(Optional.of(equipment));
+        when(userRepository.findById(14L)).thenReturn(Optional.of(technician));
+        when(userRepository.findById(15L)).thenReturn(Optional.of(supervisor));
+
+        CreateInspectionRequest request = new CreateInspectionRequest(
+                "Preventive inspection", 7L, 11L, 12L, 13L, 14L, Priority.HIGH,
+                LocalDate.of(2026, 9, 12), null, "Lock out the equipment");
+
+        assertThatThrownBy(() -> inspectionService.createInspection(request, 15L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getCode())
+                .isEqualTo("TECHNICIAN_NOT_ACTIVE");
+
+        org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
     }
 
     private InspectionTemplateVersion publishedVersion(User supervisor) {
