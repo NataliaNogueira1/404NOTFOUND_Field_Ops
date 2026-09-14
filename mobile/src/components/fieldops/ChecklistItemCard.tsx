@@ -24,7 +24,6 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
   const [observation, setObservation] = useState(answer?.observation ?? '');
   const isFailure = answer?.value === 'NAO_CONFORME';
   const statusLabel = useMemo(() => isFailure ? 'Não conforme' : answer ? 'Respondido' : 'Pendente', [answer, isFailure]);
-
   // Debounced save hook — handles timing per response type
   const { status: saveStatus, save, flush } = useDebouncedSave({
     responseType: item.responseType,
@@ -44,20 +43,26 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
     if (text) flush(parsed, observation || undefined);
   }, [item.responseType, text, observation, flush]);
 
-  // Selection controls: immediate save
+  // Selection controls: immediate save, preserving any existing observation
   const handleSelect = useCallback((value: ChecklistValue) => {
-    save(value);
-  }, [save]);
+    save(value, observation || undefined);
+  }, [observation, save]);
 
-  // Observation field for non-conformities
+  // Observation field — available for all items, not just non-conformities
   const handleObservationChange = useCallback((value: string) => {
     setObservation(value);
-    save('NAO_CONFORME', value);
-  }, [save]);
+    const currentValue = answer?.value;
+    if (currentValue !== undefined) {
+      save(currentValue, value || undefined);
+    }
+  }, [answer?.value, save]);
 
   const handleObservationBlur = useCallback(() => {
-    flush('NAO_CONFORME', observation);
-  }, [flush, observation]);
+    const currentValue = answer?.value;
+    if (currentValue !== undefined) {
+      flush(currentValue, observation || undefined);
+    }
+  }, [answer?.value, flush, observation]);
 
   return (
     <Card style={styles.card}>
@@ -77,7 +82,7 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
       {isFailure ? (
         <View style={styles.failureBox}>
           <Text style={styles.failureTitle}>Não conformidade criada</Text>
-          <Text style={styles.label}>Observação obrigatória</Text>
+          <Text style={styles.label}>Observação{item.requireObservationOnFailure ? ' obrigatória' : ''}</Text>
           <TextInput
             value={observation}
             onChangeText={handleObservationChange}
@@ -87,8 +92,21 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
             style={[styles.input, styles.textArea]}
             multiline
           />
-          <Text style={styles.label}>Evidência obrigatória</Text>
+          <Text style={styles.label}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
           <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=ins-compressor&itemId=${item.id}`)} variant="secondary" />
+        </View>
+      ) : answer !== undefined ? (
+        <View style={styles.observationBox}>
+          <Text style={styles.label}>Observação (opcional)</Text>
+          <TextInput
+            value={observation}
+            onChangeText={handleObservationChange}
+            onBlur={handleObservationBlur}
+            placeholder="Adicione uma observação sobre este item"
+            placeholderTextColor={Colors.gray400}
+            style={[styles.input, styles.textArea]}
+            multiline
+          />
         </View>
       ) : null}
       {evidences.length > 0 ? (
@@ -184,6 +202,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, paddingHorizontal: Spacing.md, color: Colors.text, fontSize: FontSize.md },
   textArea: { minHeight: 92, paddingTop: Spacing.sm, textAlignVertical: 'top' },
   failureBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.dangerLight, backgroundColor: '#FFF7F7', padding: Spacing.md },
+  observationBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, padding: Spacing.md },
   failureTitle: { color: Colors.dangerDark, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
