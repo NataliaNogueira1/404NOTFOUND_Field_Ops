@@ -56,6 +56,9 @@ class CancelInspectionControllerTest {
     private InspectionTemplateRepository templateRepository;
 
     @Autowired
+    private com.fieldops.audit.repository.AuditEventRepository auditEventRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private User supervisor;
@@ -79,6 +82,7 @@ class CancelInspectionControllerTest {
 
     private void cleanState() {
         // FK order: inspections -> templates -> refresh tokens -> users.
+        auditEventRepository.deleteAll();
         inspectionRepository.deleteAll();
         templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
@@ -106,6 +110,14 @@ class CancelInspectionControllerTest {
         assertThat(reloaded.getCanceledAt()).isNotNull();
         assertThat(reloaded.getCanceledBy().getId()).isEqualTo(supervisor.getId());
         assertThat(reloaded.getCanceledReason()).isNotBlank();
+
+        // The cancellation is recorded in the audit trail (PBI-063 wiring).
+        assertThat(auditEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAction())
+                            .isEqualTo(com.fieldops.audit.model.AuditAction.INSPECTION_CANCELED);
+                    assertThat(event.getEntityId()).isEqualTo(inspection.getId());
+                });
     }
 
     @Test
