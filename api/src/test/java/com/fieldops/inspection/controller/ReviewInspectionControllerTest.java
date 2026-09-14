@@ -1,5 +1,7 @@
 package com.fieldops.inspection.controller;
 
+import com.fieldops.audit.model.AuditAction;
+import com.fieldops.audit.repository.AuditEventRepository;
 import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
@@ -55,6 +57,9 @@ class ReviewInspectionControllerTest {
     private InspectionTemplateRepository templateRepository;
 
     @Autowired
+    private AuditEventRepository auditEventRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private User supervisor;
@@ -75,6 +80,7 @@ class ReviewInspectionControllerTest {
     }
 
     private void cleanState() {
+        auditEventRepository.deleteAll();
         inspectionRepository.deleteAll();
         templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
@@ -100,6 +106,14 @@ class ReviewInspectionControllerTest {
         assertThat(reloaded.getStatus()).isEqualTo(InspectionStatus.APPROVED);
         assertThat(reloaded.getReviewedBy().getId()).isEqualTo(supervisor.getId());
         assertThat(reloaded.getReviewComment()).isEqualTo("Tudo conforme, aprovado.");
+
+        // The approval is recorded in the audit trail (PBI-063 wiring).
+        assertThat(auditEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAction()).isEqualTo(AuditAction.INSPECTION_APPROVED);
+                    assertThat(event.getEntityId()).isEqualTo(inspection.getId());
+                    assertThat(event.getActorId()).isEqualTo(supervisor.getId());
+                });
     }
 
     @Test

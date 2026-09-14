@@ -29,15 +29,11 @@ import com.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InspectionService {
-
-    private static final Logger auditLog = LoggerFactory.getLogger("com.fieldops.audit");
 
     /** Statuses from which an inspection may still be cancelled (RN-029). APPROVED is excluded (RN-030). */
     private static final Set<InspectionStatus> CANCELABLE_STATUSES = Set.of(
@@ -107,8 +103,8 @@ public class InspectionService {
         inspection.setReviewComment(trimToNull(comment));
         Inspection saved = inspectionRepository.save(inspection);
 
-        auditLog.info("INSPECTION_APPROVED inspectionId={} reviewedBy={} at={}",
-                saved.getId(), reviewer.getId(), saved.getReviewedAt());
+        auditService.recordInspection(reviewer.getId(), AuditAction.INSPECTION_APPROVED, saved.getId(),
+                saved.getReviewComment());
 
         return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
                 reviewer.getId(), saved.getReviewComment(), null);
@@ -129,8 +125,8 @@ public class InspectionService {
         inspection.setRejectionReason(reason.trim());
         Inspection saved = inspectionRepository.save(inspection);
 
-        auditLog.info("INSPECTION_REJECTED inspectionId={} reviewedBy={} at={}",
-                saved.getId(), reviewer.getId(), saved.getReviewedAt());
+        auditService.recordInspection(reviewer.getId(), AuditAction.INSPECTION_REJECTED, saved.getId(),
+                saved.getRejectionReason());
 
         return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
                 reviewer.getId(), null, saved.getRejectionReason());
@@ -178,8 +174,8 @@ public class InspectionService {
         inspection.setCanceledReason(reason.trim());
         Inspection saved = inspectionRepository.save(inspection);
 
-        auditLog.info("INSPECTION_CANCELED inspectionId={} canceledBy={} at={}",
-                saved.getId(), actor.getId(), saved.getCanceledAt());
+        auditService.recordInspection(actor.getId(), AuditAction.INSPECTION_CANCELED, saved.getId(),
+                saved.getCanceledReason());
 
         return new CancelInspectionResponse(saved.getId(), saved.getStatus(),
                 saved.getCanceledAt(), actor.getId(), saved.getCanceledReason());
