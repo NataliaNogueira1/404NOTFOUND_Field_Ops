@@ -3,12 +3,14 @@ package com.fieldops.inspection.controller;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplate;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
@@ -27,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,6 +60,9 @@ class MobileInspectionControllerTest {
     private InspectionRepository inspectionRepository;
 
     @Autowired
+    private InspectionItemSnapshotRepository snapshotRepository;
+
+    @Autowired
     private InspectionTemplateRepository templateRepository;
 
     @Autowired
@@ -65,6 +71,8 @@ class MobileInspectionControllerTest {
     private User technician;
 
     private User otherTechnician;
+
+    private InspectionTemplate template;
 
     @BeforeEach
     void seedTechnicianWithTwoActionableInspections() {
@@ -77,7 +85,7 @@ class MobileInspectionControllerTest {
         technician = persistUser("tech@fieldops.com", Role.TECHNICIAN);
         otherTechnician = persistUser("other-tech@fieldops.com", Role.TECHNICIAN);
         User supervisor = persistUser("sup@fieldops.com", Role.SUPERVISOR);
-        InspectionTemplate template = persistTemplate(supervisor);
+        template = persistTemplate(supervisor);
 
         saveInspection(template, technician, supervisor, InspectionStatus.ASSIGNED, Priority.HIGH);
         saveInspection(template, technician, supervisor, InspectionStatus.IN_PROGRESS, Priority.LOW);
@@ -95,6 +103,28 @@ class MobileInspectionControllerTest {
                 .andExpect(jsonPath("$..status",
                         containsInAnyOrder("ASSIGNED", "IN_PROGRESS")))
                 .andExpect(jsonPath("$[0].template.sections", hasSize(1)));
+    }
+
+    @Test
+    void preservesTemplateItemRulesWhenInspectionIsCreated() {
+        assertThat(snapshotRepository.findAll())
+                .hasSize(3)
+                .allSatisfy(snapshot -> assertThat(snapshot.getRulesJson()).isEqualTo(
+                        "{\"required\":true,\"observationRequiredOnFailure\":true,"
+                                + "\"evidenceRequiredOnFailure\":true}"));
+    }
+
+    @Test
+    void rendersChecklistFromSnapshotsAfterTheTemplateChanges() throws Exception {
+        TemplateItem sourceItem = template.getSections().get(0).getItems().get(0);
+        sourceItem.setQuestion("Changed template question");
+        templateRepository.saveAndFlush(template);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections")
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].template.sections[0].items[0].question")
+                        .value("Is the equipment grounded?"));
     }
 
     @Test
@@ -129,9 +159,11 @@ class MobileInspectionControllerTest {
     private InspectionTemplate persistTemplate(User creator) {
         TemplateItem item = new TemplateItem();
         item.setQuestion("Is the equipment grounded?");
+        item.setCode("SAFE-001");
         item.setResponseType(ResponseType.BOOLEAN);
         item.setRequired(true);
-        item.setRequireObservationOnFailure(false);
+        item.setObservationRequiredOnFailure(true);
+        item.setEvidenceRequiredOnFailure(true);
         item.setSortOrder(0);
 
         TemplateSection section = new TemplateSection();
@@ -165,6 +197,8 @@ class MobileInspectionControllerTest {
         inspection.setStatus(status);
         inspection.setPriority(priority);
         inspection.setDueDate(LocalDate.now().plusDays(1));
+        template.getSections().forEach(section -> section.getItems().forEach(item ->
+                inspection.addItemSnapshot(InspectionItemSnapshot.from(inspection, section, item))));
         inspectionRepository.save(inspection);
     }
 

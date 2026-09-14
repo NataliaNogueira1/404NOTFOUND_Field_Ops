@@ -1,5 +1,5 @@
 import { apiRequest } from '@/api/client'
-import { InspectionStatus, Priority } from '@/types/domain'
+import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/types/domain'
 
 export type TemplateListStatus = 'ACTIVE' | 'DRAFT'
 
@@ -7,6 +7,31 @@ export interface InspectionTemplateInput {
   title: string
   description: string
   category: string
+}
+
+export interface ManagedTemplateSection {
+  id: string
+  title: string
+  description: string
+  displayOrder: number
+  items: TemplateItem[]
+}
+
+export interface TemplateSectionInput {
+  title: string
+  description: string
+  displayOrder: number
+}
+
+export interface TemplateItemInput {
+  title: string
+  description: string
+  responseType: ResponseType
+  required: boolean
+  observationRequiredOnFailure: boolean
+  evidenceRequiredOnFailure: boolean
+  optionsJson: string[] | null
+  displayOrder: number
 }
 
 export interface ManagedInspectionTemplate extends InspectionTemplateInput {
@@ -17,6 +42,7 @@ export interface ManagedInspectionTemplate extends InspectionTemplateInput {
   createdAt?: string
   updatedAt?: string
   version?: number
+  sections: ManagedTemplateSection[]
 }
 
 export interface TemplateSummary {
@@ -27,6 +53,15 @@ export interface TemplateSummary {
   sectionCount: number
   itemCount: number
   status: TemplateListStatus
+}
+
+export interface InspectionTemplateVersion {
+  id: string
+  versionNumber: number
+  titleSnapshot: string
+  descriptionSnapshot: string | null
+  publishedAt: string
+  publishedBy: string
 }
 
 export interface AdminInspectionSummary {
@@ -55,13 +90,27 @@ interface BackendPage<T> {
 }
 
 interface BackendTemplate extends Omit<TemplateSummary, 'id'> { id: number }
-interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy'> {
+interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy' | 'sections'> {
   id: number
   createdBy: number
+  sections?: BackendTemplateSection[]
+}
+interface BackendTemplateSection extends Omit<ManagedTemplateSection, 'id' | 'description' | 'items'> {
+  id: number
+  description: string | null
+  items?: BackendTemplateItem[]
+}
+interface BackendTemplateItem extends Omit<TemplateItemInput, 'description'> {
+  id: number
+  description: string | null
 }
 interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technicianId'> {
   id: number
   technicianId: number
+}
+interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 'publishedBy'> {
+  id: number
+  publishedBy: number
 }
 
 export const adminCatalogApi = {
@@ -81,6 +130,50 @@ export const adminCatalogApi = {
       method: 'PUT', body: JSON.stringify(input),
     })
     return managedTemplate(result)
+  },
+
+  async createTemplateSection(templateId: string, input: TemplateSectionInput) {
+    const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+    return managedSection(result)
+  },
+
+  async updateTemplateSection(templateId: string, sectionId: string, input: TemplateSectionInput) {
+    const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}`, {
+      method: 'PUT', body: JSON.stringify(input),
+    })
+    return managedSection(result)
+  },
+
+  async deleteTemplateSection(templateId: string, sectionId: string) {
+    await apiRequest<void>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}`, { method: 'DELETE' })
+  },
+
+  async createTemplateItem(templateId: string, sectionId: string, input: TemplateItemInput) {
+    const result = await apiRequest<BackendTemplateItem>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+    return managedItem(result)
+  },
+
+  async updateTemplateItem(templateId: string, sectionId: string, itemId: string, input: TemplateItemInput) {
+    const result = await apiRequest<BackendTemplateItem>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items/${itemId}`, {
+      method: 'PUT', body: JSON.stringify(input),
+    })
+    return managedItem(result)
+  },
+
+  async publishTemplate(templateId: string) {
+    const version = await apiRequest<BackendTemplateVersion>(`/api/v1/inspection-templates/${templateId}/publish`, {
+      method: 'POST',
+    })
+    return managedVersion(version)
+  },
+
+  async listTemplateVersions(templateId: string) {
+    const versions = await apiRequest<BackendTemplateVersion[]>(`/api/v1/inspection-templates/${templateId}/versions`)
+    return versions.map(managedVersion)
   },
 
   async listTemplates(filters: { name: string; status: TemplateListStatus | ''; page: number; size: number; sort: string }) {
@@ -111,7 +204,40 @@ export const adminCatalogApi = {
 }
 
 function managedTemplate(template: BackendManagedTemplate): ManagedInspectionTemplate {
-  return { ...template, id: String(template.id), createdBy: String(template.createdBy) }
+  return {
+    ...template,
+    description: template.description ?? '',
+    id: String(template.id),
+    createdBy: String(template.createdBy),
+    sections: (template.sections ?? []).map(managedSection).sort((a, b) => a.displayOrder - b.displayOrder),
+  }
+}
+
+function managedSection(section: BackendTemplateSection): ManagedTemplateSection {
+  return {
+    ...section,
+    id: String(section.id),
+    description: section.description ?? '',
+    items: (section.items ?? []).map(managedItem).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
+  }
+}
+
+function managedItem(item: BackendTemplateItem): TemplateItem {
+  return {
+    id: String(item.id),
+    question: item.title,
+    description: item.description ?? '',
+    responseType: item.responseType,
+    required: item.required,
+    options: item.optionsJson ?? undefined,
+    displayOrder: item.displayOrder,
+    requireObservationOnFailure: item.observationRequiredOnFailure ?? false,
+    requireEvidenceOnFailure: item.evidenceRequiredOnFailure ?? false,
+  }
+}
+
+function managedVersion(version: BackendTemplateVersion): InspectionTemplateVersion {
+  return { ...version, id: String(version.id), publishedBy: String(version.publishedBy) }
 }
 
 function pageParams(page: number, size: number, sort: string) {

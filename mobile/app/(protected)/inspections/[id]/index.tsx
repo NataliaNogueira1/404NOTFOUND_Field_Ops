@@ -164,14 +164,12 @@ function ActionButtons({
   inspection: ReturnType<typeof useFieldOps>['inspections'][number];
   router: ReturnType<typeof useRouter>;
 }) {
-  const base = `/(protected)/inspections/${inspection.id}`;
-
   switch (inspection.status) {
     case InspectionStatus.ASSIGNED:
       return (
         <Button
           label="▶️ Iniciar Inspeção"
-          onPress={() => router.push(`${base}/start`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/start`)}
           fullWidth
           size="lg"
         />
@@ -180,7 +178,7 @@ function ActionButtons({
       return (
         <Button
           label="▶️ Continuar"
-          onPress={() => router.push(`${base}/checklist`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/checklist`)}
           fullWidth
           size="lg"
         />
@@ -189,7 +187,7 @@ function ActionButtons({
       return (
         <Button
           label="🔧 Corrigir"
-          onPress={() => router.push(`${base}/checklist`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/checklist`)}
           variant="danger"
           fullWidth
           size="lg"

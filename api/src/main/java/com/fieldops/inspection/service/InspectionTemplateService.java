@@ -17,10 +17,13 @@ public class InspectionTemplateService {
 
     private final InspectionTemplateRepository templateRepository;
     private final UserRepository userRepository;
+    private final TemplateSectionService sectionService;
 
-    public InspectionTemplateService(InspectionTemplateRepository templateRepository, UserRepository userRepository) {
+    public InspectionTemplateService(InspectionTemplateRepository templateRepository, UserRepository userRepository,
+            TemplateSectionService sectionService) {
         this.templateRepository = templateRepository;
         this.userRepository = userRepository;
+        this.sectionService = sectionService;
     }
 
     /** Creates an empty inspection template owned by the authenticated user. */
@@ -72,6 +75,6 @@ public class InspectionTemplateService {
         return new InspectionTemplateResponse(template.getId(), template.getTitle(), template.getDescription(),
                 template.getCategory(), template.getStatus(), template.getCurrentVersion(),
                 template.getCreatedBy().getId(), template.getCreatedAt(), template.getUpdatedAt(),
-                template.getRowVersion());
+                template.getRowVersion(), sectionService.toOrderedResponses(template.getSections()));
     }
 }

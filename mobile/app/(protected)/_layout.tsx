@@ -1,12 +1,14 @@
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { OfflineBanner } from '@/components/fieldops';
 import { Colors } from '@/config/theme';
 import { OfflineLimitedBanner } from '@/features/auth';
 
 export default function ProtectedLayout() {
   return (
     <View style={styles.container}>
+      <OfflineBanner />
       <OfflineLimitedBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />

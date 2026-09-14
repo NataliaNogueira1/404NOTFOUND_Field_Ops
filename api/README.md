@@ -52,6 +52,18 @@ These accounts are created only by the `dev` profile and are never created in pr
 `FIELDOPS_DEV_USERS_ENABLED=false` to disable them, or override each `FIELDOPS_DEV_*` variable
 when needed. Passwords in this table are for local demonstration only.
 
+## Demonstration data (seed)
+
+On top of the users above, the `dev` profile seeds a coherent demonstration dataset on startup
+(PBI-066): one client (`Industria Modelo Ltda.`), one site (`Unidade Sorocaba - Galpao de
+Producao 02`), one equipment (`Compressor de Ar XPTO 500`, QR `COMP-004`), one published
+inspection template (`Inspecao Preventiva de Compressor`, 2 sections) and one inspection
+**assigned to the technician above**. Log in as `technician@fieldops.local` and the inspection
+appears at `GET /api/v1/mobile/inspections`.
+
+The seed is idempotent (guarded by the client document) and safe to re-run. Disable it with
+`FIELDOPS_DEMO_SEED_ENABLED=false`.
+
 ## Commands
 
 ```sh
