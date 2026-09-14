@@ -67,6 +67,29 @@ public class Inspection {
     @Column(name = "started_at")
     private Instant startedAt;
 
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
+
+    @Column(name = "review_comment", columnDefinition = "TEXT")
+    private String reviewComment;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
+    @Column(name = "canceled_at")
+    private Instant canceledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "canceled_by")
+    private User canceledBy;
+
+    @Column(name = "canceled_reason", columnDefinition = "TEXT")
+    private String canceledReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -120,6 +143,20 @@ public class Inspection {
     public void setProgress(Integer progress) { this.progress = progress; }
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
+    public Instant getReviewedAt() { return reviewedAt; }
+    public void setReviewedAt(Instant reviewedAt) { this.reviewedAt = reviewedAt; }
+    public User getReviewedBy() { return reviewedBy; }
+    public void setReviewedBy(User reviewedBy) { this.reviewedBy = reviewedBy; }
+    public String getReviewComment() { return reviewComment; }
+    public void setReviewComment(String reviewComment) { this.reviewComment = reviewComment; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public Instant getCanceledAt() { return canceledAt; }
+    public void setCanceledAt(Instant canceledAt) { this.canceledAt = canceledAt; }
+    public User getCanceledBy() { return canceledBy; }
+    public void setCanceledBy(User canceledBy) { this.canceledBy = canceledBy; }
+    public String getCanceledReason() { return canceledReason; }
+    public void setCanceledReason(String canceledReason) { this.canceledReason = canceledReason; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<InspectionItemSnapshot> getItemSnapshots() { return itemSnapshots; }

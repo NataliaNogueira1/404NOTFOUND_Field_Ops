@@ -3,8 +3,13 @@ package com.fieldops.inspection.controller;
 import com.fieldops.audit.dto.AuditEventResponse;
 import com.fieldops.audit.service.AuditService;
 import com.fieldops.inspection.dto.AdminInspectionSummary;
+import com.fieldops.inspection.dto.ApproveInspectionRequest;
+import com.fieldops.inspection.dto.CancelInspectionRequest;
+import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
+import com.fieldops.inspection.dto.RejectInspectionRequest;
+import com.fieldops.inspection.dto.ReviewDecisionResponse;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.service.AdminCatalogListService;
@@ -12,6 +17,7 @@ import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.shared.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
@@ -67,6 +73,42 @@ public class AdminInspectionController {
     @GetMapping("/{id}/history")
     public ResponseEntity<List<AuditEventResponse>> history(@PathVariable Long id) {
         return ResponseEntity.ok(auditService.timeline(AuditService.ENTITY_INSPECTION, id));
+    }
+
+    @Operation(summary = "Approve an inspection under review")
+    @ApiResponse(responseCode = "200", description = "Inspection approved")
+    @ApiResponse(responseCode = "404", description = "Inspection not found")
+    @ApiResponse(responseCode = "422", description = "Inspection is not under review")
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ReviewDecisionResponse> approve(@PathVariable Long id,
+            @Valid @RequestBody(required = false) ApproveInspectionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        String comment = request != null ? request.comment() : null;
+        return ResponseEntity.ok(inspectionService.approve(id, comment, user.getId()));
+    }
+
+    @Operation(summary = "Reject an inspection under review with a mandatory reason")
+    @ApiResponse(responseCode = "200", description = "Inspection rejected")
+    @ApiResponse(responseCode = "404", description = "Inspection not found")
+    @ApiResponse(responseCode = "422", description = "Inspection is not under review")
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<ReviewDecisionResponse> reject(@PathVariable Long id,
+            @Valid @RequestBody RejectInspectionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(inspectionService.reject(id, request.reason(), user.getId()));
+    }
+
+    @Operation(summary = "Cancel an inspection with a mandatory justification")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection canceled"),
+            @ApiResponse(responseCode = "404", description = "Inspection not found"),
+            @ApiResponse(responseCode = "422", description = "Inspection cannot be canceled from its current status")
+    })
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<CancelInspectionResponse> cancel(@PathVariable Long id,
+            @Valid @RequestBody CancelInspectionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(inspectionService.cancel(id, request.reason(), user.getId()));
     }
 
     @Operation(summary = "List inspections with filters, sorting, and pagination")
