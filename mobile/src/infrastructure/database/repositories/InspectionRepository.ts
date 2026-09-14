@@ -157,6 +157,34 @@ export class InspectionRepository {
     );
   }
 
+  /**
+   * Mark an inspection as started using the device's own timestamp and,
+   * optionally, the GPS location captured at start time. Location may be null
+   * when permission was denied (RN-059) — the inspection still starts.
+   */
+  async markStartedWithDevice(
+    id: string,
+    startedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET
+         status = 'IN_PROGRESS',
+         started_at = ?,
+         start_latitude = ?,
+         start_longitude = ?,
+         start_accuracy = ?,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      startedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
+      id,
+    );
+  }
+
   async markSubmitted(id: string): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections SET status = 'SUBMITTED', completed_at = datetime('now'),
