@@ -80,6 +80,16 @@ public class Inspection {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "canceled_at")
+    private Instant canceledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "canceled_by")
+    private User canceledBy;
+
+    @Column(name = "canceled_reason", columnDefinition = "TEXT")
+    private String canceledReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -141,6 +151,12 @@ public class Inspection {
     public void setReviewComment(String reviewComment) { this.reviewComment = reviewComment; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public Instant getCanceledAt() { return canceledAt; }
+    public void setCanceledAt(Instant canceledAt) { this.canceledAt = canceledAt; }
+    public User getCanceledBy() { return canceledBy; }
+    public void setCanceledBy(User canceledBy) { this.canceledBy = canceledBy; }
+    public String getCanceledReason() { return canceledReason; }
+    public void setCanceledReason(String canceledReason) { this.canceledReason = canceledReason; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<InspectionItemSnapshot> getItemSnapshots() { return itemSnapshots; }
