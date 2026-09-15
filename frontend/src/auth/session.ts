@@ -4,7 +4,10 @@ import { UserRole, type User } from '@/types/domain'
 
 type Status = 'loading' | 'authenticated' | 'anonymous'
 type Listener = () => void
-export interface AuthState { status: Status; user: User | null }
+export interface AuthState {
+  status: Status
+  user: User | null
+}
 
 const listeners = new Set<Listener>()
 
@@ -12,7 +15,7 @@ let state: AuthState = tokenStorage.get() ? { status: 'loading', user: null } : 
 let restoreStarted = false
 
 function emit() {
-  listeners.forEach(listener => listener())
+  listeners.forEach((listener) => listener())
 }
 
 function setState(next: AuthState) {
@@ -21,7 +24,7 @@ function setState(next: AuthState) {
 }
 
 function clearStoredSession() {
-  tokenStorage.clear()
+  tokenStorage.clearTokens()
 }
 
 async function restoreSession() {
@@ -51,7 +54,9 @@ async function restoreSession() {
 export const authSession = {
   subscribe(listener: Listener) {
     listeners.add(listener)
-    return () => { listeners.delete(listener) }
+    return () => {
+      listeners.delete(listener)
+    }
   },
   snapshot() {
     if (state.status === 'loading' && !restoreStarted) {
@@ -62,7 +67,7 @@ export const authSession = {
   },
   async login(email: string, password: string) {
     const response = await authApi.login(email, password)
-    tokenStorage.set(response.accessToken)
+    tokenStorage.saveTokens(response.accessToken, response.refreshToken)
     const user = normalizeUser(response.user)
     setState({ status: 'authenticated', user })
     return user
