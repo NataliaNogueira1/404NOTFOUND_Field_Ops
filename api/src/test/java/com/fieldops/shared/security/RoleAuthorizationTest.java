@@ -142,6 +142,23 @@ class RoleAuthorizationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void allowsSupervisorToReadUsersButNotManageThem() throws Exception {
+        // UC-06: a supervisor lists technicians to schedule an inspection.
+        mockMvc.perform(get("/api/v1/users?role=TECHNICIAN&status=ACTIVE")
+                        .header("Authorization", bearer("sup@fieldops.com")))
+                .andExpect(status().isOk());
+
+        // UC-02: user management (writes) remains administrator-only.
+        mockMvc.perform(post("/api/v1/users")
+                        .header("Authorization", bearer("sup@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"New Tech\",\"email\":\"new.tech@fieldops.com\","
+                                + "\"password\":\"pass1234\",\"role\":\"TECHNICIAN\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
     /**
      * This test asserts authorization, not business behaviour. An authorized ADMIN/SUPERVISOR
      * request must get past the security layer — the exact outcome then depends on each

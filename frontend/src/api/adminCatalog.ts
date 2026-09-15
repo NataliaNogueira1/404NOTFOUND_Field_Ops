@@ -3,6 +3,32 @@ import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/t
 
 export type TemplateListStatus = 'ACTIVE' | 'DRAFT'
 
+// ── Schedule inspection ──────────────────────────────────────────────────────
+
+/** Payload accepted by the backend to schedule an inspection from a published template version. */
+export interface CreateInspectionRequest {
+  title: string
+  templateVersionId: number
+  clientId: number
+  siteId: number
+  equipmentId: number
+  technicianId: number
+  priority: Priority
+  dueDate: string        // ISO date: YYYY-MM-DD
+  dueTime?: string       // ISO time: HH:mm:ss (optional)
+  supervisorInstructions?: string
+}
+
+export interface CreatedInspection {
+  id: string
+  title: string
+  status: InspectionStatus
+  dueDate: string
+  clientName: string
+  equipmentName: string
+  technicianName: string
+}
+
 export interface InspectionTemplateInput {
   title: string
   description: string
@@ -108,6 +134,9 @@ interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technic
   id: number
   technicianId: number
 }
+interface BackendCreatedInspection extends Omit<CreatedInspection, 'id'> {
+  id: number
+}
 interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 'publishedBy'> {
   id: number
   publishedBy: number
@@ -200,6 +229,15 @@ export const adminCatalogApi = {
     if (filters.review) params.set('review', 'true')
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
     return { ...result, content: result.content.map(item => ({ ...item, id: String(item.id), technicianId: String(item.technicianId) })) }
+  },
+
+  /** Schedules a new inspection from a published template version. Returns HTTP 201 on success. */
+  async createInspection(request: CreateInspectionRequest): Promise<CreatedInspection> {
+    const result = await apiRequest<BackendCreatedInspection>('/api/v1/inspections', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+    return { ...result, id: String(result.id) }
   },
 }
 
