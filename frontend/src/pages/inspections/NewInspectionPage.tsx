@@ -71,24 +71,28 @@ export function NewInspectionPage() {
 
   // ── Load versions when template changes ────────────────────────────────────
   useEffect(() => {
-    if (!templateId) {
-      setAvailableVersions([])
-      setSelectedVersion(null)
-      return
-    }
-    setVersionsLoading(true)
-    adminCatalogApi
-      .listTemplateVersions(templateId)
-      .then(versions => {
+    // Reset synchronously outside the effect body (via the loader) to avoid cascading
+    // renders flagged by react-hooks/set-state-in-effect.
+    async function loadVersions() {
+      if (!templateId) {
+        setAvailableVersions([])
+        setSelectedVersion(null)
+        return
+      }
+      setVersionsLoading(true)
+      try {
+        const versions = await adminCatalogApi.listTemplateVersions(templateId)
         setAvailableVersions(versions)
         // Default to the latest (only) published version
         setSelectedVersion(versions.length > 0 ? versions[versions.length - 1] : null)
-      })
-      .catch(() => {
+      } catch {
         setAvailableVersions([])
         setSelectedVersion(null)
-      })
-      .finally(() => setVersionsLoading(false))
+      } finally {
+        setVersionsLoading(false)
+      }
+    }
+    void loadVersions()
   }, [templateId])
 
   // ── Load active clients on mount ───────────────────────────────────────────
