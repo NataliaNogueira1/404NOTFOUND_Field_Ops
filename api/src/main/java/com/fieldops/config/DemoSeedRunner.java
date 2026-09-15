@@ -131,16 +131,65 @@ public class DemoSeedRunner implements ApplicationRunner {
 
         Long templateVersionId = seedPublishedTemplate(supervisor.getId());
 
-        inspectionService.createInspection(new CreateInspectionRequest(
-                "Inspecao Preventiva - Compressor de Ar XPTO 500",
-                templateVersionId, client.id(), site.id(), equipment.id(), technician.getId(),
-                Priority.MEDIUM, LocalDate.now().plusDays(7), null,
-                "Verificar condicao da bateria e nivel de oleo com atencao especial."),
-                supervisor.getId());
+        int created = seedInspections(templateVersionId, client.id(), site.id(),
+                equipment.id(), technician.getId(), supervisor.getId());
 
         log.info("Demo seed created: client={}, site={}, equipment={}, templateVersion={}, "
-                + "inspection ASSIGNED to technicianId={}.",
-                client.id(), site.id(), equipment.id(), templateVersionId, technician.getId());
+                + "{} inspections for technicianId={}.",
+                client.id(), site.id(), equipment.id(), templateVersionId, created, technician.getId());
+    }
+
+    /**
+     * Seeds a coherent set of six demonstration inspections for the technician, varying priority
+     * and due date so the mobile and admin lists show a realistic mix. One of them is canceled
+     * through the real {@link InspectionService#cancel} flow to also exhibit a terminal state.
+     *
+     * @return the number of inspections created
+     */
+    private int seedInspections(Long templateVersionId, Long clientId, Long siteId,
+            Long equipmentId, Long technicianId, Long supervisorId) {
+        record SeedInspection(String title, Priority priority, int dueInDays, String instructions) {
+        }
+
+        List<SeedInspection> plan = List.of(
+                new SeedInspection("Inspecao Preventiva - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 7,
+                        "Verificar condicao da bateria e nivel de oleo com atencao especial."),
+                new SeedInspection("Inspecao de Seguranca - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 2,
+                        "Priorizar verificacao das protecoes e do botao de emergencia."),
+                new SeedInspection("Inspecao Corretiva - Compressor de Ar XPTO 500",
+                        Priority.CRITICAL, 1,
+                        "Equipamento com ruido anormal reportado; inspecionar antes de liberar."),
+                new SeedInspection("Inspecao de Rotina - Compressor de Ar XPTO 500",
+                        Priority.LOW, 14,
+                        "Checklist mensal padrao, sem urgencia."),
+                new SeedInspection("Inspecao Pos-Manutencao - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 4,
+                        "Confirmar parametros de operacao apos troca de filtro."),
+                new SeedInspection("Inspecao Cancelada - Compressor de Ar XPTO 500",
+                        Priority.LOW, 10,
+                        "Agendamento duplicado; sera cancelado para demonstracao."));
+
+        Long canceledId = null;
+        for (int index = 0; index < plan.size(); index++) {
+            SeedInspection seed = plan.get(index);
+            Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
+                    seed.title(), templateVersionId, clientId, siteId, equipmentId, technicianId,
+                    seed.priority(), LocalDate.now().plusDays(seed.dueInDays()), null,
+                    seed.instructions()), supervisorId).id();
+            // Cancel the last one to showcase a terminal state in the admin listing.
+            if (index == plan.size() - 1) {
+                canceledId = inspectionId;
+            }
+        }
+
+        if (canceledId != null) {
+            inspectionService.cancel(canceledId,
+                    "Agendamento duplicado identificado durante o planejamento.", supervisorId);
+        }
+
+        return plan.size();
     }
 
     /** Builds a small but coherent compressor checklist as a draft and publishes it. */
