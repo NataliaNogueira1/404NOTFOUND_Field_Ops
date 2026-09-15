@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: ${DB_USER:-fieldops}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-fieldops}
     ports:
-      - "${DB_EXTERNAL_PORT:-5433}:5432"
+      # Host port only for optional external access; internal API talks to db:5432 directly.
+      # Default moved off 5433 to avoid clashing with other local Postgres containers.
+      - "${DB_EXTERNAL_PORT:-5434}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
