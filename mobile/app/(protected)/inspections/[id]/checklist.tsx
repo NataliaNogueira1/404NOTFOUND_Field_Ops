@@ -1,4 +1,5 @@
-﻿import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import { useCallback, useRef } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -13,8 +14,32 @@ export default function ChecklistScreen() {
   const router = useRouter();
   const { inspections, answers, evidences, answerItem } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
+  const scrollRef = useRef<ScrollView>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
+
+  const allItems = useMemo(() => (template ? template.sections.flatMap((section) => section.items) : []), [template]);
+  const total = allItems.length;
+  const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
+  const pending = total - answered;
+
+  // Scroll to first unanswered item — must be defined before any early return
+  const handleScrollToPending = useCallback(() => {
+    if (!template || !scrollRef.current) return;
+    const firstPendingItem = allItems.find((item) => answers[item.id] === undefined);
+    if (!firstPendingItem) return;
+
+    let itemsBefore = 0;
+    for (const section of template.sections) {
+      for (const item of section.items) {
+        if (item.id === firstPendingItem.id) break;
+        itemsBefore++;
+      }
+      if (section.items.some((i) => i.id === firstPendingItem.id)) break;
+    }
+    // Approximate scroll: header (~120px) + cards (~180px each)
+    scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
+  }, [allItems, answers, template]);
 
   if (templateLoading || !template) {
     return (
@@ -27,13 +52,9 @@ export default function ChecklistScreen() {
     );
   }
 
-  const allItems = template.sections.flatMap((section) => section.items);
-  const total = allItems.length;
-  const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <Text style={styles.title}>{template.title}</Text>
         <Text style={styles.muted}>
           {template.sections.length} seções / {total} itens
@@ -41,9 +62,16 @@ export default function ChecklistScreen() {
 
         <Card style={styles.card}>
           <ProgressBar value={inspection.progress} />
-          <Text style={styles.muted}>
-            {answered} de {total} itens respondidos
-          </Text>
+          <View style={styles.progressRow}>
+            <Text style={styles.muted}>
+              {answered} de {total} itens respondidos
+            </Text>
+            {pending > 0 ? (
+              <Text style={styles.pendingLink} onPress={handleScrollToPending}>
+                {pending} pendente{pending > 1 ? 's' : ''} ↓
+              </Text>
+            ) : null}
+          </View>
         </Card>
 
         {template.sections.map((section) => (
@@ -86,4 +114,6 @@ const styles = StyleSheet.create({
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
   muted: { color: Colors.textSecondary },
   card: { gap: Spacing.sm },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pendingLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
 });

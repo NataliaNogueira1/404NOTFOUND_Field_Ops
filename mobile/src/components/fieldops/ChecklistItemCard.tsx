@@ -136,17 +136,45 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
   if (item.responseType === ResponseType.BOOLEAN) return <Segmented options={[[true, 'Sim'], [false, 'Não']]} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} />;
-  return (
+  if (item.responseType === ResponseType.NUMBER) return (
     <TextInput
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
-      keyboardType={item.responseType === ResponseType.NUMBER ? 'numeric' : 'default'}
-      placeholder={item.responseType === ResponseType.NUMBER ? 'Informe o valor' : 'Digite a resposta'}
+      keyboardType="numeric"
+      placeholder="Informe o valor"
       placeholderTextColor={Colors.gray400}
-      style={[styles.input, item.responseType === ResponseType.TEXT_LONG && styles.textArea]}
-      multiline={item.responseType === ResponseType.TEXT_LONG}
+      style={styles.input}
     />
+  );
+  if (item.responseType === ResponseType.TEXT_SHORT) return (
+    <TextInput
+      value={text}
+      onChangeText={onText}
+      onBlur={onTextBlur}
+      placeholder="Digite a resposta"
+      placeholderTextColor={Colors.gray400}
+      style={styles.input}
+      maxLength={255}
+    />
+  );
+  if (item.responseType === ResponseType.TEXT_LONG) return (
+    <TextInput
+      value={text}
+      onChangeText={onText}
+      onBlur={onTextBlur}
+      placeholder="Digite a resposta"
+      placeholderTextColor={Colors.gray400}
+      style={[styles.input, styles.textArea]}
+      multiline
+      maxLength={2000}
+    />
+  );
+  // PBI-035: fallback para tipos desconhecidos — não crasha no TextInput genérico
+  return (
+    <View style={styles.incompatibleBox}>
+      <Text style={styles.incompatibleText}>Tipo incompatível: {item.responseType}</Text>
+    </View>
   );
 }
 
@@ -203,6 +231,8 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 92, paddingTop: Spacing.sm, textAlignVertical: 'top' },
   failureBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.dangerLight, backgroundColor: '#FFF7F7', padding: Spacing.md },
   observationBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, padding: Spacing.md },
+  incompatibleBox: { borderRadius: 10, borderWidth: 1, borderColor: Colors.warningLight, backgroundColor: Colors.warningLight, padding: Spacing.md },
+  incompatibleText: { fontSize: FontSize.sm, color: Colors.warningDark },
   failureTitle: { color: Colors.dangerDark, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
