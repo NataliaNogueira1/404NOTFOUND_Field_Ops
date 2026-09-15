@@ -8,6 +8,6 @@ describe('templateDraftStore', () => {
     expect(draft.id.startsWith('tpl-draft-')).toBe(true)
     expect(draft.title).toBe('')
     expect(draft.sections).toHaveLength(0)
-    expect(templateDraftStore.snapshot().some(template => template.id === draft.id)).toBe(true)
+    expect(templateDraftStore.snapshot().some((template) => template.id === draft.id)).toBe(true)
   })
 })

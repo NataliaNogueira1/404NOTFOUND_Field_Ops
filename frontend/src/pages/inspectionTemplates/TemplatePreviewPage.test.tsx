@@ -11,20 +11,32 @@ afterEach(() => {
 
 describe('TemplatePreviewPage', () => {
   it('renders the persisted checklist in order with read-only response controls', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(jsonResponse(validTemplate()))
-      .mockResolvedValueOnce(jsonResponse({
-        id: 501, versionNumber: 1, titleSnapshot: 'Modelo de campo', descriptionSnapshot: 'Checklist eletrico',
-        publishedAt: '2026-09-09T12:00:00Z', publishedBy: 7,
-      }, 201))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            id: 501,
+            versionNumber: 1,
+            titleSnapshot: 'Modelo de campo',
+            descriptionSnapshot: 'Checklist eletrico',
+            publishedAt: '2026-09-09T12:00:00Z',
+            publishedBy: 7,
+          },
+          201,
+        ),
+      )
     vi.stubGlobal('fetch', fetchMock)
     renderPreview('99')
 
     expect(await screen.findByRole('heading', { name: 'Previa: Modelo de campo' })).not.toBeNull()
     expect(screen.getByText('Categoria: Seguranca')).not.toBeNull()
     expect(screen.getByText('Secoes: 2 | Itens: 7')).not.toBeNull()
-    expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent))
-      .toEqual(['Secao 1: Primeira', 'Secao 2: Segunda'])
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      'Secao 1: Primeira',
+      'Secao 2: Segunda',
+    ])
     expect(screen.getByText('1. Confirmacao *')).not.toBeNull()
     expect(screen.getByText('2. Comentario')).not.toBeNull()
     expect(screen.getByText('Obs. na falha')).not.toBeNull()
@@ -42,7 +54,8 @@ describe('TemplatePreviewPage', () => {
     expect(screen.getByLabelText('Data')).toBeDisabled()
 
     expect(screen.getByRole('link', { name: 'Voltar para edicao' })).toHaveAttribute(
-      'href', '/app/inspection-templates/99/edit',
+      'href',
+      '/app/inspection-templates/99/edit',
     )
     expect(screen.getByRole('button', { name: 'Publicar versao' })).toBeEnabled()
     await userEvent.click(screen.getByRole('button', { name: 'Publicar versao' }))
@@ -68,11 +81,13 @@ describe('TemplatePreviewPage', () => {
 })
 
 function renderPreview(id: string) {
-  render(<MemoryRouter initialEntries={[`/app/inspection-templates/${id}/preview`]}>
-    <Routes>
-      <Route path="/app/inspection-templates/:id/preview" element={<TemplatePreviewPage />} />
-    </Routes>
-  </MemoryRouter>)
+  render(
+    <MemoryRouter initialEntries={[`/app/inspection-templates/${id}/preview`]}>
+      <Routes>
+        <Route path="/app/inspection-templates/:id/preview" element={<TemplatePreviewPage />} />
+      </Routes>
+    </MemoryRouter>,
+  )
 }
 
 function validTemplate() {
@@ -87,7 +102,10 @@ function validTemplate() {
     version: 0,
     sections: [
       {
-        id: 12, title: 'Segunda', description: null, displayOrder: 2,
+        id: 12,
+        title: 'Segunda',
+        description: null,
+        displayOrder: 2,
         items: [
           item(22, 'Data da leitura', 'DATE', 6),
           item(21, 'Comentario', 'TEXT_SHORT', 1),
@@ -98,11 +116,18 @@ function validTemplate() {
         ],
       },
       {
-        id: 11, title: 'Primeira', description: 'Validacoes iniciais', displayOrder: 1,
-        items: [{
-          ...item(20, 'Confirmacao', 'CONFORMITY', 1), required: true,
-          observationRequiredOnFailure: true, evidenceRequiredOnFailure: true,
-        }],
+        id: 11,
+        title: 'Primeira',
+        description: 'Validacoes iniciais',
+        displayOrder: 1,
+        items: [
+          {
+            ...item(20, 'Confirmacao', 'CONFORMITY', 1),
+            required: true,
+            observationRequiredOnFailure: true,
+            evidenceRequiredOnFailure: true,
+          },
+        ],
       },
     ],
   }
@@ -110,9 +135,15 @@ function validTemplate() {
 
 function item(id: number, title: string, responseType: string, displayOrder: number) {
   return {
-    id, title, description: null, responseType, required: false,
-    observationRequiredOnFailure: false, evidenceRequiredOnFailure: false,
-    optionsJson: null, displayOrder,
+    id,
+    title,
+    description: null,
+    responseType,
+    required: false,
+    observationRequiredOnFailure: false,
+    evidenceRequiredOnFailure: false,
+    optionsJson: null,
+    displayOrder,
   }
 }
 

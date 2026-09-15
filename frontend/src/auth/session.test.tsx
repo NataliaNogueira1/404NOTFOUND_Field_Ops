@@ -12,7 +12,9 @@ const technicianUser = { id: 2, name: 'Carlos Henrique', email: 'carlos@fieldops
 const supervisorUser = { id: 1, name: 'Marina Silva', email: 'marina@fieldops.com', role: 'SUPERVISOR' }
 
 function response(body: unknown, status = 200) {
-  return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
+  return Promise.resolve(
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+  )
 }
 
 function loginBody(user: { id: number; name: string; email: string; role: string }) {
@@ -20,21 +22,28 @@ function loginBody(user: { id: number; name: string; email: string; role: string
 }
 
 function mockFetch(handler: (url: string, init?: RequestInit) => Promise<Response>) {
-  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => handler(String(input), init)))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => handler(String(input), init)),
+  )
 }
 
 function renderRoute(path: string) {
-  return render(<MemoryRouter initialEntries={[path]}><AppRoutes /></MemoryRouter>)
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  )
 }
 
 beforeEach(() => {
-  window.sessionStorage.clear()
+  window.localStorage.clear()
 })
 
 afterEach(() => {
   cleanup()
   authSession.logout()
-  window.sessionStorage.clear()
+  window.localStorage.clear()
   vi.unstubAllGlobals()
 })
 
@@ -44,7 +53,9 @@ describe('real auth session and route guards', () => {
   })
 
   it('redirects successful TECHNICIAN login to the technician portal', async () => {
-    mockFetch(async url => url.endsWith('/api/v1/auth/login') ? response(loginBody(technicianUser)) : response(technicianUser))
+    mockFetch(async (url) =>
+      url.endsWith('/api/v1/auth/login') ? response(loginBody(technicianUser)) : response(technicianUser),
+    )
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'carlos@fieldops.com')
@@ -53,10 +64,13 @@ describe('real auth session and route guards', () => {
 
     expect(await screen.findByText(/ola, carlos/i)).not.toBeNull()
     expect(tokenStorage.get()).toBe('access-TECHNICIAN')
+    expect(tokenStorage.getRefreshToken()).toBe('refresh-TECHNICIAN')
   })
 
   it('redirects successful SUPERVISOR login to admin dashboard', async () => {
-    mockFetch(async url => url.endsWith('/api/v1/auth/login') ? response(loginBody(supervisorUser)) : response(supervisorUser))
+    mockFetch(async (url) =>
+      url.endsWith('/api/v1/auth/login') ? response(loginBody(supervisorUser)) : response(supervisorUser),
+    )
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
@@ -68,7 +82,9 @@ describe('real auth session and route guards', () => {
   })
 
   it('shows invalid credentials without storing a token', async () => {
-    mockFetch(async () => response({ status: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid credentials', fieldErrors: [] }, 401))
+    mockFetch(async () =>
+      response({ status: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid credentials', fieldErrors: [] }, 401),
+    )
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
@@ -77,11 +93,14 @@ describe('real auth session and route guards', () => {
 
     expect(await screen.findByText(/e-mail ou senha invalidos/i)).not.toBeNull()
     expect(tokenStorage.get()).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 
   it('restores the session from /auth/me when a token exists', async () => {
-    tokenStorage.set('access-existing')
-    mockFetch(async url => url.endsWith('/api/v1/auth/me') ? response(supervisorUser) : response(loginBody(supervisorUser)))
+    tokenStorage.saveTokens('access-existing', 'refresh-existing')
+    mockFetch(async (url) =>
+      url.endsWith('/api/v1/auth/me') ? response(supervisorUser) : response(loginBody(supervisorUser)),
+    )
 
     await authSession.restore()
 
@@ -89,19 +108,25 @@ describe('real auth session and route guards', () => {
   })
 
   it('clears the session when /auth/me returns 401', async () => {
-    tokenStorage.set('expired-token')
-    mockFetch(async () => response({ status: 401, code: 'UNAUTHORIZED', message: 'Authentication failed', fieldErrors: [] }, 401))
+    window.history.pushState({}, '', '/login')
+    tokenStorage.saveTokens('expired-token', 'expired-refresh')
+    mockFetch(async () =>
+      response({ status: 401, code: 'UNAUTHORIZED', message: 'Authentication failed', fieldErrors: [] }, 401),
+    )
 
     await authSession.restore()
 
     expect(authSession.snapshot().user).toBeNull()
     expect(tokenStorage.get()).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 
   it('keeps the session when an authenticated request returns 403', async () => {
-    mockFetch(async url => url.endsWith('/api/v1/auth/login')
-      ? response(loginBody(supervisorUser))
-      : response({ status: 403, code: 'FORBIDDEN', message: 'Forbidden', fieldErrors: [] }, 403))
+    mockFetch(async (url) =>
+      url.endsWith('/api/v1/auth/login')
+        ? response(loginBody(supervisorUser))
+        : response({ status: 403, code: 'FORBIDDEN', message: 'Forbidden', fieldErrors: [] }, 403),
+    )
     await authSession.login('marina@fieldops.com', '123456')
 
     await expect(apiRequest('/api/v1/admin-only')).rejects.toMatchObject({ status: 403 })
@@ -128,7 +153,9 @@ describe('real auth session and route guards', () => {
   })
 
   it('allows only administrators to access user management', async () => {
-    mockFetch(async url => url.endsWith('/api/v1/auth/login') ? response(loginBody(supervisorUser)) : response(supervisorUser))
+    mockFetch(async (url) =>
+      url.endsWith('/api/v1/auth/login') ? response(loginBody(supervisorUser)) : response(supervisorUser),
+    )
     await authSession.login('marina@fieldops.com', '123456')
     renderRoute('/app/users')
 
@@ -144,5 +171,6 @@ describe('real auth session and route guards', () => {
 
     expect(authSession.snapshot().user).toBeNull()
     expect(tokenStorage.get()).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 })

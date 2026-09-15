@@ -13,7 +13,7 @@ public record CreateInspectionRequest(
         @NotNull Long templateVersionId,
         @NotNull Long clientId,
         @NotNull Long siteId,
-        @NotNull Long equipmentId,
+        Long equipmentId,
         @NotNull Long technicianId,
         @NotNull Priority priority,
         @NotNull @FutureOrPresent LocalDate dueDate,

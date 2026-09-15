@@ -14,7 +14,7 @@ Fonte da auditoria: codigo atual do repositorio em `frontend/`, documentacao em 
 - Prototipo frontend aproximado: ~80% visual/interativo.
 - Integracao frontend <-> backend: 0%.
 
-Observacao critica: PBI-003 fala em "Projeto Next.js com layout", mas o frontend atual e React + Vite. Evidencias: `frontend/package.json`, `frontend/vite.config.ts`, `frontend/src/main.tsx`.
+Observacao: PBI-003 esta alinhado ao frontend atual em React + Vite. Evidencias: `frontend/package.json`, `frontend/vite.config.ts`, `frontend/src/main.tsx`.
 
 Validacoes executadas:
 
@@ -27,7 +27,7 @@ Validacoes executadas:
 | PBI | Funcionalidade | UI | Interacao local | API | Veredicto |
 |---|---|---:|---:|---:|---|
 | PBI-001 | Repositorios e convencoes | N/A | N/A | N/A | Parcialmente atendido no repo |
-| PBI-003 | Projeto Next.js com layout | Sim | Sim | Nao | Layout existe, stack divergente, rotas sem protecao |
+| PBI-003 | Projeto React + Vite com layout | Sim | Sim | Sim | Layout, estrutura modular e rotas protegidas |
 | PBI-005 | Lint, tipos e fluxo PR | N/A | N/A | N/A | Parcial |
 | PBI-009 | Login e sessao | Sim | Sim, mock | Nao | UI existe, sessao real pendente |
 | PBI-011 | CRUD usuarios | Sim | Sim, mock | Nao | UI/interacao existem, API pendente |
@@ -68,7 +68,7 @@ Para considerar concluido:
 
 - Formalizar convencoes, fluxo de PR e CI verificavel no repo.
 
-### PBI-003 - Projeto Next.js com layout
+### PBI-003 - Projeto React + Vite com layout
 
 Veredicto: UI/layout implementados; divergencia de stack; rotas protegidas pendentes.
 
@@ -86,13 +86,13 @@ Evidencias:
 
 O que falta:
 
-- Nao e Next.js; e React + Vite.
+- Frontend implementado em React + Vite.
 - Nao ha protecao real de rota: `/app` renderiza direto `AppLayout`.
 - Nao ha sessao, role guard ou redirect por autenticacao.
 
 Para considerar concluido:
 
-- Ou ajustar criterio do PBI para Vite, ou migrar para Next.js.
+- Criterio do PBI alinhado para React + Vite.
 - Implementar autenticacao/guards reais se "rotas protegidas" fizer parte do aceite.
 
 ### PBI-005 - Lint, tipos e fluxo de PR
@@ -571,7 +571,7 @@ Nao inclui integracao/API nesta secao.
 
 ### Importante
 
-- Corrigir PBI-003: alinhar Vite vs Next.js com o criterio oficial.
+- PBI-003 alinhado ao criterio React + Vite.
 - Completar PBI-029.
 - Fazer filtros de periodo e busca por cliente/equipamento em inspecoes.
 - Persistir draft do construtor e fazer previa derivar do draft real.

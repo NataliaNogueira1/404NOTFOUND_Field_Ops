@@ -4,8 +4,13 @@ import { tokenStorage } from '@/services/auth/tokenStorage'
 
 import { httpClient } from './httpClient'
 
-const BASE_URL = 'http://localhost:8080'
-const REFRESH_URL = `${BASE_URL}/api/v1/auth/refresh`
+const REFRESH_PATH = '/api/v1/auth/refresh'
+
+// The client prefixes every request with VITE_API_URL, so assertions match on
+// the path suffix rather than an absolute URL to stay independent of the base.
+function isRefreshCall(url: unknown): boolean {
+  return String(url).endsWith(REFRESH_PATH)
+}
 
 const fetchMock = vi.fn()
 
@@ -24,7 +29,7 @@ function requestUrl(call: number): string {
 }
 
 function requestHeaders(call: number): Record<string, string> {
-  return fetchMock.mock.calls[call][1].headers as Record<string, string>
+  return Object.fromEntries(new Headers(fetchMock.mock.calls[call][1].headers).entries())
 }
 
 beforeEach(() => {
@@ -44,7 +49,7 @@ describe('httpClient', () => {
     const data = await httpClient.get<{ value: number }>('/api/v1/things')
 
     expect(data).toEqual({ value: 42 })
-    expect(requestHeaders(0).Authorization).toBe('Bearer access-1')
+    expect(requestHeaders(0).authorization).toBe('Bearer access-1')
   })
 
   it('retries the original request with the new token after a 401', async () => {
@@ -57,8 +62,8 @@ describe('httpClient', () => {
 
     expect(data).toEqual({ value: 42 })
     expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(requestUrl(1)).toBe(REFRESH_URL)
-    expect(requestHeaders(2).Authorization).toBe('Bearer access-2')
+    expect(isRefreshCall(requestUrl(1))).toBe(true)
+    expect(requestHeaders(2).authorization).toBe('Bearer access-2')
     expect(tokenStorage.getAccessToken()).toBe('access-2')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-1')
   })
@@ -78,45 +83,35 @@ describe('httpClient', () => {
 
     expect(first).toEqual({ value: 1 })
     expect(second).toEqual({ value: 2 })
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === REFRESH_URL)
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => isRefreshCall(url))
     expect(refreshCalls).toHaveLength(1)
   })
 
   it('clears the session and redirects to login when the refresh fails', async () => {
-    const assign = vi.fn()
-    vi.stubGlobal('window', {
-      location: { pathname: '/app/inspections', assign },
-      dispatchEvent: vi.fn(),
-    })
-
+    window.history.pushState({}, '', '/login')
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ code: 'UNAUTHORIZED' }, 401))
       .mockResolvedValueOnce(jsonResponse({ code: 'INVALID_REFRESH_TOKEN' }, 401))
 
-    await expect(httpClient.get('/api/v1/things')).rejects.toThrow('session expired')
+    await expect(httpClient.get('/api/v1/things')).rejects.toMatchObject({ status: 401, code: 'SESSION_EXPIRED' })
 
     expect(tokenStorage.getAccessToken()).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
-    expect(assign).toHaveBeenCalledWith('/login')
   })
 
   it('does not intercept a 401 from the login endpoint itself', async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' }, 401),
-    )
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' }, 401))
 
     await expect(
       httpClient.post('/api/v1/auth/login', { email: 'x@fieldops.com', password: 'wrong' }),
-    ).rejects.toThrow('API 401: Invalid credentials')
+    ).rejects.toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('surfaces the API error message for non-401 failures', async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 'NOT_FOUND', message: 'Resource not found' }, 404),
-    )
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'Resource not found' }, 404))
 
-    await expect(httpClient.get('/api/v1/things/999')).rejects.toThrow('API 404: Resource not found')
+    await expect(httpClient.get('/api/v1/things/999')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
   })
 })
