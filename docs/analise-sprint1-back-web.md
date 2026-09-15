@@ -271,12 +271,12 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ✅ Concluído — `DemoSeedRunner` cria dataset coerente (cliente + local + equipamento com QR + modelo publicado + inspeção ASSIGNED), idempotente por `existsByDocument`; **restrição: só roda no profile `dev` com `fieldops.bootstrap.demo-seed.enabled`, não em `prod`** |
 | PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | 🟡 Parcial — há `Dockerfile` e `docker-compose.yml`; falta validar/publicar o build de demonstração |
 | PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | 🟡 Parcial — OpenAPI gerado via springdoc + `OpenApiConfig`; falta contrato completo revisado e diagramas |
-| PBI-073 | *P1:* Dashboard com indicadores por estado e criticidade (API) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente no repositório |
-| PBI-075 | *P1:* Notificações push — integração servidor | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-077 | *P1:* Relatório PDF básico | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-078 | *P1:* Histórico detalhado de respostas | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-079 | *P1:* Comentários de revisão por item | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-082 | *P1:* Exportação CSV | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
+| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
 
 ### Resumo Sprint 2 Backend (14 itens)
 
@@ -305,12 +305,12 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-059 | Iniciar revisão formalmente | [#79](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/79) | ❌ Não feito — não há ação/estado de "iniciar revisão" formal |
 | PBI-064 | Estados de carregamento, vazio, erro e offline | [#84](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/84) | ❌ Não feito — não confirmado como cobertura sistemática no código |
 | PBI-069 | Build e publicação do painel web admin | [#89](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/89) | 🟡 Parcial — CI existe (`.github/workflows/frontend-ci.yml`); publicação ainda não configurada |
-| PBI-073 | *P1:* Dashboard com indicadores (telas) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-077 | *P1:* Relatório PDF básico (visualização/download) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-078 | *P1:* Histórico detalhado de respostas (telas) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-079 | *P1:* Comentários de revisão por item (telas) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-081 | *P1:* Tema escuro | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-082 | *P1:* Exportação CSV (botão e download) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
+| PBI-083 | *P1:* Dashboard com indicadores (telas) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-088 | *P1:* Histórico detalhado de respostas (telas) | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-089 | *P1:* Comentários de revisão por item (telas) | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-092 | *P1:* Exportação CSV (botão e download) | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
 
 ### Resumo Sprint 2 Frontend Web (13 itens)
 
@@ -347,11 +347,11 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-067 | READMEs com instruções de execução | [#87](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/87) | ✅ Concluído — `api/README.md`, `frontend/README.md` e `mobile/README.md` existem, com pré-requisitos, comandos de execução, estrutura e convenções de commit/PR |
 | PBI-068 | Build Android (APK) para demonstração | [#88](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/88) | ❌ Não feito — sem configuração de build de APK |
 | PBI-072 | Demonstração ponta a ponta | [#92](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/92) | ❌ Não feito — depende de itens ainda ausentes (aprovação/reprovação, sync real) |
-| PBI-074 | *P1:* Notificações locais de prazo | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-075 | *P1:* Notificações push de nova atribuição | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-076 | *P1:* Assinatura desenhada no dispositivo | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-080 | *P1:* Biometria para reabertura de sessão local | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
-| PBI-081 | *P1:* Tema escuro (mobile) | — (sem issue) | ❌ Não feito — sem código; sem issue correspondente |
+| PBI-084 | *P1:* Notificações locais de prazo | [#147](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/147) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-085 | *P1:* Notificações push de nova atribuição | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-086 | *P1:* Assinatura desenhada no dispositivo | [#148](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/148) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-090 | *P1:* Biometria para reabertura de sessão local | [#152](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/152) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-091 | *P1:* Tema escuro (mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ❌ Não feito (sem código) — issue criada no backlog |
 
 ### Resumo Sprint 2 Mobile (22 itens)
 
@@ -367,11 +367,23 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 ---
 
-## Ressalva de numeração dos itens P1 (PBI-073 a PBI-082)
+## Ressalva de numeração dos itens P1 (renumerados para PBI-083 a PBI-092)
 
-No `cronograma.md`, os números **PBI-073 a PBI-082** designam funcionalidades **P1** (dashboard, notificações push, PDF, histórico, comentários de revisão, CSV, tema escuro, assinatura, biometria). Porém, no GitHub:
+No `cronograma.md` original, os números **PBI-073 a PBI-082** designavam as funcionalidades **P1** (dashboard, notificações locais/push, assinatura, PDF, histórico, comentários de revisão, biometria, tema escuro, CSV). Porém, no GitHub, os números **PBI-073 a PBI-076** já estavam em uso pelas issues #96–#99, com **outro significado** — tarefas de fundação já concluídas (criar protótipos e estruturas base de backend/web/mobile).
 
-- **Não existem issues** para os itens P1 com esses números;
-- os números **PBI-073 a PBI-076** aparecem em issues (#96–#99), mas com **outro significado** — são tarefas de fundação já concluídas (criar protótipos e estruturas base de backend/web/mobile).
+Para evitar a colisão, os itens P1 foram **renumerados para PBI-083 a PBI-092** e tiveram suas issues criadas no backlog do quadro (prioridade P1). Mapa da renumeração:
 
-Ou seja, os itens P1 do cronograma ainda **não têm issue nem código**. É preciso criar/renumerar essas issues antes de rastreá-las.
+| Antigo | Novo | Feature | Issue |
+|--------|------|---------|-------|
+| PBI-073 | **PBI-083** | Dashboard com indicadores por estado e criticidade | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) |
+| PBI-074 | **PBI-084** | Notificações locais de prazo | [#147](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/147) |
+| PBI-075 | **PBI-085** | Notificações push de nova atribuição | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) |
+| PBI-076 | **PBI-086** | Assinatura desenhada no dispositivo | [#148](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/148) |
+| PBI-077 | **PBI-087** | Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) |
+| PBI-078 | **PBI-088** | Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) |
+| PBI-079 | **PBI-089** | Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) |
+| PBI-080 | **PBI-090** | Biometria para reabertura de sessão local | [#152](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/152) |
+| PBI-081 | **PBI-091** | Tema escuro (web e mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) |
+| PBI-082 | **PBI-092** | Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) |
+
+> Todos os itens P1 agora **têm issue no quadro** (coluna Backlog, prioridade P1). Continuam **sem código** — são melhorias planejadas, fora do escopo mínimo das duas sprints.
