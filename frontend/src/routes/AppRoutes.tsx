@@ -20,6 +20,7 @@ const TemplateBuilderPage = lazy(() => import('@/pages/inspectionTemplates/Templ
 const TemplatePreviewPage = lazy(() => import('@/pages/inspectionTemplates/TemplatePreviewPage').then(module => ({ default: module.TemplatePreviewPage })))
 const InspectionsPage = lazy(() => import('@/pages/inspections/InspectionsPage').then(module => ({ default: module.InspectionsPage })))
 const NewInspectionPage = lazy(() => import('@/pages/inspections/NewInspectionPage').then(module => ({ default: module.NewInspectionPage })))
+const ReviewQueuePage = lazy(() => import('@/pages/inspections/ReviewQueuePage').then(module => ({ default: module.ReviewQueuePage })))
 const InspectionReviewPage = lazy(() => import('@/pages/inspections/InspectionReviewPage').then(module => ({ default: module.InspectionReviewPage })))
 const NonConformitiesPage = lazy(() => import('@/pages/nonConformities/NonConformitiesPage').then(module => ({ default: module.NonConformitiesPage })))
 const AuditPage = lazy(() => import('@/pages/audit/AuditPage').then(module => ({ default: module.AuditPage })))
@@ -81,6 +82,7 @@ export function AppRoutes() {
         <Route path="inspection-templates/:id/preview" element={<LazyPage><TemplatePreviewPage /></LazyPage>} />
         <Route path="inspections" element={<LazyPage><InspectionsPage /></LazyPage>} />
         <Route path="inspections/new" element={<LazyPage><NewInspectionPage /></LazyPage>} />
+        <Route path="inspections/review" element={<LazyPage><ReviewQueuePage /></LazyPage>} />
         <Route path="inspections/:id/review" element={<LazyPage><InspectionReviewPage /></LazyPage>} />
         <Route path="non-conformities" element={<LazyPage><NonConformitiesPage /></LazyPage>} />
         <Route path="audit" element={<LazyPage><AuditPage /></LazyPage>} />

@@ -170,6 +170,17 @@ export const adminCatalogApi = {
     return result.map(v => ({ ...v, templateId: String(v.templateId) }))
   },
 
+  /**
+   * Returns the total number of inspections awaiting supervisor review
+   * (status SUBMITTED or UNDER_REVIEW). Lightweight: fetches page 0 with size 1,
+   * reads only totalElements.
+   */
+  async countReviewQueue(): Promise<number> {
+    const params = new URLSearchParams({ review: 'true', page: '0', size: '1', sort: 'dueDate,asc' })
+    const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
+    return result.totalElements
+  },
+
   /** Schedules a new inspection from a published template. Returns HTTP 201 on success. */
   async scheduleInspection(request: ScheduleInspectionRequest): Promise<ScheduleInspectionResponse> {
     const result = await apiRequest<BackendScheduleResponse>('/api/v1/inspections', {
