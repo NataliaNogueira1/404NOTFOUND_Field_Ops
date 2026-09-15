@@ -33,7 +33,7 @@ import java.util.List;
  * if the technician already has inspections, nothing is created.
  */
 @Component
-@Profile("dev")
+@Profile({"dev", "demo"})
 @Order(20) // after DevUsersBootstrapRunner (default order)
 public class DevInspectionsBootstrapRunner implements ApplicationRunner {
 
