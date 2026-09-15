@@ -4,8 +4,7 @@ import { tokenStorage } from '@/services/auth/tokenStorage'
 
 import { httpClient } from './httpClient'
 
-const BASE_URL = 'http://localhost:8080'
-const REFRESH_URL = `${BASE_URL}/api/v1/auth/refresh`
+const REFRESH_URL = '/api/v1/auth/refresh'
 
 const fetchMock = vi.fn()
 
