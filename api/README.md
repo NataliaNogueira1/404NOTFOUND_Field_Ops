@@ -20,6 +20,32 @@ cp .env.example .env          # then edit DB + JWT values
 
 The app starts on `http://localhost:8080`; Swagger UI at `http://localhost:8080/swagger-ui`.
 
+## Demonstration via Docker (PBI-070)
+
+A single command builds the API image and starts PostgreSQL + API in containers, ready to demo:
+
+```bash
+cd api
+docker compose up --build
+```
+
+On the first start the container (profile `demo`):
+
+- runs the Flyway migrations automatically;
+- seeds the demo users (see the credentials table below), a set of ASSIGNED inspections for
+  the technician, and a coherent catalog dataset (client, site, equipment, published template
+  and one assigned inspection — the compressor example).
+
+Then open:
+
+- Swagger UI: `http://localhost:8080/swagger-ui`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Health: `http://localhost:8080/actuator/health`
+
+Log in at `POST /api/v1/auth/login` with any account from the credentials table. The API port
+is overridable with `API_EXTERNAL_PORT`; `JWT_SECRET` has a demo default and should be
+overridden for any real deployment. Stop and reset with `docker compose down -v`.
+
 ## Database
 
 Schema is managed by **Flyway** (`src/main/resources/db/migration`). Hibernate runs with

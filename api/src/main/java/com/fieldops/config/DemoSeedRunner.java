@@ -51,7 +51,7 @@ import java.util.List;
  * Active only under the {@code dev} profile and when {@code fieldops.bootstrap.demo-seed.enabled}.
  */
 @Component
-@Profile("dev")
+@Profile({"dev", "demo"})
 @Order(100) // after DevUsersBootstrapRunner so the demo users already exist
 public class DemoSeedRunner implements ApplicationRunner {
 

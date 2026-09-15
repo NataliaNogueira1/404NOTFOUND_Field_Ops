@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * ({@code @Order(20)}) and {@link DemoSeedRunner} ({@code @Order(100)}).
  */
 @Component
-@Profile("dev")
+@Profile({"dev", "demo"})
 @Order(10)
 public class DevUsersBootstrapRunner implements ApplicationRunner {
 

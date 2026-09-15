@@ -1,0 +1,36 @@
+# Demonstration profile (PBI-070): containerized API + PostgreSQL for a reproducible demo.
+# Flyway runs migrations on startup (inherited from application.yml) and the dev bootstrap
+# runners seed users, inspections and the catalog demo dataset. Not for production.
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.fieldops: INFO
+    org.hibernate.SQL: WARN
+
+fieldops:
+  security:
+    jwt:
+      # Demo-only default so the container starts without extra config; override in real deployments.
+      secret: ${JWT_SECRET:demo-secret-demo-secret-demo-secret-demo-secret-32b}
+      expiration: ${JWT_EXPIRATION:8h}
+  bootstrap:
+    dev-users:
+      enabled: ${FIELDOPS_DEV_USERS_ENABLED:true}
+      admin:
+        name: ${FIELDOPS_DEV_ADMIN_NAME:Admin Dev}
+        email: ${FIELDOPS_DEV_ADMIN_EMAIL:admin@fieldops.local}
+        password: ${FIELDOPS_DEV_ADMIN_PASSWORD:fieldops-admin-dev}
+      supervisor:
+        name: ${FIELDOPS_DEV_SUPERVISOR_NAME:Supervisor Dev}
+        email: ${FIELDOPS_DEV_SUPERVISOR_EMAIL:supervisor@fieldops.local}
+        password: ${FIELDOPS_DEV_SUPERVISOR_PASSWORD:fieldops-supervisor-dev}
+      technician:
+        name: ${FIELDOPS_DEV_TECHNICIAN_NAME:Tecnico Dev}
+        email: ${FIELDOPS_DEV_TECHNICIAN_EMAIL:technician@fieldops.local}
+        password: ${FIELDOPS_DEV_TECHNICIAN_PASSWORD:fieldops-technician-dev}
+    demo-seed:
+      # Reproducible demonstration dataset (PBI-066). Reuses the dev users above.
+      enabled: ${FIELDOPS_DEMO_SEED_ENABLED:true}
