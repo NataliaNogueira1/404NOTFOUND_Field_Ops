@@ -1,6 +1,7 @@
 package com.fieldops.inspection.controller;
 
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
+import com.fieldops.inspection.dto.InspectionTemplatePreviewResponse;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateSummary;
 import com.fieldops.inspection.dto.InspectionTemplateVersionResponse;
@@ -83,6 +84,13 @@ public class AdminInspectionTemplateController {
     @GetMapping("/{id}")
     public ResponseEntity<InspectionTemplateResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(templateService.getById(id));
+    }
+
+    @Operation(summary = "Preview an inspection checklist and its publication issues")
+    @ApiResponse(responseCode = "200", description = "Read-only checklist preview")
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<InspectionTemplatePreviewResponse> preview(@PathVariable Long id) {
+        return ResponseEntity.ok(templateService.preview(id));
     }
 
     @Operation(summary = "Update draft inspection template metadata")

@@ -137,6 +137,21 @@ class UserControllerTest {
     }
 
     @Test
+    void returnsConflictWhenCreatingUserWithDuplicateEmail() throws Exception {
+        persist("Existing", "duplicate@example.com", Role.TECHNICIAN, UserStatus.ACTIVE);
+
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Duplicate","email":"DUPLICATE@example.com",
+                                 "password":"secret1","role":"TECHNICIAN"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value("Email is already in use: duplicate@example.com"));
+    }
+
+    @Test
     @WithMockUser(authorities = "SUPERVISOR")
     void forbidsSupervisor() throws Exception {
         mockMvc.perform(get("/api/v1/users"))

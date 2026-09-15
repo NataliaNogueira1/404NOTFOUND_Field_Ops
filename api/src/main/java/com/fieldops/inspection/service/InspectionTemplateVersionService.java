@@ -2,7 +2,6 @@ package com.fieldops.inspection.service;
 
 import com.fieldops.inspection.dto.InspectionTemplateVersionResponse;
 import com.fieldops.inspection.model.InspectionTemplate;
-import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.InspectionTemplateVersion;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.inspection.repository.InspectionTemplateVersionRepository;
@@ -37,7 +36,6 @@ public class InspectionTemplateVersionService {
     public InspectionTemplateVersionResponse publish(Long templateId, Long publisherId) {
         InspectionTemplate template = templateRepository.findByIdForUpdate(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection template not found: " + templateId));
-        requireDraft(template);
         List<String> issues = validator.validate(template);
         if (!issues.isEmpty()) {
             throw new BusinessException("Inspection template cannot be published: " + String.join("; ", issues));
@@ -48,7 +46,7 @@ public class InspectionTemplateVersionService {
         InspectionTemplateVersion version = InspectionTemplateVersion.publish(
                 template, versionNumber, publisher, Instant.now());
         template.setCurrentVersion(versionNumber);
-        template.setStatus(InspectionTemplateStatus.ACTIVE);
+        template.setPublished(true);
         return toResponse(versionRepository.save(version));
     }
 
@@ -61,12 +59,6 @@ public class InspectionTemplateVersionService {
         return versionRepository.findByTemplateIdOrderByVersionNumberAsc(templateId).stream()
                 .map(this::toResponse)
                 .toList();
-    }
-
-    private void requireDraft(InspectionTemplate template) {
-        if (template.getStatus() != InspectionTemplateStatus.DRAFT) {
-            throw new BusinessException("Only DRAFT inspection templates can be published: " + template.getId());
-        }
     }
 
     private InspectionTemplateVersionResponse toResponse(InspectionTemplateVersion version) {

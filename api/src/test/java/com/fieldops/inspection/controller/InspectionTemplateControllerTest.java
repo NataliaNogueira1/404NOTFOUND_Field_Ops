@@ -384,6 +384,40 @@ class InspectionTemplateControllerTest {
     }
 
     @Test
+    void previewsChecklistWithPublicationValidationBeforePublishing() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+        TemplateSection section = persistSection(template, "Seguranca", null, 1);
+        persistItem(section, "Aterramento conforme?", 1);
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}/preview", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.template.id").value(template.getId()))
+                .andExpect(jsonPath("$.template.sections[0].title").value("Seguranca"))
+                .andExpect(jsonPath("$.template.sections[0].items[0].title")
+                        .value("Aterramento conforme?"))
+                .andExpect(jsonPath("$.validForPublication").value(true))
+                .andExpect(jsonPath("$.issues").isEmpty());
+    }
+
+    @Test
+    void previewsPublicationIssuesWithoutPublishingTheDraft() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}/preview", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.validForPublication").value(false))
+                .andExpect(jsonPath("$.issues[0]").value("At least one section is required"));
+
+        assertThat(versionRepository.findAll()).isEmpty();
+        assertThat(templateRepository.findById(template.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionTemplateStatus.DRAFT);
+    }
+
+    @Test
     void rejectsPublishingSingleChoiceItemWithoutTwoOptions() throws Exception {
         User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
         InspectionTemplate template = persistDraft(supervisor);

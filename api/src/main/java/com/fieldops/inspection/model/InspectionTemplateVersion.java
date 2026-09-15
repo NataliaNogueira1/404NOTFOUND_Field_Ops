@@ -61,4 +61,7 @@ public class InspectionTemplateVersion {
     public String getDescriptionSnapshot() { return descriptionSnapshot; }
     public User getPublishedBy() { return publishedBy; }
     public Instant getPublishedAt() { return publishedAt; }
+    public boolean isPublished() {
+        return versionNumber != null && versionNumber > 0 && publishedBy != null && publishedAt != null;
+    }
 }
