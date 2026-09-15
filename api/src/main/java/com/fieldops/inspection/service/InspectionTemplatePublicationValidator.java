@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fieldops.inspection.model.InspectionTemplate;
+import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
@@ -23,6 +24,9 @@ public class InspectionTemplatePublicationValidator {
     /** Returns every structural issue that prevents publication. Use before activating a draft. */
     public List<String> validate(InspectionTemplate template) {
         List<String> issues = new ArrayList<>();
+        if (template.getStatus() != InspectionTemplateStatus.DRAFT) {
+            issues.add("Only DRAFT inspection templates can be published: " + template.getId());
+        }
         if (template.getTitle() == null || template.getTitle().isBlank()) issues.add("Title is required");
         if (template.getCategory() == null || template.getCategory().isBlank()) issues.add("Category is required");
         if (template.getSections().isEmpty()) issues.add("At least one section is required");

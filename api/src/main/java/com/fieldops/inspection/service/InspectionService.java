@@ -3,8 +3,10 @@ package com.fieldops.inspection.service;
 import com.fieldops.audit.model.AuditAction;
 import com.fieldops.audit.service.AuditService;
 import com.fieldops.client.model.Client;
+import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.model.Equipment;
+import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
@@ -225,13 +227,22 @@ public class InspectionService {
     }
 
     private InspectionTemplateVersion findVersion(Long id) {
-        return versionRepository.findById(id)
+        InspectionTemplateVersion version = versionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection template version not found: " + id));
+        if (!version.isPublished()) {
+            throw new BusinessException("TEMPLATE_VERSION_NOT_PUBLISHED",
+                    "Inspection template version must be published: " + id);
+        }
+        return version;
     }
 
     private Client findClient(Long id) {
-        return clientRepository.findById(id)
+        Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + id));
+        if (client.getStatus() != ClientStatus.ACTIVE) {
+            throw new BusinessException("CLIENT_NOT_ACTIVE", "Client must be active: " + id);
+        }
+        return client;
     }
 
     private InspectionSite findSite(Long id) {
@@ -240,8 +251,12 @@ public class InspectionService {
     }
 
     private Equipment findEquipment(Long id) {
-        return equipmentRepository.findById(id)
+        Equipment equipment = equipmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));
+        if (equipment.getStatus() != EquipmentStatus.ACTIVE) {
+            throw new BusinessException("EQUIPMENT_NOT_ACTIVE", "Equipment must be active: " + id);
+        }
+        return equipment;
     }
 
     private User findUser(Long id) {

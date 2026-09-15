@@ -3,11 +3,14 @@ package com.fieldops.inspection.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fieldops.client.model.Client;
+import com.fieldops.client.model.ClientStatus;
 import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.model.Equipment;
+import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.model.Inspection;
@@ -151,6 +154,69 @@ class InspectionServiceTest {
                 .isEqualTo("TECHNICIAN_NOT_ACTIVE");
 
         org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void rejectsUnpublishedTemplateVersion() {
+        InspectionTemplateVersion version = mock(InspectionTemplateVersion.class);
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+
+        assertThatThrownBy(() -> inspectionService.createInspection(request(), 15L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo("TEMPLATE_VERSION_NOT_PUBLISHED");
+
+        org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void rejectsInactiveClientForNewInspection() {
+        User supervisor = user("Supervisor", Role.SUPERVISOR);
+        InspectionTemplateVersion version = publishedVersion(supervisor);
+        Client client = new Client();
+        client.setName("Inactive client");
+        client.setStatus(ClientStatus.INACTIVE);
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+        when(clientRepository.findById(11L)).thenReturn(Optional.of(client));
+
+        assertThatThrownBy(() -> inspectionService.createInspection(request(), 15L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo("CLIENT_NOT_ACTIVE");
+
+        org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void rejectsInactiveEquipmentForNewInspection() {
+        User supervisor = user("Supervisor", Role.SUPERVISOR);
+        InspectionTemplateVersion version = publishedVersion(supervisor);
+        Client client = new Client();
+        client.setName("Acme");
+        InspectionSite site = new InspectionSite();
+        site.setName("Plant 1");
+        site.setClient(client);
+        Equipment equipment = new Equipment();
+        equipment.setName("Inactive compressor");
+        equipment.setSite(site);
+        equipment.setStatus(EquipmentStatus.INACTIVE);
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+        when(clientRepository.findById(11L)).thenReturn(Optional.of(client));
+        when(siteRepository.findById(12L)).thenReturn(Optional.of(site));
+        when(equipmentRepository.findById(13L)).thenReturn(Optional.of(equipment));
+
+        assertThatThrownBy(() -> inspectionService.createInspection(request(), 15L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo("EQUIPMENT_NOT_ACTIVE");
+
+        org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    private CreateInspectionRequest request() {
+        return new CreateInspectionRequest(
+                "Preventive inspection", 7L, 11L, 12L, 13L, 14L, Priority.HIGH,
+                LocalDate.of(2026, 9, 14), null, "Lock out the equipment");
     }
 
     private InspectionTemplateVersion publishedVersion(User supervisor) {
