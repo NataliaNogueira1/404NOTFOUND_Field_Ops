@@ -11,11 +11,11 @@ export interface CreateInspectionRequest {
   templateVersionId: number
   clientId: number
   siteId: number
-  equipmentId: number
+  equipmentId?: number
   technicianId: number
   priority: Priority
-  dueDate: string        // ISO date: YYYY-MM-DD
-  dueTime?: string       // ISO time: HH:mm:ss (optional)
+  dueDate: string // ISO date: YYYY-MM-DD
+  dueTime?: string // ISO time: HH:mm:ss (optional)
   supervisorInstructions?: string
 }
 
@@ -115,7 +115,9 @@ interface BackendPage<T> {
   last: boolean
 }
 
-interface BackendTemplate extends Omit<TemplateSummary, 'id'> { id: number }
+interface BackendTemplate extends Omit<TemplateSummary, 'id'> {
+  id: number
+}
 interface BackendManagedTemplate extends Omit<ManagedInspectionTemplate, 'id' | 'createdBy' | 'sections'> {
   id: number
   createdBy: number
@@ -137,6 +139,13 @@ interface BackendInspection extends Omit<AdminInspectionSummary, 'id' | 'technic
 interface BackendCreatedInspection extends Omit<CreatedInspection, 'id'> {
   id: number
 }
+interface BackendCancelInspectionResponse {
+  id: number
+  status: InspectionStatus
+  canceledAt: string
+  canceledBy: number
+  canceledReason: string
+}
 interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 'publishedBy'> {
   id: number
   publishedBy: number
@@ -145,7 +154,8 @@ interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 
 export const adminCatalogApi = {
   async createTemplate(input: InspectionTemplateInput) {
     const result = await apiRequest<BackendManagedTemplate>('/api/v1/inspection-templates', {
-      method: 'POST', body: JSON.stringify(input),
+      method: 'POST',
+      body: JSON.stringify(input),
     })
     return managedTemplate(result)
   },
@@ -156,22 +166,28 @@ export const adminCatalogApi = {
 
   async updateTemplate(id: string, input: InspectionTemplateInput) {
     const result = await apiRequest<BackendManagedTemplate>(`/api/v1/inspection-templates/${id}`, {
-      method: 'PUT', body: JSON.stringify(input),
+      method: 'PUT',
+      body: JSON.stringify(input),
     })
     return managedTemplate(result)
   },
 
   async createTemplateSection(templateId: string, input: TemplateSectionInput) {
     const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections`, {
-      method: 'POST', body: JSON.stringify(input),
+      method: 'POST',
+      body: JSON.stringify(input),
     })
     return managedSection(result)
   },
 
   async updateTemplateSection(templateId: string, sectionId: string, input: TemplateSectionInput) {
-    const result = await apiRequest<BackendTemplateSection>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}`, {
-      method: 'PUT', body: JSON.stringify(input),
-    })
+    const result = await apiRequest<BackendTemplateSection>(
+      `/api/v1/inspection-templates/${templateId}/sections/${sectionId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    )
     return managedSection(result)
   },
 
@@ -180,16 +196,24 @@ export const adminCatalogApi = {
   },
 
   async createTemplateItem(templateId: string, sectionId: string, input: TemplateItemInput) {
-    const result = await apiRequest<BackendTemplateItem>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items`, {
-      method: 'POST', body: JSON.stringify(input),
-    })
+    const result = await apiRequest<BackendTemplateItem>(
+      `/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    )
     return managedItem(result)
   },
 
   async updateTemplateItem(templateId: string, sectionId: string, itemId: string, input: TemplateItemInput) {
-    const result = await apiRequest<BackendTemplateItem>(`/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items/${itemId}`, {
-      method: 'PUT', body: JSON.stringify(input),
-    })
+    const result = await apiRequest<BackendTemplateItem>(
+      `/api/v1/inspection-templates/${templateId}/sections/${sectionId}/items/${itemId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    )
     return managedItem(result)
   },
 
@@ -205,18 +229,32 @@ export const adminCatalogApi = {
     return versions.map(managedVersion)
   },
 
-  async listTemplates(filters: { name: string; status: TemplateListStatus | ''; page: number; size: number; sort: string }) {
+  async listTemplates(filters: {
+    name: string
+    status: TemplateListStatus | ''
+    page: number
+    size: number
+    sort: string
+  }) {
     const params = pageParams(filters.page, filters.size, filters.sort)
     if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.status) params.set('status', filters.status)
     const result = await apiRequest<BackendPage<BackendTemplate>>(`/api/v1/inspection-templates?${params}`)
-    return { ...result, content: result.content.map(item => ({ ...item, id: String(item.id) })) }
+    return { ...result, content: result.content.map((item) => ({ ...item, id: String(item.id) })) }
   },
 
   async listInspections(filters: {
-    name: string; status: InspectionStatus | ''; technicianName: string; clientName: string
-    priority: Priority | ''; dueDate: string; overdue: boolean; review: boolean
-    page: number; size: number; sort: string
+    name: string
+    status: InspectionStatus | ''
+    technicianName: string
+    clientName: string
+    priority: Priority | ''
+    dueDate: string
+    overdue: boolean
+    review: boolean
+    page: number
+    size: number
+    sort: string
   }) {
     const params = pageParams(filters.page, filters.size, filters.sort)
     if (filters.name.trim()) params.set('name', filters.name.trim())
@@ -228,7 +266,14 @@ export const adminCatalogApi = {
     if (filters.overdue) params.set('overdue', 'true')
     if (filters.review) params.set('review', 'true')
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
-    return { ...result, content: result.content.map(item => ({ ...item, id: String(item.id), technicianId: String(item.technicianId) })) }
+    return {
+      ...result,
+      content: result.content.map((item) => ({
+        ...item,
+        id: String(item.id),
+        technicianId: String(item.technicianId),
+      })),
+    }
   },
 
   /** Schedules a new inspection from a published template version. Returns HTTP 201 on success. */
@@ -238,6 +283,14 @@ export const adminCatalogApi = {
       body: JSON.stringify(request),
     })
     return { ...result, id: String(result.id) }
+  },
+
+  async cancelInspection(id: string, reason: string) {
+    const result = await apiRequest<BackendCancelInspectionResponse>(`/api/v1/inspections/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+    return { ...result, id: String(result.id), canceledBy: String(result.canceledBy) }
   },
 }
 

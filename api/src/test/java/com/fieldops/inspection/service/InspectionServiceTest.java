@@ -13,6 +13,7 @@ import com.fieldops.equipment.model.Equipment;
 import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
+import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionTemplate;
@@ -94,11 +95,13 @@ class InspectionServiceTest {
                 "Preventive inspection", 7L, 11L, 12L, 13L, 14L, Priority.HIGH,
                 LocalDate.of(2026, 9, 12), null, "Lock out the equipment");
 
-        inspectionService.createInspection(request, 15L);
+        InspectionResponse response = inspectionService.createInspection(request, 15L);
 
         ArgumentCaptor<Inspection> inspectionCaptor = ArgumentCaptor.forClass(Inspection.class);
         org.mockito.Mockito.verify(inspectionRepository).save(inspectionCaptor.capture());
         Inspection inspection = inspectionCaptor.getValue();
+        assertThat(response.equipmentName()).isEqualTo("Compressor A");
+        assertThat(inspection.getEquipmentName()).isEqualTo("Compressor A");
         assertThat(inspection.getTemplateVersion()).isSameAs(version);
         assertThat(inspection.getItemSnapshots()).singleElement().satisfies(snapshot -> {
             assertThat(snapshot.getSourceTemplateItemId()).isEqualTo(44L);
@@ -120,6 +123,67 @@ class InspectionServiceTest {
         source.setQuestion("Changed after scheduling");
         InspectionItemSnapshot snapshot = inspection.getItemSnapshots().get(0);
         assertThat(snapshot.getItemTitle()).isEqualTo("Are the cables intact?");
+    }
+
+    @Test
+    void createsInspectionWithoutEquipmentWhenEquipmentIdIsMissing() {
+        User supervisor = user("Supervisor", Role.SUPERVISOR);
+        User technician = user("Technician", Role.TECHNICIAN);
+        InspectionTemplateVersion version = publishedVersion(supervisor);
+        Client client = new Client();
+        client.setName("Acme");
+        InspectionSite site = new InspectionSite();
+        site.setName("Plant 1");
+        site.setClient(client);
+
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+        when(clientRepository.findById(11L)).thenReturn(Optional.of(client));
+        when(siteRepository.findById(12L)).thenReturn(Optional.of(site));
+        when(userRepository.findById(14L)).thenReturn(Optional.of(technician));
+        when(userRepository.findById(15L)).thenReturn(Optional.of(supervisor));
+        when(inspectionRepository.save(any(Inspection.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InspectionResponse response = inspectionService.createInspection(requestWithoutEquipment(), 15L);
+
+        ArgumentCaptor<Inspection> inspectionCaptor = ArgumentCaptor.forClass(Inspection.class);
+        org.mockito.Mockito.verify(inspectionRepository).save(inspectionCaptor.capture());
+        Inspection inspection = inspectionCaptor.getValue();
+        assertThat(inspection.getEquipmentName()).isNull();
+        assertThat(response.equipmentName()).isNull();
+        org.mockito.Mockito.verify(equipmentRepository, org.mockito.Mockito.never()).findById(any());
+    }
+
+    @Test
+    void rejectsEquipmentThatDoesNotBelongToInspectionSite() {
+        User supervisor = user("Supervisor", Role.SUPERVISOR);
+        User technician = user("Technician", Role.TECHNICIAN);
+        InspectionTemplateVersion version = publishedVersion(supervisor);
+        Client client = new Client();
+        client.setName("Acme");
+        InspectionSite selectedSite = new InspectionSite();
+        ReflectionTestUtils.setField(selectedSite, "id", 12L);
+        selectedSite.setName("Plant 1");
+        selectedSite.setClient(client);
+        InspectionSite equipmentSite = new InspectionSite();
+        ReflectionTestUtils.setField(equipmentSite, "id", 99L);
+        equipmentSite.setName("Plant 2");
+        equipmentSite.setClient(client);
+        Equipment equipment = new Equipment();
+        equipment.setName("Compressor A");
+        equipment.setSite(equipmentSite);
+
+        when(versionRepository.findById(7L)).thenReturn(Optional.of(version));
+        when(clientRepository.findById(11L)).thenReturn(Optional.of(client));
+        when(siteRepository.findById(12L)).thenReturn(Optional.of(selectedSite));
+        when(equipmentRepository.findById(13L)).thenReturn(Optional.of(equipment));
+        when(userRepository.findById(14L)).thenReturn(Optional.of(technician));
+        when(userRepository.findById(15L)).thenReturn(Optional.of(supervisor));
+
+        assertThatThrownBy(() -> inspectionService.createInspection(request(), 15L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Equipment does not belong to inspection site");
+
+        org.mockito.Mockito.verify(inspectionRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -216,6 +280,12 @@ class InspectionServiceTest {
     private CreateInspectionRequest request() {
         return new CreateInspectionRequest(
                 "Preventive inspection", 7L, 11L, 12L, 13L, 14L, Priority.HIGH,
+                LocalDate.of(2026, 9, 14), null, "Lock out the equipment");
+    }
+
+    private CreateInspectionRequest requestWithoutEquipment() {
+        return new CreateInspectionRequest(
+                "Preventive inspection", 7L, 11L, 12L, null, 14L, Priority.HIGH,
                 LocalDate.of(2026, 9, 14), null, "Lock out the equipment");
     }
 

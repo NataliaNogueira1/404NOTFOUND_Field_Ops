@@ -72,7 +72,7 @@ public class InspectionService {
         InspectionTemplateVersion version = findVersion(request.templateVersionId());
         Client client = findClient(request.clientId());
         InspectionSite site = findSite(request.siteId());
-        Equipment equipment = findEquipment(request.equipmentId());
+        Equipment equipment = request.equipmentId() == null ? null : findEquipment(request.equipmentId());
         User technician = findUser(request.technicianId());
         User supervisor = findUser(supervisorId);
         validateAssignment(client, site, equipment, technician);
@@ -191,7 +191,7 @@ public class InspectionService {
         inspection.setTemplateVersion(version);
         inspection.setClientName(client.getName());
         inspection.setSiteName(site.getName());
-        inspection.setEquipmentName(equipment.getName());
+        inspection.setEquipmentName(equipment == null ? null : equipment.getName());
         inspection.setTechnician(technician);
         inspection.setSupervisor(supervisor);
         inspection.setStatus(InspectionStatus.ASSIGNED);
@@ -214,7 +214,9 @@ public class InspectionService {
         if (!Objects.equals(site.getClient().getId(), client.getId()) && site.getClient() != client) {
             throw new BusinessException("Inspection site does not belong to client: " + client.getId());
         }
-        if (!Objects.equals(equipment.getSite().getId(), site.getId()) && equipment.getSite() != site) {
+        if (equipment != null
+                && !Objects.equals(equipment.getSite().getId(), site.getId())
+                && equipment.getSite() != site) {
             throw new BusinessException("Equipment does not belong to inspection site: " + site.getId());
         }
         if (technician.getRole() != Role.TECHNICIAN) {

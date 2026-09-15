@@ -52,6 +52,17 @@ class CreateInspectionRequestValidationTest {
     }
 
     @Test
+    void acceptsNullEquipmentId() {
+        CreateInspectionRequest request = new CreateInspectionRequest(
+                "Preventive inspection", 7L, 11L, 12L, null, 14L, Priority.HIGH,
+                LocalDate.now().plusDays(1), null, null);
+
+        Set<ConstraintViolation<CreateInspectionRequest>> violations = validator.validate(request);
+
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
     void rejectsInstructionsLongerThan2000Characters() {
         CreateInspectionRequest request = requestWithInstructions("a".repeat(2001));
 
