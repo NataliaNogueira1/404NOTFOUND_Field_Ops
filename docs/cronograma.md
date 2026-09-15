@@ -95,12 +95,12 @@
 | PBI-066 | Dados de demonstração reproduzíveis (seed) |
 | PBI-070 | API em contêiner Docker para demonstração |
 | PBI-071 | OpenAPI completo e diagramas |
-| PBI-073 | *P1:* Dashboard com indicadores por estado e criticidade (API) |
-| PBI-075 | *P1:* Notificações push — integração servidor |
-| PBI-077 | *P1:* Relatório PDF básico |
-| PBI-078 | *P1:* Histórico detalhado de respostas |
-| PBI-079 | *P1:* Comentários de revisão por item |
-| PBI-082 | *P1:* Exportação CSV |
+| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) |
+| PBI-085 | *P1:* Notificações push — integração servidor |
+| PBI-087 | *P1:* Relatório PDF básico |
+| PBI-088 | *P1:* Histórico detalhado de respostas |
+| PBI-089 | *P1:* Comentários de revisão por item |
+| PBI-092 | *P1:* Exportação CSV |
 
 ### Frontend Web (Andressa, Ian, Júlia e Carol)
 
@@ -113,12 +113,12 @@
 | PBI-059 | Iniciar revisão formalmente |
 | PBI-064 | Estados de carregamento, vazio, erro e offline |
 | PBI-069 | Build e publicação do painel web admin |
-| PBI-073 | *P1:* Dashboard com indicadores (telas) |
-| PBI-077 | *P1:* Relatório PDF básico (visualização/download) |
-| PBI-078 | *P1:* Histórico detalhado de respostas (telas) |
-| PBI-079 | *P1:* Comentários de revisão por item (telas) |
-| PBI-081 | *P1:* Tema escuro |
-| PBI-082 | *P1:* Exportação CSV (botão e download) |
+| PBI-083 | *P1:* Dashboard com indicadores (telas) |
+| PBI-087 | *P1:* Relatório PDF básico (visualização/download) |
+| PBI-088 | *P1:* Histórico detalhado de respostas (telas) |
+| PBI-089 | *P1:* Comentários de revisão por item (telas) |
+| PBI-091 | *P1:* Tema escuro |
+| PBI-092 | *P1:* Exportação CSV (botão e download) |
 
 ### Mobile (Rodrigo, Natália e Cutiur)
 
@@ -141,11 +141,11 @@
 | PBI-067 | READMEs com instruções de execução |
 | PBI-068 | Build Android (APK) para demonstração |
 | PBI-072 | Demonstração ponta a ponta |
-| PBI-074 | *P1:* Notificações locais de prazo |
-| PBI-075 | *P1:* Notificações push de nova atribuição |
-| PBI-076 | *P1:* Assinatura desenhada no dispositivo |
-| PBI-080 | *P1:* Biometria para reabertura de sessão local |
-| PBI-081 | *P1:* Tema escuro (mobile) |
+| PBI-084 | *P1:* Notificações locais de prazo |
+| PBI-085 | *P1:* Notificações push de nova atribuição |
+| PBI-086 | *P1:* Assinatura desenhada no dispositivo |
+| PBI-090 | *P1:* Biometria para reabertura de sessão local |
+| PBI-091 | *P1:* Tema escuro (mobile) |
 
 ---
 
