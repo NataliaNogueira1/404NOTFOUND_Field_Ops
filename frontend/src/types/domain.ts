@@ -17,7 +17,7 @@ export type ChecklistValue = string | number | boolean | 'CONFORME' | 'NAO_CONFO
 export interface Inspection { id: string; title: string; templateId: string; clientId: string; siteId: string; equipmentId: string; technicianId: string; status: InspectionStatus; priority: Priority; dueDate: string; progress: number; overdue?: boolean; clientName?: string; siteName?: string; equipmentName?: string; supervisorId?: string; supervisorName?: string; dueTime?: string; createdAt?: string; syncStatus?: SyncStatus; pendingSyncCount?: number; supervisorInstructions?: string; startedAt?: string }
 export interface NonConformity { id: string; title: string; inspectionId: string; item: string; clientId: string; severity: Severity; status: 'Aberta' | 'Em tratamento' | 'Resolvida'; date: string }
 export interface AuditLog { id: string; timestamp: string; user: string; action: string; entity: string; entityId: string }
-export interface ReviewAnswer { id: string; section: string; question: string; result: string; observation?: string; evidence?: string; nonConformityId?: string }
+export interface ReviewAnswer { id: string; section: string; question: string; result: string; observation?: string; evidence?: string; evidenceCapturedAt?: string; evidenceLocation?: string; nonConformityId?: string }
 export interface Evidence { id: string; inspectionId: string; itemId: string; description: string; capturedAt: string; syncStatus: SyncStatus }
 export interface ChecklistAnswer { itemId: string; value: ChecklistValue; observation?: string; savedAt: string }
 export interface SyncOperation { id: string; title: string; status: 'Enviada' | 'Upload concluido' | 'Pendente' | 'Erro' }
