@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -36,6 +38,7 @@
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
     "jsdom": "^29.1.1",
+    "prettier": "^3.9.6",
     "tailwindcss": "latest",
     "typescript": "latest",
     "typescript-eslint": "latest",

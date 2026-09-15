@@ -43,7 +43,7 @@
 | PBI | Título |
 |-----|--------|
 | PBI-001 | Repositórios e convenções definidos (participação) |
-| PBI-003 | Projeto Next.js com layout, rotas protegidas e estrutura modular |
+| PBI-003 | Projeto React + Vite com layout, rotas protegidas e estrutura modular |
 | PBI-005 | Lint, verificação de tipos e fluxo de PR |
 | PBI-009 | Login e sessão na interface web |
 | PBI-011 | CRUD de usuários pelo administrador (telas) |
@@ -169,7 +169,7 @@ gantt
     Agendamento + Atribuicao               :b9, after b8, 3d
 
     section Web S1
-    Projeto Next.js + Layout + Rotas       :w1, 2026-08-21, 4d
+    Projeto React + Vite + Layout + Rotas  :w1, 2026-08-21, 4d
     Login web                              :w2, after b3, 3d
     Telas Usuarios                         :w3, after w2, 4d
     Telas Clientes + Locais + Filtros      :w4, after w2, 5d

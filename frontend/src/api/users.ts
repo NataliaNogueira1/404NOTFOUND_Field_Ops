@@ -52,9 +52,12 @@ function backendRole(role: UserRole): BackendRole {
 }
 
 function managedUser(user: BackendUser): ManagedUser {
-  const role = user.role === 'ADMINISTRATOR'
-    ? UserRole.ADMIN
-    : user.role === 'SUPERVISOR' ? UserRole.SUPERVISOR : UserRole.TECHNICIAN
+  const role =
+    user.role === 'ADMINISTRATOR'
+      ? UserRole.ADMIN
+      : user.role === 'SUPERVISOR'
+        ? UserRole.SUPERVISOR
+        : UserRole.TECHNICIAN
   return {
     id: user.id,
     name: user.name,
@@ -71,7 +74,14 @@ function payload(input: UserInput) {
 }
 
 export const usersApi = {
-  async list(filters: { name: string; role: UserRole | ''; status: UserStatus | ''; page: number; size: number; sort: string }) {
+  async list(filters: {
+    name: string
+    role: UserRole | ''
+    status: UserStatus | ''
+    page: number
+    size: number
+    sort: string
+  }) {
     const params = new URLSearchParams({ page: String(filters.page), size: String(filters.size), sort: filters.sort })
     if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.role) params.set('role', backendRole(filters.role))
@@ -81,21 +91,30 @@ export const usersApi = {
   },
 
   async create(input: UserInput) {
-    return managedUser(await apiRequest<BackendUser>('/api/v1/users', {
-      method: 'POST', body: JSON.stringify(payload(input)),
-    }))
+    return managedUser(
+      await apiRequest<BackendUser>('/api/v1/users', {
+        method: 'POST',
+        body: JSON.stringify(payload(input)),
+      }),
+    )
   },
 
   async update(id: number, input: UserInput) {
-    return managedUser(await apiRequest<BackendUser>(`/api/v1/users/${id}`, {
-      method: 'PUT', body: JSON.stringify(payload(input)),
-    }))
+    return managedUser(
+      await apiRequest<BackendUser>(`/api/v1/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload(input)),
+      }),
+    )
   },
 
   async updateStatus(id: number, status: UserStatus.ACTIVE | UserStatus.INACTIVE) {
-    return managedUser(await apiRequest<BackendUser>(`/api/v1/users/${id}/status`, {
-      method: 'PATCH', body: JSON.stringify({ status }),
-    }))
+    return managedUser(
+      await apiRequest<BackendUser>(`/api/v1/users/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    )
   },
 
   async emailAvailable(email: string, excludeId?: number) {

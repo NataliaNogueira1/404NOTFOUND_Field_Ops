@@ -39,7 +39,7 @@ export function useListQuery(defaultSort = 'name,asc') {
 
   function clear(names: string[]) {
     const next = new URLSearchParams(params)
-    names.forEach(name => next.delete(name))
+    names.forEach((name) => next.delete(name))
     next.set('page', '0')
     setParams(next, { replace: true })
   }

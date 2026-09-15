@@ -1,5 +1,14 @@
 import { clients, equipment, templates, users } from '@/mocks/domain'
-import { InspectionStatus, Priority, Severity, type ChecklistAnswer, type Evidence, type Inspection, type NonConformity, type SyncOperation } from '@/types/domain'
+import {
+  InspectionStatus,
+  Priority,
+  Severity,
+  type ChecklistAnswer,
+  type Evidence,
+  type Inspection,
+  type NonConformity,
+  type SyncOperation,
+} from '@/types/domain'
 
 const today = new Date()
 const fmt = (date: Date) => date.toISOString().slice(0, 10)
@@ -9,7 +18,7 @@ const addDays = (date: Date, days: number) => {
   return next
 }
 
-export const technicianUser = users.find(user => user.id === 'usr-carlos') ?? users[1]
+export const technicianUser = users.find((user) => user.id === 'usr-carlos') ?? users[1]
 export const technicianTemplate = templates[0]
 
 export const technicianInspections: Inspection[] = [
@@ -117,13 +126,45 @@ export const technicianAnswers: Record<string, ChecklistAnswer> = {
 }
 
 export const technicianEvidences: Evidence[] = [
-  { id: 'ev-1', inspectionId: 'ins-compressor', itemId: 'item-2', description: 'Foto mockada da base do compressor', capturedAt: `${fmt(today)} 09:18`, syncStatus: 'pending' },
-  { id: 'ev-2', inspectionId: 'ins-compressor', itemId: 'item-7', description: 'Foto mockada do cabo eletrico', capturedAt: `${fmt(today)} 09:31`, syncStatus: 'error' },
+  {
+    id: 'ev-1',
+    inspectionId: 'ins-compressor',
+    itemId: 'item-2',
+    description: 'Foto mockada da base do compressor',
+    capturedAt: `${fmt(today)} 09:18`,
+    syncStatus: 'pending',
+  },
+  {
+    id: 'ev-2',
+    inspectionId: 'ins-compressor',
+    itemId: 'item-7',
+    description: 'Foto mockada do cabo eletrico',
+    capturedAt: `${fmt(today)} 09:31`,
+    syncStatus: 'error',
+  },
 ]
 
 export const technicianNonConformities: NonConformity[] = [
-  { id: 'nc-tech-oleo', title: 'Acumulo de oleo', inspectionId: 'ins-compressor', item: 'Equipamento limpo e conservado?', clientId: 'cli-industria', severity: Severity.LOW, status: 'Aberta', date: fmt(today) },
-  { id: 'nc-tech-cabo', title: 'Cabo eletrico danificado', inspectionId: 'ins-compressor', item: 'Cabos eletricos integros?', clientId: 'cli-industria', severity: Severity.CRITICAL, status: 'Aberta', date: fmt(today) },
+  {
+    id: 'nc-tech-oleo',
+    title: 'Acumulo de oleo',
+    inspectionId: 'ins-compressor',
+    item: 'Equipamento limpo e conservado?',
+    clientId: 'cli-industria',
+    severity: Severity.LOW,
+    status: 'Aberta',
+    date: fmt(today),
+  },
+  {
+    id: 'nc-tech-cabo',
+    title: 'Cabo eletrico danificado',
+    inspectionId: 'ins-compressor',
+    item: 'Cabos eletricos integros?',
+    clientId: 'cli-industria',
+    severity: Severity.CRITICAL,
+    status: 'Aberta',
+    date: fmt(today),
+  },
 ]
 
 export const technicianSyncOperations: SyncOperation[] = [
@@ -134,13 +175,13 @@ export const technicianSyncOperations: SyncOperation[] = [
 ]
 
 export function inspectionTemplate(inspection: Inspection) {
-  return templates.find(template => template.id === inspection.templateId) ?? technicianTemplate
+  return templates.find((template) => template.id === inspection.templateId) ?? technicianTemplate
 }
 
 export function inspectionClient(inspection: Inspection) {
-  return clients.find(client => client.id === inspection.clientId)
+  return clients.find((client) => client.id === inspection.clientId)
 }
 
 export function inspectionEquipment(inspection: Inspection) {
-  return equipment.find(item => item.id === inspection.equipmentId)
+  return equipment.find((item) => item.id === inspection.equipmentId)
 }
