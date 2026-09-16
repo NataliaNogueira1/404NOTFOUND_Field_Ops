@@ -29,18 +29,17 @@ interface LightboxProps {
  *  - Metadata: date, location, linked item
  */
 export function Lightbox({ photos, initialIndex = 0, onClose }: LightboxProps) {
+  const open = initialIndex >= 0 && photos.length > 0
+  if (!open) return null
+
+  // Remount the content whenever the caller opens a different photo so the
+  // internal navigation state (index/zoom) resets without a synchronizing effect.
+  return <LightboxContent key={initialIndex} photos={photos} initialIndex={initialIndex} onClose={onClose} />
+}
+
+function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
   const [index, setIndex] = useState(initialIndex)
   const [zoomed, setZoomed] = useState(false)
-
-  const open = initialIndex >= 0 && photos.length > 0
-
-  // Sync index when the caller opens a different photo
-  useEffect(() => {
-    if (initialIndex >= 0) {
-      setIndex(initialIndex)
-      setZoomed(false)
-    }
-  }, [initialIndex])
 
   const prev = useCallback(() => {
     setZoomed(false)
@@ -54,7 +53,6 @@ export function Lightbox({ photos, initialIndex = 0, onClose }: LightboxProps) {
 
   // Keyboard navigation
   useEffect(() => {
-    if (!open) return
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'ArrowLeft') prev()
       else if (event.key === 'ArrowRight') next()
@@ -64,9 +62,7 @@ export function Lightbox({ photos, initialIndex = 0, onClose }: LightboxProps) {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [open, prev, next, onClose])
-
-  if (!open) return null
+  }, [prev, next, onClose])
 
   const photo = photos[Math.min(index, photos.length - 1)]
   if (!photo) return null

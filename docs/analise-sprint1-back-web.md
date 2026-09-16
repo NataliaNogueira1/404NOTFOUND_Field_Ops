@@ -66,12 +66,12 @@
 >
 > O frontend também possui lint, tipagem estrita, testes automatizados, CI e documentação de convenções.
 >
-> ⚠️ O PBI-003 cita originalmente Next.js, porém a implementação atual utiliza React + TypeScript + Vite. O layout e a arquitetura frontend estão implementados, mas essa divergência de stack ainda precisa ser validada formalmente com o professor/time.
+> Atualização: o frontend web está padronizado em React + TypeScript + Vite, com layout, rotas protegidas e estrutura modular.
 
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
 | PBI-001 | Repositórios e convenções | [#11](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/11) | ✅ Concluído |
-| PBI-003 | Projeto Next.js com layout | [#13](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/13) | 🟡 Parcial — layout concluído em React + Vite; divergência com Next.js precisa ser validada |
+| PBI-003 | Projeto React + Vite com layout | [#13](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/13) | ✅ Concluído — layout, rotas protegidas e estrutura modular em React + Vite |
 | PBI-005 | Lint, tipos e fluxo de PR | [#15](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/15) | ✅ Concluído |
 | PBI-009 | Login e sessão na web | [#19](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/19) | ✅ Concluído — integrado à API real |
 | PBI-011 | CRUD de usuários (telas) | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ✅ Concluído no frontend — integração do CRUD com API pendente |
@@ -97,7 +97,7 @@
 
 **Porcentagem do escopo Frontend Web: ~94%** (15/16)
 
-> ⚠️ O único item que impede considerar formalmente 16/16 é o PBI-003, pois a issue especifica Next.js enquanto a aplicação foi implementada em React + Vite. Caso essa escolha tecnológica seja validada pelo professor/time, o escopo frontend pode ser considerado 100% concluído.
+> O PBI-003 foi alinhado à implementação atual em React + Vite; o escopo frontend pode ser avaliado pela estrutura, layout e rotas protegidas entregues.
 
 ### Estado atual da integração Frontend ↔ Backend
 

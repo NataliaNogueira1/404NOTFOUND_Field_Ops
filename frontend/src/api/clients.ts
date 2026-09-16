@@ -65,7 +65,9 @@ function payload(input: ClientInput) {
 export const clientsApi = {
   async list(filters: { name: string; status: ClientStatus | ''; page: number; size: number; sort?: string }) {
     const params = new URLSearchParams({
-      page: String(filters.page), size: String(filters.size), sort: filters.sort ?? 'name,asc',
+      page: String(filters.page),
+      size: String(filters.size),
+      sort: filters.sort ?? 'name,asc',
     })
     if (filters.name.trim()) params.set('name', filters.name.trim())
     if (filters.status) params.set('status', filters.status)
@@ -78,20 +80,29 @@ export const clientsApi = {
   },
 
   async create(input: ClientInput) {
-    return normalize(await apiRequest<BackendClient>('/api/v1/clients', {
-      method: 'POST', body: JSON.stringify(payload(input)),
-    }))
+    return normalize(
+      await apiRequest<BackendClient>('/api/v1/clients', {
+        method: 'POST',
+        body: JSON.stringify(payload(input)),
+      }),
+    )
   },
 
   async update(id: string, input: ClientInput) {
-    return normalize(await apiRequest<BackendClient>(`/api/v1/clients/${id}`, {
-      method: 'PUT', body: JSON.stringify(payload(input)),
-    }))
+    return normalize(
+      await apiRequest<BackendClient>(`/api/v1/clients/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload(input)),
+      }),
+    )
   },
 
   async updateStatus(id: string, status: ClientStatus) {
-    return normalize(await apiRequest<BackendClient>(`/api/v1/clients/${id}/status`, {
-      method: 'PATCH', body: JSON.stringify({ status }),
-    }))
+    return normalize(
+      await apiRequest<BackendClient>(`/api/v1/clients/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    )
   },
 }

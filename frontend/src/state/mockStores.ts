@@ -13,17 +13,19 @@ const templateDrafts = new Map<string, InspectionTemplate>()
 let templateRows: InspectionTemplate[] = []
 
 function emitInspections() {
-  inspectionListeners.forEach(listener => listener())
+  inspectionListeners.forEach((listener) => listener())
 }
 
 function emitTemplates() {
-  templateListeners.forEach(listener => listener())
+  templateListeners.forEach((listener) => listener())
 }
 
 export const inspectionStore = {
   subscribe(listener: Listener) {
     inspectionListeners.add(listener)
-    return () => { inspectionListeners.delete(listener) }
+    return () => {
+      inspectionListeners.delete(listener)
+    }
   },
   adminSnapshot() {
     return adminInspections
@@ -36,7 +38,8 @@ export const inspectionStore = {
     emitInspections()
   },
   cancel(id: string) {
-    const cancelOne = (inspection: Inspection) => inspection.id === id ? { ...inspection, status: InspectionStatus.CANCELED, progress: 0 } : inspection
+    const cancelOne = (inspection: Inspection) =>
+      inspection.id === id ? { ...inspection, status: InspectionStatus.CANCELED, progress: 0 } : inspection
     adminInspections = adminInspections.map(cancelOne)
     technicianInspections = technicianInspections.map(cancelOne)
     emitInspections()
@@ -46,14 +49,16 @@ export const inspectionStore = {
 export const templateDraftStore = {
   subscribe(listener: Listener) {
     templateListeners.add(listener)
-    return () => { templateListeners.delete(listener) }
+    return () => {
+      templateListeners.delete(listener)
+    }
   },
   snapshot() {
     return templateRows
   },
   set(template: InspectionTemplate) {
     templateDrafts.set(template.id, template)
-    templateRows = [template, ...templateRows.filter(item => item.id !== template.id)]
+    templateRows = [template, ...templateRows.filter((item) => item.id !== template.id)]
     emitTemplates()
   },
   get(id: string) {

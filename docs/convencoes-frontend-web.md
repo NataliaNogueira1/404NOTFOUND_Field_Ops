@@ -4,7 +4,7 @@
 
 O frontend web atual usa React + Vite + TypeScript, com React Router, Tailwind CSS e componentes locais em `frontend/src/components`.
 
-O PBI-003 histórico cita Next.js. O código atual não contém configuração Next.js e usa `vite.config.ts`, `@vitejs/plugin-react` e scripts Vite em `frontend/package.json`. Não foi encontrada no repositório uma decisão formal documentando a troca para Vite; validar esse ponto com o time/professor antes de tratar como mudança definitiva de escopo.
+O frontend web usa React + TypeScript + Vite, com `vite.config.ts`, `@vitejs/plugin-react` e scripts Vite em `frontend/package.json`.
 
 ## Branches
 

@@ -7,6 +7,13 @@ import type {
   TemplateItem,
 } from '@/features/fieldops/types';
 
+// Snapshot section/item ids are unique only within a template. Scoping them to the
+// inspection keeps the global TEXT PRIMARY KEY unique when several inspections share
+// the same template, and keeps answers/evidences pointing at the right item.
+function scopedId(inspectionId: string, originalId: string): string {
+  return `${inspectionId}::${originalId}`;
+}
+
 // ─── Row types (DB shape) ──────────────────────────────────────────────────────
 
 interface InspectionRow {
@@ -202,9 +209,14 @@ export class InspectionRepository {
 
     for (let sIdx = 0; sIdx < template.sections.length; sIdx++) {
       const section = template.sections[sIdx];
+      // Snapshot section/item ids are only unique within a template, but the
+      // section/item tables use a global TEXT PRIMARY KEY. Inspections that share
+      // the same template would collide on insert (dropping every inspection after
+      // the first). Scope the ids to the inspection to keep the primary key unique.
+      const scopedSectionId = scopedId(inspectionId, section.id);
       await this.db.runAsync(
         'INSERT INTO inspection_sections (id, inspection_id, title, sort_order) VALUES (?, ?, ?, ?)',
-        section.id,
+        scopedSectionId,
         inspectionId,
         section.title,
         sIdx,
@@ -217,8 +229,8 @@ export class InspectionRepository {
             id, section_id, inspection_id, question, description, response_type,
             required, require_observation_on_failure, require_evidence_on_failure, options, sort_order
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          item.id,
-          section.id,
+          scopedId(inspectionId, item.id),
+          scopedSectionId,
           inspectionId,
           item.question,
           item.description ?? null,

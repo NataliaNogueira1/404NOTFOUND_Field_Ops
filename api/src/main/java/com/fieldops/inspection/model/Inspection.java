@@ -33,7 +33,7 @@ public class Inspection {
     @Column(name = "site_name", nullable = false, length = 200)
     private String siteName;
 
-    @Column(name = "equipment_name", nullable = false, length = 200)
+    @Column(name = "equipment_name", length = 200)
     private String equipmentName;
 
     @ManyToOne(fetch = FetchType.LAZY)

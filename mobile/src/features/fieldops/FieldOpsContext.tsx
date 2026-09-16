@@ -1,4 +1,5 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { useAuth } from '@/features/auth';
 import { useDatabase } from '@/infrastructure/database/DatabaseProvider';
@@ -48,6 +49,20 @@ interface FieldOpsContextValue {
   lastSyncError: string | null;
 }
 
+// Downloads the technician's inspections from the API into SQLite. Failures are
+// swallowed (logged) on purpose: the app must keep working offline from the local
+// cache, so a pull error never blocks the UI.
+async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
+  try {
+    const syncService = new InspectionSyncService(db);
+    console.log('[FieldOps] Pulling inspections from API...');
+    const result = await syncService.pullInspections(token);
+    console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
+  } catch (apiError) {
+    console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+  }
+}
+
 const FieldOpsContext = createContext<FieldOpsContextValue | undefined>(undefined);
 
 // ─── Provider ──────────────────────────────────────────────────────────────────
@@ -59,6 +74,8 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   // Refs to avoid stale closures and prevent re-init loops
   const initDoneRef = useRef(false);
   const inspectionsRef = useRef<Inspection[]>([]);
+  // Tracks the token we last pulled with, so the post-login effect pulls once per session.
+  const lastPulledTokenRef = useRef<string | null>(null);
 
   // State
   const [inspections, setInspections] = useState<Inspection[]>([]);
@@ -75,74 +92,90 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Initialize DB once ──────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!db || initDoneRef.current) return;
-    initDoneRef.current = true;
-
+  // Loads every entity from SQLite into React state. Shared by the initial DB load
+  // and by the post-login pull, so both paths hydrate the UI the same way.
+  const loadFromDb = useCallback(async () => {
+    if (!db) return;
     const inspRepo = new InspectionRepository(db);
     const ansRepo = new AnswerRepository(db);
     const evRepo = new EvidenceRepository(db);
     const ncRepo = new NonConformityRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
+    const dbInspections = await inspRepo.getAll();
+    setInspections(dbInspections);
+
+    const allAnswers: Record<string, ChecklistAnswer> = {};
+    for (const insp of dbInspections) {
+      const a = await ansRepo.getByInspection(insp.id);
+      Object.assign(allAnswers, a);
+    }
+    setAnswers(allAnswers);
+
+    const allEvs: Evidence[] = [];
+    for (const insp of dbInspections) {
+      const e = await evRepo.getByInspection(insp.id);
+      allEvs.push(...e);
+    }
+    setEvidences(allEvs);
+
+    const allNCs: NonConformity[] = [];
+    for (const insp of dbInspections) {
+      const n = await ncRepo.getByInspection(insp.id);
+      allNCs.push(...n);
+    }
+    setNonConformities(allNCs);
+
+    const queue = await sqRepo.getAll();
+    setSyncOperations(queue.map((entry) => ({
+      id: entry.id,
+      title: `${entry.entityType}: ${entry.entityId}`,
+      status: entry.status === 'sent' ? 'Enviada' as const :
+              entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
+    })));
+
+    console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
+  }, [db]);
+
+  // ─── Initialize DB once ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db || initDoneRef.current) return;
+    initDoneRef.current = true;
+
     (async () => {
       try {
-        // Try to pull from API first (if we have a token)
+        // Try to pull from API first (if we already have a token at startup).
         if (token) {
-          try {
-            const syncService = new InspectionSyncService(db);
-            console.log('[FieldOps] Pulling inspections from API...');
-            const result = await syncService.pullInspections(token);
-            console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
-          } catch (apiError) {
-            console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
-          }
+          await pullFromApi(db, token);
         }
-
-        let dbInspections = await inspRepo.getAll();
-
-        // Load everything from DB
-        setInspections(dbInspections);
-
-        const allAnswers: Record<string, ChecklistAnswer> = {};
-        for (const insp of dbInspections) {
-          const a = await ansRepo.getByInspection(insp.id);
-          Object.assign(allAnswers, a);
-        }
-        setAnswers(allAnswers);
-
-        const allEvs: Evidence[] = [];
-        for (const insp of dbInspections) {
-          const e = await evRepo.getByInspection(insp.id);
-          allEvs.push(...e);
-        }
-        setEvidences(allEvs);
-
-        const allNCs: NonConformity[] = [];
-        for (const insp of dbInspections) {
-          const n = await ncRepo.getByInspection(insp.id);
-          allNCs.push(...n);
-        }
-        setNonConformities(allNCs);
-
-        const queue = await sqRepo.getAll();
-        if (queue.length > 0) {
-          setSyncOperations(queue.map((entry) => ({
-            id: entry.id,
-            title: `${entry.entityType}: ${entry.entityId}`,
-            status: entry.status === 'sent' ? 'Enviada' as const :
-                    entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
-          })));
-        }
-
-        console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
+        await loadFromDb();
       } catch (error) {
         console.warn('[FieldOps] DB init failed:', error);
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [db, token]);
+  }, [db, loadFromDb, token]);
+
+  // ─── Pull from the server when the technician logs in ─────────────────────
+  // The DB init above runs once and may execute before the user authenticates
+  // (no token yet), which would skip the download and leave the stale local
+  // cache on screen. This effect re-runs the pull as soon as a token becomes
+  // available, then re-hydrates the UI from SQLite.
+  useEffect(() => {
+    if (!db || !token) return;
+    if (lastPulledTokenRef.current === token) return;
+    lastPulledTokenRef.current = token;
+
+    (async () => {
+      try {
+        await pullFromApi(db, token);
+        await loadFromDb();
+      } catch (error) {
+        console.warn('[FieldOps] Post-login pull failed:', error);
+      }
+    })();
+  }, [db, token, loadFromDb]);
 
   // ─── Helper: get repos (only if db available) ────────────────────────────
 
