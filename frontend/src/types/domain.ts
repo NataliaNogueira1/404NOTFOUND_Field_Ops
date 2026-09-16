@@ -153,6 +153,8 @@ export interface ReviewAnswer {
   result: string
   observation?: string
   evidence?: string
+  evidenceCapturedAt?: string
+  evidenceLocation?: string
   nonConformityId?: string
 }
 export interface Evidence {
