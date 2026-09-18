@@ -25,8 +25,8 @@ A **Matriz RACI** é uma matriz de responsabilidades (MR) que mostra os recursos
 | Sigla | Integrante | Papel |
 |---|---|---|
 | **NAT** | Natália | Gerente de Projeto + Líder Mobile |
-| **LUC** | Lucas | Líder Backend |
-| **MAR** | Marcela | Dev Backend + Nuvem |
+| **MAR** | Marcela | Líder Backend + Nuvem |
+| **LUC** | Lucas | Dev Backend |
 | **JUL** | Júlia | Líder Web + Nuvem |
 | **AND** | Andressa | Dev Web |
 | **CAR** | Carol | Dev Web |
@@ -51,23 +51,23 @@ A **Matriz RACI** é uma matriz de responsabilidades (MR) que mostra os recursos
 
 | # | Card / Atividade | NAT | LUC | MAR | JUL | AND | CAR | IAN | ROD | FEL |
 |---|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| PBI-004 | API Spring Boot conectada ao PostgreSQL com migrações | A | R | R | C | I | I | I | I | I |
-| PBI-006 | Contrato inicial OpenAPI e dados simulados | A | R | C | C | C | C | C | C | C |
-| PBI-007 | Autenticação por e-mail e senha na API | A | R | C | C | I | I | I | I | I |
-| PBI-010 | Renovação automática de sessão (refresh token) | A | R | C | I | I | I | I | C | C |
-| PBI-012 | Autorização por perfil na API | A | R | C | C | I | I | I | I | I |
-| PBI-011 | CRUD de usuários pelo administrador | A | R | C | C | R | I | I | I | I |
-| PBI-013 | CRUD de clientes | A | C | R | C | R | I | I | I | I |
-| PBI-015 | CRUD de equipamentos com QR Code único | A | R | C | C | I | R | I | I | I |
-| PBI-023 | Publicar versão imutável do modelo | A | R | C | C | I | I | C | I | I |
-| PBI-024 | Snapshot dos itens ao criar inspeção | A | R | C | I | I | I | I | C | C |
-| PBI-025 | Agendar inspeção a partir de modelo publicado | A | R | C | C | I | I | R | I | I |
-| PBI-051 | Envio em lote respeitando dependências | A | R | C | I | I | I | I | C | C |
-| PBI-052 | Idempotência — impedir duplicidade no reenvio | A | R | C | I | I | I | I | C | C |
-| PBI-060 | Aprovar inspeção | A | R | C | C | R | I | I | I | I |
-| PBI-061 | Reprovar inspeção com motivo obrigatório | A | R | C | C | R | I | I | C | I |
-| PBI-063 | Auditoria de mudanças de estado | A | R | R | I | I | I | I | I | I |
-| PBI-071 | OpenAPI completo e diagramas | A | R | C | C | C | C | C | C | C |
+| PBI-004 | API Spring Boot conectada ao PostgreSQL com migrações | I | R | A | C | I | I | I | I | I |
+| PBI-006 | Contrato inicial OpenAPI e dados simulados | I | R | A | C | C | C | C | C | C |
+| PBI-007 | Autenticação por e-mail e senha na API | I | R | A | C | I | I | I | I | I |
+| PBI-010 | Renovação automática de sessão (refresh token) | I | R | A | I | I | I | I | C | C |
+| PBI-012 | Autorização por perfil na API | I | R | A | C | I | I | I | I | I |
+| PBI-011 | CRUD de usuários pelo administrador | I | R | A | C | R | I | I | I | I |
+| PBI-013 | CRUD de clientes | I | R | A | C | R | I | I | I | I |
+| PBI-015 | CRUD de equipamentos com QR Code único | I | R | A | C | I | R | I | I | I |
+| PBI-023 | Publicar versão imutável do modelo | I | R | A | C | I | I | C | I | I |
+| PBI-024 | Snapshot dos itens ao criar inspeção | I | R | A | I | I | I | I | C | C |
+| PBI-025 | Agendar inspeção a partir de modelo publicado | I | R | A | C | I | I | R | I | I |
+| PBI-051 | Envio em lote respeitando dependências | I | R | A | I | I | I | I | C | C |
+| PBI-052 | Idempotência — impedir duplicidade no reenvio | I | R | A | I | I | I | I | C | C |
+| PBI-060 | Aprovar inspeção | I | R | A | C | R | I | I | I | I |
+| PBI-061 | Reprovar inspeção com motivo obrigatório | I | R | A | C | R | I | I | C | I |
+| PBI-063 | Auditoria de mudanças de estado | I | R | A | I | I | I | I | I | I |
+| PBI-071 | OpenAPI completo e diagramas | I | R | A | C | C | C | C | C | C |
 
 ### 3.3 Interface Administrativa Web
 
@@ -107,8 +107,8 @@ A **Matriz RACI** é uma matriz de responsabilidades (MR) que mostra os recursos
 
 | # | Card / Atividade | NAT | LUC | MAR | JUL | AND | CAR | IAN | ROD | FEL |
 |---|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| PBI-066 | Dados de demonstração reproduzíveis (seed) | A | R | R | C | I | I | I | C | I |
-| PBI-070 | API em contêiner Docker para demonstração | A | C | R | R | I | I | I | I | I |
+| PBI-066 | Dados de demonstração reproduzíveis (seed) | I | R | A | C | I | I | I | C | I |
+| PBI-070 | API em contêiner Docker para demonstração | I | C | A/R | R | I | I | I | I | I |
 | PBI-065 | Testes automatizados dos fluxos críticos | A | R | C | R | C | C | C | R | C |
 | PBI-067 | READMEs com instruções de execução | A/R | C | C | C | C | C | C | C | C |
 | PBI-072 | Demonstração ponta a ponta (MVP) | A/R | C | C | C | C | C | C | C | C |
@@ -124,8 +124,8 @@ flowchart LR
     NAT["Natalia<br/>GP + Lider Mobile"]
 
     subgraph BE["Backend"]
+        MAR["Marcela (A - Lider)"]
         LUC["Lucas (R)"]
-        MAR["Marcela (R)"]
     end
     subgraph WEB["Web"]
         JUL["Julia (R)"]
@@ -142,10 +142,13 @@ flowchart LR
         JUL2["Julia"]
     end
 
-    NAT -->|Aprova| BE
-    NAT -->|Aprova| WEB
+    NAT -->|Coordena| BE
+    NAT -->|Coordena / Aprova| WEB
     NAT -->|Aprova| MOB
-    NAT -->|Aprova| CLOUD
+    NAT -->|Coordena| CLOUD
+
+    MAR -->|Aprova Backend + Nuvem| BE
+    MAR -->|Aprova| CLOUD
 
     classDef gp fill:#B45309,stroke:#7C2D12,color:#fff,font-weight:bold;
     classDef area fill:#FFFFFF,stroke:#2563EB,color:#1E293B;
@@ -157,7 +160,7 @@ flowchart LR
 
 ## 5. Observações sobre a atribuição
 
-- **Um único Aprovador (A) por atividade:** a **Natália** (Gerente de Projeto) é a aprovadora final na maioria dos cards, por ser responsável pela accountability do projeto. Em cards de execução própria do Mobile, ela acumula A/R.
+- **Um único Aprovador (A) por atividade:** a aprovação é feita pelo **líder da área** responsável pelo card — **Marcela** aprova os cards de Backend e Nuvem, **Júlia** os de Web e a **Natália** (Gerente de Projeto + Líder Mobile) os de Mobile e Gestão/Entrega. Em cards de execução própria, o líder pode acumular A/R.
 - **Responsável (R):** sempre o(s) desenvolvedor(es) da área que executa(m) o card.
 - **Consultado (C):** tipicamente a área que fornece o contrato/dependência (ex.: Backend é consultado pelo Web/Mobile em cards que consomem a API).
 - **Informado (I):** as demais áreas que precisam conhecer o resultado, mas não atuam diretamente.

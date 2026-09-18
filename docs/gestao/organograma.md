@@ -20,8 +20,8 @@ A estrutura reflete a equipe descrita no `README.md` do repositório e a governa
 | Integrante | GitHub | Papel no projeto | Área |
 |---|---|---|---|
 | **Natália** | [@NataliaNogueira1](https://github.com/NataliaNogueira1) | Gerente de Projeto + Desenvolvedora Mobile | Gestão / Mobile |
-| **Lucas** | [@lucasmiguelleite](https://github.com/lucasmiguelleite) | Líder Técnico Backend | Backend |
-| **Marcela** | [@MarcelaMulato](https://github.com/MarcelaMulato) | Desenvolvedora Backend + Nuvem | Backend / Nuvem |
+| **Marcela** | [@MarcelaMulato](https://github.com/MarcelaMulato) | Líder de Backend + Nuvem | Backend / Nuvem |
+| **Lucas** | [@lucasmiguelleite](https://github.com/lucasmiguelleite) | Desenvolvedor Backend | Backend |
 | **Júlia** | [@JujubsPaes](https://github.com/JujubsPaes) | Desenvolvedora Web + Nuvem | Web / Nuvem |
 | **Andressa** | [@DreBartolomeu](https://github.com/DreBartolomeu) | Desenvolvedora Web | Web |
 | **Carol** | [@almeida-carol](https://github.com/almeida-carol) | Desenvolvedora Web | Web |
@@ -40,11 +40,11 @@ flowchart TB
     PO["Product Owner / Cliente<br/><i>Stakeholders FieldOps</i>"]
     GP["Natalia<br/><b>Gerente de Projeto</b>"]
 
-    LB["Lucas<br/><b>Lider Backend</b>"]
+    LB["Marcela<br/><b>Lider Backend + Nuvem</b>"]
     LW["Julia<br/><b>Lider Web + Nuvem</b>"]
     LM["Natalia<br/><b>Lider Mobile</b>"]
 
-    B1["Marcela<br/>Dev Backend + Nuvem"]
+    B1["Lucas<br/>Dev Backend"]
 
     W1["Andressa<br/>Dev Web"]
     W2["Carol<br/>Dev Web"]
@@ -89,12 +89,12 @@ Representa as partes interessadas do FieldOps. Define a visão do produto, prior
 Responsável pela **gestão e planejamento** (EAP, backlog, cronograma), pela coordenação entre as três frentes de desenvolvimento e pela comunicação com os stakeholders. Acompanha desempenho, remove impedimentos e conduz as cerimônias do projeto.
 
 ### 4.3 Líderes de área
-- **Lucas — Líder Backend:** conduz a API REST (Java + Spring Boot), autenticação, regras de negócio, persistência e sincronização.
-- **Júlia — Líder Web + Nuvem:** conduz a interface administrativa (React/Vite) e apoia a infraestrutura/nuvem (ambientes, banco, pipeline).
+- **Marcela — Líder Backend + Nuvem:** conduz a API REST (Java + Spring Boot), autenticação, regras de negócio, persistência e sincronização, e apoia a infraestrutura/nuvem (ambientes, banco, pipeline). É a **aprovadora** das entregas de backend.
+- **Júlia — Líder Web + Nuvem:** conduz a interface administrativa (React/Vite) e apoia a infraestrutura/nuvem.
 - **Natália — Líder Mobile:** conduz o aplicativo (Expo/React Native), acumulando com a gerência do projeto.
 
 ### 4.4 Desenvolvedores
-- **Backend:** Marcela (também Nuvem).
+- **Backend:** Lucas.
 - **Web:** Andressa, Carol e Ian.
 - **Mobile:** Rodrigo e Felipe (Cutiur).
 
@@ -106,8 +106,8 @@ Responsável pela **gestão e planejamento** (EAP, backlog, cronograma), pela co
 Product Owner / Cliente (Stakeholders)
 └── Natália — Gerente de Projeto
     ├── Backend
-    │   ├── Lucas (Líder Backend)
-    │   └── Marcela (Dev Backend + Nuvem)
+    │   ├── Marcela (Líder Backend + Nuvem)
+    │   └── Lucas (Dev Backend)
     ├── Web
     │   ├── Júlia (Líder Web + Nuvem)
     │   ├── Andressa (Dev Web)

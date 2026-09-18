@@ -19,7 +19,7 @@ Definir uma abordagem apropriada para as comunicações do projeto FieldOps, com
 |---|---|---|
 | Cliente / Product Owner | Valor entregue, andamento do MVP | Reunião + e-mail |
 | Gerente de Projeto (Natália) | Andamento geral, riscos, impedimentos | Todos |
-| Líderes de área (Lucas, Júlia, Natália) | Coordenação técnica entre frentes | Reunião + GitHub |
+| Líderes de área (Marcela, Júlia, Natália) | Coordenação técnica entre frentes | Reunião + GitHub |
 | Equipe de desenvolvimento | Tarefas, dúvidas técnicas, integração | WhatsApp + GitHub |
 | Professor / Orientador | Evolução e entregas acadêmicas | Reunião + repositório |
 
@@ -36,7 +36,7 @@ Definir uma abordagem apropriada para as comunicações do projeto FieldOps, com
 | **Coordenação técnica entre áreas** | Semanal | Google Meet / GitHub (síncrono e assíncrono) | Líderes (Backend, Web, Mobile, Nuvem) | Líderes de área | Alinhamento de contratos/integração (API ↔ Web ↔ Mobile) | Meio da semana |
 | **Revisão de código (Pull Request)** | Contínua (a cada PR) | GitHub — Pull Requests (assíncrono) | Área responsável + revisores | Autor do PR | Descrição do PR + comentários de review | A cada entrega de código |
 | **Acompanhamento do backlog / board** | Contínua | GitHub Issues / Projects (assíncrono) | Toda a equipe | Natália (GP) | Cards (PBIs) com status e responsáveis | Ao longo da sprint |
-| **Contrato de API (OpenAPI/Swagger)** | A cada mudança | GitHub + Swagger UI (assíncrono) | Backend, Web, Mobile | Lucas (Líder Backend) | Documentação OpenAPI publicada | A cada alteração de endpoint |
+| **Contrato de API (OpenAPI/Swagger)** | A cada mudança | GitHub + Swagger UI (assíncrono) | Backend, Web, Mobile | Marcela (Líder Backend) | Documentação OpenAPI publicada | A cada alteração de endpoint |
 | **Relatório de status ao Cliente/PO** | Quinzenal / por sprint | E-mail (assíncrono) | Cliente / Product Owner | Natália (GP) | Resumo de progresso, riscos e próximos passos | Fim de cada sprint |
 | **Comunicação de riscos e impedimentos** | Conforme necessário | WhatsApp / Google Meet (síncrono) | GP + Líderes + envolvidos | Quem identifica o risco | Alerta + plano de ação | Ao surgir o risco |
 | **Documentação do projeto (docs/)** | Conforme necessário | Repositório GitHub (assíncrono) | Toda a equipe + Orientador | Autor do documento | Arquivos Markdown versionados | A cada atualização |
@@ -52,11 +52,11 @@ flowchart TD
     ORI["Professor / Orientador"]
     GP["Natalia<br/>Gerente de Projeto"]
 
-    LB["Lucas<br/>Lider Backend"]
+    LB["Marcela<br/>Lider Backend + Nuvem"]
     LW["Julia<br/>Lider Web + Nuvem"]
     LM["Natalia<br/>Lider Mobile"]
 
-    EQB["Equipe Backend<br/>(Marcela)"]
+    EQB["Equipe Backend<br/>(Lucas)"]
     EQW["Equipe Web<br/>(Andressa, Carol, Ian)"]
     EQM["Equipe Mobile<br/>(Rodrigo, Felipe)"]
 
