@@ -244,6 +244,13 @@ Este fluxo só se aplica **depois** de entregar uma mudança e apresentar o tuto
 teste (seção 10), e **somente quando o usuário confirmar que deu certo**. Se o usuário
 não confirmou (ou disse que falhou), não mova nada — ajude a corrigir primeiro.
 
+> **Título de issue (regra geral):** o título de toda issue é **em português** e
+> descreve a tarefa de forma direta. **Não** use prefixos de tipo no estilo commit
+> (`docs:`, `feat:`, `fix:` etc.) nem emojis no título. Exemplos: "Atualizar stack do
+> web admin para React + Vite", "Corrigir login com hash bcrypt". (Isso vale para o
+> título; as mensagens de **commit** continuam em inglês no padrão iuricode — ver
+> seção 5.)
+
 ### 11.1. Quando o usuário confirma que deu certo
 
 1. **Mova a issue correspondente para "In review"** no board do projeto
@@ -285,6 +292,12 @@ todas as colunas do board na ordem, para manter o histórico coerente:
 4. **Comentar na issue** informando qual **commit** comprova a conclusão
    (ex.: hash + mensagem do commit).
 5. Mover para **Done**.
+
+> **Regra para mover qualquer issue para "Done":** só passe uma issue para **Done**
+> quando **houver um commit que comprove a conclusão** (referenciado na issue) **ou**
+> quando **o usuário disser explicitamente** que pode concluir. Sem uma dessas
+> condições, **não** mova para Done — deixe em "In review" (ou na coluna anterior) e
+> avise o usuário do que falta para comprovar.
 
 > Observação: mover cards de projeto e criar/comentar issues normalmente é feito via
 > GitHub CLI (`gh issue create`, `gh issue comment`, `gh project item-edit`) ou pela
