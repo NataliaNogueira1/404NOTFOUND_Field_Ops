@@ -152,6 +152,16 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN rejected_at TEXT;
     `,
   },
+  {
+    version: 3,
+    description: 'Add end-location and ended_at to inspections (PBI-045)',
+    sql: `
+      ALTER TABLE inspections ADD COLUMN end_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN end_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN end_accuracy REAL;
+      ALTER TABLE inspections ADD COLUMN ended_at TEXT;
+    `,
+  },
 ];
 
 /**
