@@ -152,6 +152,27 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN rejected_at TEXT;
     `,
   },
+  {
+    version: 3,
+    description: 'PBI-044: evidence upload state (operation id, error, retries) + outbox dependencies',
+    sql: `
+      -- Evidence carries its own upload operation, so its status can be tracked
+      -- independently from the answer (RN-078). last_error is persisted so a
+      -- failed upload survives an app restart (RN-066) instead of living only in
+      -- memory. response_id links the photo to the answer whose sync operation it
+      -- depends on (RN-069). retry_count powers the "Tentar novamente" UX.
+      ALTER TABLE evidences ADD COLUMN operation_id TEXT;
+      ALTER TABLE evidences ADD COLUMN response_id TEXT;
+      ALTER TABLE evidences ADD COLUMN last_error TEXT;
+      ALTER TABLE evidences ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
+
+      -- Outbox dependencies: JSON array of operation ids that must be COMPLETED
+      -- before this operation can run (RN-069). The photo upload depends on the
+      -- answer operation, so the sync worker keeps it deferred until the answer
+      -- is applied by the server.
+      ALTER TABLE sync_queue ADD COLUMN dependency_ids TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];
 
 /**
