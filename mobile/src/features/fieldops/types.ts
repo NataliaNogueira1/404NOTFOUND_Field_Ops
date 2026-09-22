@@ -43,6 +43,14 @@ export interface Inspection {
   startLongitude?: number;
   /** GPS accuracy (in metres) captured when the inspection was started. */
   startAccuracy?: number;
+  /** Device timestamp (ISO) when the inspection was concluded. */
+  endedAt?: string;
+  /** GPS latitude captured when the inspection was concluded (offline). */
+  endLatitude?: number;
+  /** GPS longitude captured when the inspection was concluded (offline). */
+  endLongitude?: number;
+  /** GPS accuracy (in metres) captured when the inspection was concluded. */
+  endAccuracy?: number;
   /** Supervisor's reason when the inspection was REJECTED. */
   rejectionReason?: string;
   /** Who rejected the inspection (supervisor name). */
