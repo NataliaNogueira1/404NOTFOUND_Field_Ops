@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -7,14 +7,19 @@ import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
+import { useLocation } from '@/infrastructure/location';
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { answers, evidences, nonConformities, concludeInspection } = useFieldOps();
   const { template } = useInspectionTemplate(id);
+  const location = useLocation();
+
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [registerLocation, setRegisterLocation] = useState(true);
+  const [concluding, setConcluding] = useState(false);
 
   const items = template?.sections.flatMap((section) => section.items) ?? [];
   const total = items.length;
@@ -34,10 +39,22 @@ export default function SummaryScreen() {
     setConfirm(true);
   }
 
-  function conclude() {
-    concludeInspection(id);
+  async function conclude() {
     setConfirm(false);
-    router.replace('/(protected)/(tabs)/sync');
+    setConcluding(true);
+    try {
+      // Capture device timestamp at the exact moment the technician confirms.
+      const endedAtDevice = new Date().toISOString();
+
+      // One-shot GPS capture, unless the technician opted out for this inspection.
+      // If denied/unavailable, continue anyway (RN-059).
+      const captured = registerLocation ? await location.capture() : null;
+
+      concludeInspection(id, { endedAtDevice, location: captured });
+      router.replace('/(protected)/(tabs)/sync');
+    } finally {
+      setConcluding(false);
+    }
   }
 
   return (
@@ -59,7 +76,39 @@ export default function SummaryScreen() {
           <Metric label="Não conformidades" value={nonConformities.length} />
         </Card>
 
-        <Button label="Concluir inspeção" onPress={tryConclude} fullWidth size="lg" />
+        {/* Location opt-in — mirrors the behaviour in start.tsx (RN-058, RN-059) */}
+        <Card style={styles.card}>
+          <Text style={styles.section}>Localização de conclusão</Text>
+          {location.permission === 'denied' ? (
+            <Text style={styles.warning}>
+              ⚠️ Sem permissão de localização a inspeção conclui normalmente, mas o local de
+              conclusão não será registrado.
+            </Text>
+          ) : (
+            <View style={styles.row}>
+              <Text style={styles.muted}>📍 Registrar localização de conclusão</Text>
+              <Switch
+                value={registerLocation}
+                onValueChange={setRegisterLocation}
+                disabled={concluding}
+                trackColor={{ true: Colors.primary, false: Colors.gray400 }}
+              />
+            </View>
+          )}
+          {location.permission !== 'denied' && !registerLocation ? (
+            <Text style={styles.warning}>
+              ⚠️ Esta inspeção será concluída sem registrar o local de conclusão.
+            </Text>
+          ) : null}
+        </Card>
+
+        <Button
+          label="Concluir inspeção"
+          onPress={tryConclude}
+          loading={concluding}
+          fullWidth
+          size="lg"
+        />
         <Button label="Ir para pendências" onPress={() => setShowPending(true)} variant="secondary" fullWidth />
       </ScrollView>
 
@@ -68,8 +117,9 @@ export default function SummaryScreen() {
           <Card style={styles.modal}>
             <Text style={styles.modalTitle}>Concluir inspeção?</Text>
             <Text style={styles.muted}>A inspeção será marcada como enviada e ficará pendente de sincronização.</Text>
-            <Button label="Concluir inspeção" onPress={conclude} fullWidth />
-            <Button label="Cancelar" onPress={() => setConfirm(false)} variant="ghost" fullWidth />
+            {concluding && <ActivityIndicator size="small" color={Colors.primary} />}
+            <Button label="Concluir inspeção" onPress={conclude} loading={concluding} fullWidth />
+            <Button label="Cancelar" onPress={() => setConfirm(false)} variant="ghost" disabled={concluding} fullWidth />
           </Card>
         </View>
       </Modal>
@@ -121,12 +171,14 @@ const styles = StyleSheet.create({
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
   card: { gap: Spacing.sm },
+  section: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, color: Colors.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   metric: { width: '47%', padding: Spacing.sm, borderRadius: 10, backgroundColor: Colors.mutedSurface },
   metricValue: { fontSize: FontSize.xxl, color: Colors.primary, fontWeight: FontWeight.bold },
   row: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.sm },
   muted: { color: Colors.textSecondary },
   value: { color: Colors.text, fontWeight: FontWeight.semibold },
+  warning: { color: Colors.warning, fontSize: FontSize.sm },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.30)', justifyContent: 'center', padding: Spacing.lg },
   modal: { gap: Spacing.md },
   modalTitle: { color: Colors.text, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
