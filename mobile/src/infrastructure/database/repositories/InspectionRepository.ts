@@ -47,6 +47,10 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  end_latitude: number | null;
+  end_longitude: number | null;
+  end_accuracy: number | null;
+  ended_at: string | null;
 }
 
 interface SectionRow {
@@ -200,6 +204,36 @@ export class InspectionRepository {
     );
   }
 
+  /**
+   * Mark an inspection as submitted using the device's own timestamp and,
+   * optionally, the GPS location captured at conclusion time. Location may be
+   * null when permission was denied (RN-059) — the inspection still concludes.
+   */
+  async markSubmittedWithDevice(
+    id: string,
+    endedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET
+         status = 'SUBMITTED',
+         completed_at = datetime('now'),
+         ended_at = ?,
+         end_latitude = ?,
+         end_longitude = ?,
+         end_accuracy = ?,
+         progress = 100,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      endedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
+      id,
+    );
+  }
+
   // ─── Sections & Items (template snapshot) ──────────────────────────────────
 
   async saveTemplate(inspectionId: string, template: InspectionTemplate): Promise<void> {
@@ -338,6 +372,10 @@ export class InspectionRepository {
     startLatitude: row.start_latitude ?? undefined,
     startLongitude: row.start_longitude ?? undefined,
     startAccuracy: row.start_accuracy ?? undefined,
+    endedAt: row.ended_at ?? undefined,
+    endLatitude: row.end_latitude ?? undefined,
+    endLongitude: row.end_longitude ?? undefined,
+    endAccuracy: row.end_accuracy ?? undefined,
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
