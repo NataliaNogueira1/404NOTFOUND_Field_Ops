@@ -42,7 +42,13 @@ interface FieldOpsContextValue {
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
-  concludeInspection: (inspectionId: string) => void;
+  concludeInspection: (
+    inspectionId: string,
+    options?: {
+      endedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ) => void;
   syncNow: () => void;
   resetSession: () => void;
   isSyncing: boolean;
@@ -359,19 +365,44 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
-  const concludeInspection = useCallback((inspectionId: string) => {
+  const concludeInspection = useCallback((
+    inspectionId: string,
+    options?: {
+      endedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ) => {
+    const endedAtDevice = options?.endedAtDevice ?? new Date().toISOString();
+    const location = options?.location ?? null;
+
     setInspections((current) =>
       current.map((insp) =>
         insp.id === inspectionId
-          ? { ...insp, status: InspectionStatus.SUBMITTED, progress: 100, syncStatus: 'pending' as const, pendingSyncCount: Math.max(insp.pendingSyncCount, 5) }
+          ? {
+              ...insp,
+              status: InspectionStatus.SUBMITTED,
+              progress: 100,
+              syncStatus: 'pending' as const,
+              pendingSyncCount: Math.max(insp.pendingSyncCount, 5),
+              endedAt: endedAtDevice,
+              endLatitude: location?.latitude ?? insp.endLatitude,
+              endLongitude: location?.longitude ?? insp.endLongitude,
+              endAccuracy: location?.accuracy ?? insp.endAccuracy,
+            }
           : insp,
       ),
     );
     const repos = getRepos();
     const sync = getSyncService();
     if (repos && sync) {
-      repos.inspection.markSubmitted(inspectionId).catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
+      // Persist to SQLite with device timestamp + optional end-location (PBI-045).
+      repos.inspection
+        .markSubmittedWithDevice(inspectionId, endedAtDevice, location)
+        .catch(console.warn);
+      // Outbox: TRANSITION carrying device timestamp + optional location (PBI-045).
+      sync
+        .enqueueConclusion(inspectionId, endedAtDevice, location)
+        .catch(console.warn);
     }
   }, [getRepos, getSyncService]);
 
