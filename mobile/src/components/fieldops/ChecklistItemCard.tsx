@@ -7,18 +7,21 @@ import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button, Card } from '@/design-system';
 import { ResponseType, type ChecklistAnswer, type ChecklistValue, type Evidence, type TemplateItem } from '@/features/fieldops';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
-import { SyncBadge } from './Badges';
 import { SaveStatusIndicator } from './SaveStatusIndicator';
 
 interface ChecklistItemProps {
   item: TemplateItem;
   index: number;
+  /** Real inspection id — used to route the camera to the correct inspection. */
+  inspectionId: string;
   answer?: ChecklistAnswer;
   evidences: Evidence[];
   onAnswer: (value: ChecklistValue, observation?: string) => void;
+  /** Retry a failed photo upload, reusing the existing file (PBI-044). */
+  onRetryEvidence?: (evidenceId: string) => void;
 }
 
-export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: ChecklistItemProps) {
+export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence }: ChecklistItemProps) {
   const router = useRouter();
   const [text, setText] = useState(answer?.value?.toString() ?? '');
   const [observation, setObservation] = useState(answer?.observation ?? '');
@@ -93,7 +96,7 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
             multiline
           />
           <Text style={styles.label}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
-          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=ins-compressor&itemId=${item.id}`)} variant="secondary" />
+          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
         </View>
       ) : answer !== undefined ? (
         <View style={styles.observationBox}>
@@ -112,15 +115,54 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
       {evidences.length > 0 ? (
         <View style={styles.evidenceRow}>
           {evidences.map((evidence) => (
-            <View key={evidence.id} style={styles.thumb}>
-              {evidence.uri ? <Image source={{ uri: evidence.uri }} style={styles.thumbImage} /> : <Text style={styles.thumbIcon}>▧</Text>}
-              <SyncBadge status={evidence.syncStatus} />
-            </View>
+            <EvidenceThumb key={evidence.id} evidence={evidence} onRetry={onRetryEvidence} />
           ))}
         </View>
       ) : null}
       <SaveStatusIndicator status={saveStatus} />
     </Card>
+  );
+}
+
+/**
+ * Photo thumbnail with its sync state (PBI-044):
+ *   ⏳ Pendente upload — captured, file on disk, not yet confirmed by the server
+ *   ✓ Enviada        — server confirmed APPLIED (synced)
+ *   ❌ Erro           — upload failed; file is preserved and "Tentar novamente"
+ *                        re-enqueues the same file (no re-capture, no duplicate).
+ */
+function EvidenceThumb({ evidence, onRetry }: { evidence: Evidence; onRetry?: (evidenceId: string) => void }) {
+  const stateLabel =
+    evidence.syncStatus === 'synced' ? '✓ Enviada'
+    : evidence.syncStatus === 'error' ? '❌ Erro'
+    : '⏳ Pendente upload';
+  const stateStyle =
+    evidence.syncStatus === 'synced' ? styles.thumbStateOk
+    : evidence.syncStatus === 'error' ? styles.thumbStateError
+    : styles.thumbStatePending;
+
+  return (
+    <View style={styles.thumb}>
+      {evidence.uri ? <Image source={{ uri: evidence.uri }} style={styles.thumbImage} /> : <Text style={styles.thumbIcon}>▧</Text>}
+      <Text style={[styles.thumbState, stateStyle]}>{stateLabel}</Text>
+      {evidence.syncStatus === 'error' ? (
+        <>
+          {evidence.lastError ? (
+            <Text style={styles.thumbError} numberOfLines={2}>{evidence.lastError}</Text>
+          ) : null}
+          {onRetry ? (
+            <Pressable
+              onPress={() => onRetry(evidence.id)}
+              style={styles.retryButton}
+              accessibilityRole="button"
+              accessibilityLabel="Tentar novamente o envio da foto"
+            >
+              <Text style={styles.retryText}>Tentar novamente</Text>
+            </Pressable>
+          ) : null}
+        </>
+      ) : null}
+    </View>
   );
 }
 
@@ -236,9 +278,16 @@ const styles = StyleSheet.create({
   failureTitle: { color: Colors.dangerDark, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  thumb: { width: 98, minHeight: 76, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.mutedSurface, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, overflow: 'hidden' },
-  thumbImage: { width: 98, height: 64, borderRadius: 8 },
+  thumb: { width: 118, minHeight: 76, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.mutedSurface, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, overflow: 'hidden', padding: Spacing.xs },
+  thumbImage: { width: 106, height: 64, borderRadius: 8 },
   thumbIcon: { fontSize: 26, color: Colors.primary },
+  thumbState: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, textAlign: 'center' },
+  thumbStateOk: { color: Colors.success },
+  thumbStatePending: { color: Colors.warningDark },
+  thumbStateError: { color: Colors.danger },
+  thumbError: { fontSize: FontSize.xs, color: Colors.danger, textAlign: 'center' },
+  retryButton: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: Colors.danger, backgroundColor: '#FFF7F7' },
+  retryText: { fontSize: FontSize.xs, color: Colors.danger, fontWeight: FontWeight.semibold },
   dateButton: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, paddingHorizontal: Spacing.md, justifyContent: 'center' },
   dateButtonText: { fontSize: FontSize.md, color: Colors.text },
   datePlaceholder: { color: Colors.gray400 },
