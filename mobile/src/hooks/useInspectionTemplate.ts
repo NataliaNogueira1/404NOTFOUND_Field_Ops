@@ -11,14 +11,16 @@ import type { InspectionTemplate } from '@/features/fieldops/types';
 export function useInspectionTemplate(inspectionId: string | undefined) {
   const db = useDatabase();
   const [template, setTemplate] = useState<InspectionTemplate | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Start as loading only when there is something to load; avoids a synchronous
+  // setState inside the effect body (react-hooks/set-state-in-effect).
+  const [isLoading, setIsLoading] = useState(!!inspectionId);
 
   useEffect(() => {
     if (!db || !inspectionId) {
-      setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
     const repo = new InspectionRepository(db);
     (async () => {
       try {
