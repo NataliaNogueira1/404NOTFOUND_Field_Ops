@@ -402,6 +402,24 @@ export class InspectionSyncService {
   }
 
   /**
+   * Enqueue the inspection conclusion transition, including the device
+   * timestamp and optional GPS location captured at conclusion time (PBI-045).
+   * Location may be null when permission was denied (RN-059).
+   */
+  async enqueueConclusion(
+    inspectionId: string,
+    endedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    const id = `conclusion-${inspectionId}-${Date.now()}`;
+    await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
+      status: 'SUBMITTED',
+      endedAtDevice,
+      location,
+    });
+  }
+
+  /**
    * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
    * carrying the device timestamp and the optional start location (PBI-034).
    */
