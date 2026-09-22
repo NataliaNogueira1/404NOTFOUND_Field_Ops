@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
 import { randomUuidV4 } from './uuid';
+import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
   AnswerRepository,
@@ -186,8 +187,12 @@ export class InspectionSyncService {
       overdue: false,
     });
 
-    // Save template snapshot (sections + items) if available
-    if (apiInsp.template) {
+    // Save the template snapshot (sections + items) only if we don't already have
+    // one locally. The snapshot is immutable once assigned (RN-021), and rewriting
+    // it deletes the items — which cascade-deletes the technician's evidences
+    // (RN-047). Skipping the rewrite preserves captured photos across re-pulls and
+    // app restarts.
+    if (apiInsp.template && !(await this.inspectionRepo.hasSnapshot(apiInsp.id))) {
       const template = this.mapApiTemplate(apiInsp.template);
       await this.inspectionRepo.saveTemplate(apiInsp.id, template);
     }
@@ -227,7 +232,10 @@ export class InspectionSyncService {
    * Returns the number of operations successfully sent and any errors.
    */
   async pushPendingOperations(token: string): Promise<{ sent: number; failed: number; errors: string[] }> {
-    const pending = await this.syncQueueRepo.getPending();
+    // Only operations whose dependencies are already applied are eligible: a
+    // photo UPLOAD stays deferred while its answer op is still pending/failed
+    // (RN-069). This is enforced by the sync worker, not just the UI.
+    const pending = await this.syncQueueRepo.getReady();
     let sent = 0;
     let failed = 0;
     const errors: string[] = [];
@@ -237,10 +245,20 @@ export class InspectionSyncService {
         await this.syncQueueRepo.markInProgress(operation.id);
         await this.sendOperation(token, operation);
         await this.syncQueueRepo.markSent(operation.id);
+        // For an evidence UPLOAD, success means the server confirmed APPLIED, so
+        // the evidence row is marked SYNCED (its file may now be released).
+        if (operation.entityType === 'evidence') {
+          await this.evidenceRepo.markSyncedById(operation.entityId);
+        }
         sent++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
+        // Failure never deletes the file or the evidence: we only flag it FAILED
+        // and persist the error so the photo stays available for retry (RN-047).
         await this.syncQueueRepo.markError(operation.id, msg);
+        if (operation.entityType === 'evidence') {
+          await this.evidenceRepo.markFailed(operation.entityId, msg);
+        }
         failed++;
         errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
       }
@@ -266,11 +284,16 @@ export class InspectionSyncService {
           await this.pushInspectionStatus(token, operation.entityId, payload);
         }
         break;
-      // answer/evidence/non_conformity have no server endpoint yet: only
-      // INSPECTION_STATUS is implemented in POST /mobile/sync/push (PBI-051/052).
-      // They stay queued (marked error → retried) until their endpoints exist.
-      case 'answer':
       case 'evidence':
+        // Photo upload — separate from the structured data (RN-078). Only marks
+        // the evidence SYNCED when the server confirms APPLIED (see caller). If
+        // the upload endpoint is unavailable it throws, keeping the photo FAILED.
+        await this.uploadEvidence(token, operation.entityId, payload);
+        break;
+      // answer/non_conformity have no server endpoint yet: only INSPECTION_STATUS
+      // is implemented in POST /mobile/sync/push (PBI-051/052). They stay queued
+      // (marked error → retried) until their endpoints exist.
+      case 'answer':
       case 'non_conformity':
         throw new Error(
           `Sync for '${operation.entityType}' is not supported by the API yet; keeping it queued.`,
@@ -278,6 +301,38 @@ export class InspectionSyncService {
       default:
         throw new Error(`Unknown entity type: ${operation.entityType}`);
     }
+  }
+
+  /**
+   * Upload a single evidence photo through the isolated {@link evidenceUploadClient}.
+   * Resolves only if the server confirms APPLIED; any failure propagates so the
+   * outbox marks it FAILED and the file is preserved (PBI-044).
+   */
+  private async uploadEvidence(
+    token: string,
+    evidenceId: string,
+    payload: {
+      inspectionId: string;
+      itemId: string;
+      responseId?: string;
+      uri?: string;
+      description?: string;
+    },
+  ): Promise<void> {
+    // Prefer the freshest URI from the DB (retry reuses the persisted file).
+    const evidence = await this.evidenceRepo.getById(evidenceId);
+    const localUri = evidence?.uri ?? payload.uri;
+    if (!localUri) {
+      throw new Error('Evidence has no local file to upload.');
+    }
+
+    await evidenceUploadClient.upload(token, {
+      inspectionId: payload.inspectionId,
+      itemId: payload.itemId,
+      responseId: payload.responseId,
+      localUri,
+      description: payload.description,
+    });
   }
 
   /**
@@ -346,7 +401,22 @@ export class InspectionSyncService {
   // ─── Helper: enqueue operations ──────────────────────────────────────────
 
   /**
-   * Enqueue an answer to be synced later.
+   * Deterministic outbox id for an answer operation. Stable per (inspection,item)
+   * so an evidence upload can depend on it (RN-069) and a resend stays idempotent.
+   */
+  static answerOperationId(inspectionId: string, itemId: string): string {
+    return `answer-${inspectionId}-${itemId}`;
+  }
+
+  /** Deterministic outbox id for an evidence upload operation. */
+  static evidenceOperationId(evidenceId: string): string {
+    return `evidence-${evidenceId}`;
+  }
+
+  /**
+   * Enqueue an answer to be synced later. Uses a stable operation id per
+   * (inspection,item) so evidences captured for the same item can declare it as
+   * a dependency (RN-069) and reruns never duplicate the operation (RN-068).
    */
   async enqueueAnswer(
     inspectionId: string,
@@ -354,7 +424,7 @@ export class InspectionSyncService {
     value: ChecklistValue,
     observation?: string,
   ): Promise<void> {
-    const id = `answer-${inspectionId}-${itemId}-${Date.now()}`;
+    const id = InspectionSyncService.answerOperationId(inspectionId, itemId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'answer', `${inspectionId}-${itemId}`, {
       inspectionId,
       itemId,
@@ -364,17 +434,42 @@ export class InspectionSyncService {
   }
 
   /**
-   * Enqueue an evidence to be synced later.
+   * Enqueue an evidence photo UPLOAD. The operation depends on the answer op of
+   * the same item, so the upload stays deferred until the answer is applied by
+   * the server (RN-069). The photo is uploaded separately from the structured
+   * data (RN-078), so a synced answer with a failed photo is a valid state.
    */
   async enqueueEvidence(evidence: Evidence): Promise<void> {
-    const id = `evidence-${evidence.id}`;
-    await this.syncQueueRepo.enqueue(id, 'CREATE', 'evidence', evidence.id, {
-      inspectionId: evidence.inspectionId,
-      itemId: evidence.itemId,
-      description: evidence.description,
-      uri: evidence.uri,
-      capturedAt: evidence.capturedAt,
-    });
+    const id = InspectionSyncService.evidenceOperationId(evidence.id);
+    const dependencyIds = evidence.responseId ? [evidence.responseId] : [];
+    await this.syncQueueRepo.enqueue(
+      id,
+      'UPLOAD',
+      'evidence',
+      evidence.id,
+      {
+        inspectionId: evidence.inspectionId,
+        itemId: evidence.itemId,
+        responseId: evidence.responseId,
+        uri: evidence.uri,
+        description: evidence.description,
+        capturedAt: evidence.capturedAt,
+      },
+      dependencyIds,
+    );
+  }
+
+  /**
+   * Re-enqueue a previously failed evidence upload ("Tentar novamente"). Reuses
+   * the existing outbox row and file — no new capture, no duplicate evidence
+   * (PBI-044). The answer dependency is still respected: if the answer is not yet
+   * applied, the retried upload simply waits again.
+   */
+  async retryEvidenceUpload(evidence: Evidence): Promise<void> {
+    const opId = evidence.operationId ?? InspectionSyncService.evidenceOperationId(evidence.id);
+    // Move both the evidence row and its outbox op back to pending.
+    await this.evidenceRepo.markPending(evidence.id);
+    await this.syncQueueRepo.markPending(opId);
   }
 
   /**
