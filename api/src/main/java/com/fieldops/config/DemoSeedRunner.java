@@ -18,6 +18,9 @@ import com.fieldops.inspection.dto.TemplateSectionRequest;
 import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
+import com.fieldops.audit.service.InspectionAnswerHistoryService;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.inspection.service.InspectionTemplateService;
 import com.fieldops.inspection.service.InspectionTemplateVersionService;
@@ -37,7 +40,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -75,13 +80,17 @@ public class DemoSeedRunner implements ApplicationRunner {
     private final TemplateItemService itemService;
     private final InspectionTemplateVersionService versionService;
     private final InspectionService inspectionService;
+    private final InspectionItemSnapshotRepository snapshotRepository;
+    private final InspectionAnswerHistoryService answerHistoryService;
 
     public DemoSeedRunner(DemoSeedProperties properties, UserRepository userRepository,
             ClientRepository clientRepository, EquipmentRepository equipmentRepository,
             ClientService clientService, InspectionSiteService siteService,
             EquipmentService equipmentService, InspectionTemplateService templateService,
             TemplateSectionService sectionService, TemplateItemService itemService,
-            InspectionTemplateVersionService versionService, InspectionService inspectionService) {
+            InspectionTemplateVersionService versionService, InspectionService inspectionService,
+            InspectionItemSnapshotRepository snapshotRepository,
+            InspectionAnswerHistoryService answerHistoryService) {
         this.properties = properties;
         this.userRepository = userRepository;
         this.clientRepository = clientRepository;
@@ -94,6 +103,8 @@ public class DemoSeedRunner implements ApplicationRunner {
         this.itemService = itemService;
         this.versionService = versionService;
         this.inspectionService = inspectionService;
+        this.snapshotRepository = snapshotRepository;
+        this.answerHistoryService = answerHistoryService;
     }
 
     @Override
@@ -131,12 +142,72 @@ public class DemoSeedRunner implements ApplicationRunner {
 
         Long templateVersionId = seedPublishedTemplate(supervisor.getId());
 
-        int created = seedInspections(templateVersionId, client.id(), site.id(),
+        SeededInspections seeded = seedInspections(templateVersionId, client.id(), site.id(),
                 equipment.id(), technician.getId(), supervisor.getId());
+
+        // Seed a detailed answer history (PBI-088) on the first inspection so the admin can see a
+        // realistic timeline, including an item answered more than once over time.
+        seedAnswerHistory(seeded.firstInspectionId(), technician.getId());
 
         log.info("Demo seed created: client={}, site={}, equipment={}, templateVersion={}, "
                 + "{} inspections for technicianId={}.",
-                client.id(), site.id(), equipment.id(), templateVersionId, created, technician.getId());
+                client.id(), site.id(), equipment.id(), templateVersionId, seeded.created(), technician.getId());
+    }
+
+    private record SeededInspections(int created, Long firstInspectionId) {
+    }
+
+    /**
+     * Appends a coherent answer history to the given inspection (PBI-088). The first item is
+     * answered three times (Conforming -> Non-conforming -> Conforming) to demonstrate that the
+     * history keeps every version chronologically, not just the current value.
+     */
+    private void seedAnswerHistory(Long inspectionId, Long technicianId) {
+        if (inspectionId == null) {
+            return;
+        }
+        List<InspectionItemSnapshot> items = snapshotRepository
+                .findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspectionId);
+        if (items.isEmpty()) {
+            return;
+        }
+        Instant base = Instant.now().minus(2, ChronoUnit.HOURS);
+
+        InspectionItemSnapshot first = items.get(0);
+        // Same item answered three times over ~40 minutes: full change history.
+        appendAnswer(inspectionId, technicianId, first, "NON_CONFORMING",
+                "Carcaca apresentou leve corrosao na base.", base);
+        appendAnswer(inspectionId, technicianId, first, "NON_CONFORMING",
+                "Corrosao confirmada apos limpeza; requer tratamento.", base.plus(20, ChronoUnit.MINUTES));
+        appendAnswer(inspectionId, technicianId, first, "CONFORMING",
+                "Superficie tratada e liberada.", base.plus(40, ChronoUnit.MINUTES));
+
+        // Remaining items answered once each.
+        for (int index = 1; index < items.size(); index++) {
+            InspectionItemSnapshot item = items.get(index);
+            String value = demoValueFor(item.getResponseType().name());
+            String observation = index % 2 == 0 ? "Sem anomalias." : null;
+            appendAnswer(inspectionId, technicianId, item, value, observation,
+                    base.plus(45L + index * 5L, ChronoUnit.MINUTES));
+        }
+    }
+
+    private void appendAnswer(Long inspectionId, Long technicianId, InspectionItemSnapshot item,
+            String value, String observation, Instant answeredAt) {
+        answerHistoryService.record(inspectionId, item.getSourceTemplateItemId(), item.getSectionTitle(),
+                item.getSectionOrder(), item.getItemTitle(), item.getItemOrder(), item.getResponseType(),
+                value, observation, technicianId, answeredAt);
+    }
+
+    private String demoValueFor(String responseType) {
+        return switch (responseType) {
+            case "BOOLEAN" -> "true";
+            case "NUMBER" -> "7.5";
+            case "CONFORMITY" -> "CONFORMING";
+            case "SINGLE_CHOICE" -> "Funcionando";
+            case "DATE" -> LocalDate.now().toString();
+            default -> "Verificado";
+        };
     }
 
     /**
@@ -146,7 +217,7 @@ public class DemoSeedRunner implements ApplicationRunner {
      *
      * @return the number of inspections created
      */
-    private int seedInspections(Long templateVersionId, Long clientId, Long siteId,
+    private SeededInspections seedInspections(Long templateVersionId, Long clientId, Long siteId,
             Long equipmentId, Long technicianId, Long supervisorId) {
         record SeedInspection(String title, Priority priority, int dueInDays, String instructions) {
         }
@@ -172,12 +243,16 @@ public class DemoSeedRunner implements ApplicationRunner {
                         "Agendamento duplicado; sera cancelado para demonstracao."));
 
         Long canceledId = null;
+        Long firstInspectionId = null;
         for (int index = 0; index < plan.size(); index++) {
             SeedInspection seed = plan.get(index);
             Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
                     seed.title(), templateVersionId, clientId, siteId, equipmentId, technicianId,
                     seed.priority(), LocalDate.now().plusDays(seed.dueInDays()), null,
                     seed.instructions()), supervisorId).id();
+            if (index == 0) {
+                firstInspectionId = inspectionId;
+            }
             // Cancel the last one to showcase a terminal state in the admin listing.
             if (index == plan.size() - 1) {
                 canceledId = inspectionId;
@@ -189,7 +264,7 @@ public class DemoSeedRunner implements ApplicationRunner {
                     "Agendamento duplicado identificado durante o planejamento.", supervisorId);
         }
 
-        return plan.size();
+        return new SeededInspections(plan.size(), firstInspectionId);
     }
 
     /** Builds a small but coherent compressor checklist as a draft and publishes it. */
