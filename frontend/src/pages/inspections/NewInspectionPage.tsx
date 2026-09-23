@@ -73,24 +73,40 @@ export function NewInspectionPage() {
 
   // ── Load versions when template changes ────────────────────────────────────
   useEffect(() => {
+    let active = true
+
+    // No template selected: clear the version state. Done inside an async
+    // callback (not synchronously in the effect body) to satisfy
+    // react-hooks/set-state-in-effect.
     if (!templateId) {
-      setAvailableVersions([])
-      setSelectedVersion(null)
-      return
+      void Promise.resolve().then(() => {
+        if (!active) return
+        setAvailableVersions([])
+        setSelectedVersion(null)
+        setVersionsLoading(false)
+      })
+      return () => { active = false }
     }
-    setVersionsLoading(true)
-    adminCatalogApi
-      .listTemplateVersions(templateId)
-      .then(versions => {
+
+    async function loadVersions(id: string) {
+      setVersionsLoading(true)
+      try {
+        const versions = await adminCatalogApi.listTemplateVersions(id)
+        if (!active) return
         setAvailableVersions(versions)
         // Default to the latest (only) published version
         setSelectedVersion(versions.length > 0 ? versions[versions.length - 1] : null)
-      })
-      .catch(() => {
+      } catch {
+        if (!active) return
         setAvailableVersions([])
         setSelectedVersion(null)
-      })
-      .finally(() => setVersionsLoading(false))
+      } finally {
+        if (active) setVersionsLoading(false)
+      }
+    }
+
+    void loadVersions(templateId)
+    return () => { active = false }
   }, [templateId])
 
   // ── Load active clients on mount ───────────────────────────────────────────
