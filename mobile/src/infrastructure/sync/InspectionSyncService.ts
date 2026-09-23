@@ -8,6 +8,7 @@ import {
   EvidenceRepository,
   NonConformityRepository,
   SyncQueueRepository,
+  SyncMetadataRepository,
 } from '@/infrastructure/database/repositories';
 import type {
   Inspection,
@@ -105,6 +106,7 @@ export class InspectionSyncService {
   private evidenceRepo: EvidenceRepository;
   private ncRepo: NonConformityRepository;
   private syncQueueRepo: SyncQueueRepository;
+  private metadataRepo: SyncMetadataRepository;
 
   constructor(db: SQLiteDatabase) {
     this.inspectionRepo = new InspectionRepository(db);
@@ -112,6 +114,7 @@ export class InspectionSyncService {
     this.evidenceRepo = new EvidenceRepository(db);
     this.ncRepo = new NonConformityRepository(db);
     this.syncQueueRepo = new SyncQueueRepository(db);
+    this.metadataRepo = new SyncMetadataRepository(db);
   }
 
   // ─── Pull: API → SQLite ──────────────────────────────────────────────────
@@ -336,11 +339,26 @@ export class InspectionSyncService {
     const pullResult = await this.pullInspections(token);
     errors.push(...pullResult.errors);
 
+    // Record the timestamp of the last *successful* sync only when the whole
+    // cycle finished with no errors (RN-072). A failed attempt must NOT advance
+    // this timestamp, so the sync screen keeps showing the last real success.
+    if (errors.length === 0) {
+      await this.metadataRepo.setLastSuccessfulSync();
+    }
+
     return {
       pulled: pullResult.downloaded,
       pushed: pushResult.sent,
       errors,
     };
+  }
+
+  /**
+   * ISO timestamp of the last successful sync, or `null` when it never
+   * completed successfully. Persisted across app restarts (RN-066).
+   */
+  async getLastSuccessfulSync(): Promise<string | null> {
+    return this.metadataRepo.getLastSuccessfulSync();
   }
 
   // ─── Helper: enqueue operations ──────────────────────────────────────────
