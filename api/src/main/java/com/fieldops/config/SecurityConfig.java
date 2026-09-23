@@ -43,7 +43,8 @@ public class SecurityConfig {
             "/api/v1/sites/**",
             "/api/v1/equipment/**",
             "/api/v1/inspection-templates/**",
-            "/api/v1/inspections/**"
+            "/api/v1/inspections/**",
+            "/api/v1/dashboard/**"
     };
 
     @Bean
