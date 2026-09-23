@@ -25,9 +25,12 @@ import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateVersionResponse;
 import com.fieldops.inspection.dto.TemplateSectionResponse;
+import com.fieldops.audit.service.InspectionAnswerHistoryService;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.Priority;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.inspection.service.InspectionTemplateService;
 import com.fieldops.inspection.service.InspectionTemplateVersionService;
@@ -69,6 +72,8 @@ class DemoSeedRunnerTest {
     @Mock private TemplateItemService itemService;
     @Mock private InspectionTemplateVersionService versionService;
     @Mock private InspectionService inspectionService;
+    @Mock private InspectionItemSnapshotRepository snapshotRepository;
+    @Mock private InspectionAnswerHistoryService answerHistoryService;
 
     @InjectMocks private DemoSeedRunner runner;
 
@@ -79,6 +84,9 @@ class DemoSeedRunnerTest {
         stubUsers();
         stubCatalog();
         AtomicLong sequence = stubInspectionCreation();
+        // No snapshots seeded here → answer-history seeding is a no-op (returns early).
+        when(snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(anyLong()))
+                .thenReturn(List.<InspectionItemSnapshot>of());
 
         runner.run(mock(ApplicationArguments.class));
 
