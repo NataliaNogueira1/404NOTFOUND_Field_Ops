@@ -292,6 +292,59 @@ export const adminCatalogApi = {
     })
     return { ...result, id: String(result.id), canceledBy: String(result.canceledBy) }
   },
+
+  /**
+   * Downloads the inspection list as a CSV file, applying the filters currently
+   * active on the admin listing page. The browser is triggered to save the file
+   * via an invisible anchor element — no page navigation occurs.
+   *
+   * Only ADMINISTRATOR accounts may call this endpoint (403 for SUPERVISOR).
+   */
+  async exportCsv(filters: {
+    status: InspectionStatus | ''
+    from: string
+    to: string
+    clientName: string
+  }): Promise<void> {
+    const params = new URLSearchParams()
+    if (filters.status) params.set('status', filters.status)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.clientName.trim()) params.set('clientName', filters.clientName.trim())
+
+    const query = params.toString()
+    const url = `/api/v1/inspections/export.csv${query ? `?${query}` : ''}`
+
+    // Use fetch directly — apiRequest always JSON.parses the body
+    const token = (await import('@/api/client')).tokenStorage.get()
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'text/csv',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Erro ao exportar CSV: ${response.status} ${text}`)
+    }
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+
+    // Derive filename from Content-Disposition header when available
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const match = /filename="?([^";\n]+)"?/.exec(disposition)
+    const filename = match?.[1] ?? `inspections-${new Date().toISOString().slice(0, 10)}.csv`
+
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(objectUrl)
+  },
 }
 
 function managedTemplate(template: BackendManagedTemplate): ManagedInspectionTemplate {
