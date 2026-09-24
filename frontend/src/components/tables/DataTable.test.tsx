@@ -3,17 +3,25 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DataTable } from '@/components/tables/DataTable'
 
-const columns = [
-  { header: 'Nome', sortKey: 'name', cell: (row: { name: string }) => row.name },
-]
+const columns = [{ header: 'Nome', sortKey: 'name', cell: (row: { name: string }) => row.name }]
 
 afterEach(cleanup)
 
 describe('DataTable', () => {
   it('shows the server page range and reusable page-size options', async () => {
     const changeSize = vi.fn()
-    render(<DataTable columns={columns} rows={[{ name: 'Atlas' }]} page={2} pageSize={10}
-      totalRows={42} totalPages={5} onPageChange={vi.fn()} onPageSizeChange={changeSize} />)
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ name: 'Atlas' }]}
+        page={2}
+        pageSize={10}
+        totalRows={42}
+        totalPages={5}
+        onPageChange={vi.fn()}
+        onPageSizeChange={changeSize}
+      />,
+    )
 
     expect(screen.getByText('Mostrando 11-20 de 42')).not.toBeNull()
     expect(screen.getByText('Pagina 2 de 5')).not.toBeNull()
@@ -34,7 +42,9 @@ describe('DataTable', () => {
   })
 
   it('renders standardized loading and empty states', () => {
-    const { rerender } = render(<DataTable columns={columns} rows={[]} loading loadingLabel="Carregando registros..." />)
+    const { rerender } = render(
+      <DataTable columns={columns} rows={[]} loading loadingLabel="Carregando registros..." />,
+    )
     expect(screen.getByRole('status')).toHaveTextContent('Carregando registros...')
     rerender(<DataTable columns={columns} rows={[]} />)
     expect(screen.getByText('Nenhum registro encontrado')).not.toBeNull()

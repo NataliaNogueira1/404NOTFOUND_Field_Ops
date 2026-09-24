@@ -15,11 +15,15 @@ export default function InspectionsScreen() {
   const [priority, setPriority] = useState<'Todas' | Priority>('Todas');
   const [period, setPeriod] = useState<'Todas' | 'Hoje' | 'Semana'>('Todas');
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekEnd = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const weekEnd = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  }, []);
 
   const filtered = useMemo(() => inspections.filter((inspection) => {
-    const haystack = `${inspection.title} ${inspection.clientId} ${inspection.equipmentId}`.toLowerCase();
+    const haystack = `${inspection.title} ${inspection.clientName} ${inspection.equipmentName} ${inspection.siteName}`.toLowerCase();
     const matchesQuery = haystack.includes(query.toLowerCase());
     const matchesStatus = status === 'Todas' || inspection.status === status;
     const matchesPriority = priority === 'Todas' || inspection.priority === priority;
@@ -84,6 +88,9 @@ export default function InspectionsScreen() {
           onSelect={(value) => setPeriod(value as typeof period)}
           labels={{ Semana: 'Esta semana' }}
         />
+        <Text style={styles.resultCount}>
+          {filtered.length} {filtered.length === 1 ? 'inspeção encontrada' : 'inspeções encontradas'}
+        </Text>
         <View style={styles.list}>
           {filtered.map((inspection) => (
             <InspectionCard key={inspection.id} inspection={inspection} />
@@ -139,6 +146,7 @@ const styles = StyleSheet.create({
   chipText: { color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   chipTextActive: { color: Colors.white },
   list: { gap: Spacing.sm, marginTop: Spacing.sm },
+  resultCount: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: Spacing.xs },
   empty: { color: Colors.textSecondary, textAlign: 'center', padding: Spacing.lg },
   notice: { backgroundColor: Colors.warningLight, borderRadius: 10, padding: Spacing.sm, marginTop: Spacing.xs },
   noticeText: { color: Colors.warningDark, fontSize: FontSize.sm, textAlign: 'center' },

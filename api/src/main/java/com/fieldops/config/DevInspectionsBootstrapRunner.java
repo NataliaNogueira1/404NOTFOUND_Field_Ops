@@ -10,170 +10,173 @@ import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
-import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Seeds a published template and a couple of inspections for the local {@code dev} profile so the
- * mobile technician has something to sync and review. Runs after {@link DevUsersBootstrapRunner}
- * (higher {@link Order} value) so the seeded technician/supervisor already exist.
+ * Legacy seed of standalone ASSIGNED inspections (built from detached entities, without a real
+ * client/site/equipment). Superseded by {@link DemoSeedRunner}, which now seeds a full set of
+ * inspections on top of the real catalog through the domain services. Keeping two seeders active
+ * produced an inconsistent list (only one inspection surviving), so this runner is disabled by
+ * default and only runs when {@code fieldops.bootstrap.dev-inspections.enabled=true}.
  *
- * <p>Idempotent: skips entirely once any inspection exists. Never loads outside the dev profile.
+ * <p>Dev/demo profile only. Runs after {@link DevUsersBootstrapRunner} (see {@link Order})
+ * because it needs the technician/supervisor accounts to exist. It is idempotent:
+ * if the technician already has inspections, nothing is created.
  */
 @Component
-@Profile("dev")
-@Order(20)
+@Profile({"dev", "demo"})
+@ConditionalOnProperty(prefix = "fieldops.bootstrap.dev-inspections", name = "enabled",
+        havingValue = "true", matchIfMissing = false)
+@Order(20) // after DevUsersBootstrapRunner (default order)
 public class DevInspectionsBootstrapRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevInspectionsBootstrapRunner.class);
 
-    private final DevUsersProperties properties;
-    private final UserRepository userRepository;
-    private final InspectionTemplateRepository templateRepository;
-    private final InspectionRepository inspectionRepository;
+    private static final String TECHNICIAN_EMAIL = "technician@fieldops.local";
+    private static final String SUPERVISOR_EMAIL = "supervisor@fieldops.local";
 
-    public DevInspectionsBootstrapRunner(DevUsersProperties properties,
-                                         UserRepository userRepository,
-                                         InspectionTemplateRepository templateRepository,
-                                         InspectionRepository inspectionRepository) {
-        this.properties = properties;
+    private final UserRepository userRepository;
+    private final InspectionRepository inspectionRepository;
+    private final InspectionTemplateRepository templateRepository;
+
+    public DevInspectionsBootstrapRunner(UserRepository userRepository,
+                                         InspectionRepository inspectionRepository,
+                                         InspectionTemplateRepository templateRepository) {
         this.userRepository = userRepository;
-        this.templateRepository = templateRepository;
         this.inspectionRepository = inspectionRepository;
+        this.templateRepository = templateRepository;
     }
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
-        if (!properties.enabled()) {
+        User technician = userRepository.findByEmail(TECHNICIAN_EMAIL).orElse(null);
+        User supervisor = userRepository.findByEmail(SUPERVISOR_EMAIL).orElse(null);
+
+        if (technician == null || supervisor == null) {
+            log.info("[DevSeed] Skipping inspection seed — dev technician/supervisor not found.");
             return;
         }
-        if (inspectionRepository.count() > 0) {
-            return; // already seeded
-        }
 
-        User technician = userRepository.findByEmail(properties.technician().email()).orElse(null);
-        User supervisor = userRepository.findByEmail(properties.supervisor().email()).orElse(null);
-        if (technician == null || supervisor == null
-                || technician.getRole() != Role.TECHNICIAN) {
-            log.warn("Skipping dev inspection seed: technician/supervisor dev accounts not found");
+        // Idempotent: don't re-seed if this technician already has ASSIGNED inspections
+        // waiting to be started. Existing IN_PROGRESS/other inspections are ignored, so
+        // the technician always has fresh ASSIGNED ones to exercise the start flow (PBI-034).
+        List<Inspection> assigned = inspectionRepository.findByTechnicianAndStatuses(
+                technician.getId(), List.of(InspectionStatus.ASSIGNED));
+        if (!assigned.isEmpty()) {
+            log.info("[DevSeed] Technician already has {} ASSIGNED inspection(s); skipping seed.", assigned.size());
             return;
         }
 
         InspectionTemplate template = seedTemplate(supervisor);
+        LocalDate today = LocalDate.now();
 
-        seedInspection(template, technician, supervisor,
-                "Indústria Atlas", "Unidade Sorocaba", "Compressor XPTO 500",
-                Priority.HIGH, InspectionStatus.ASSIGNED, 0,
-                "Verificar vazamentos e pressão antes da liberação.");
+        inspectionRepository.saveAll(List.of(
+                newInspection("Inspeção Preventiva — Compressor XPTO 500", template,
+                        "Indústria Modelo", "Unidade Sorocaba", "Compressor XPTO 500",
+                        technician, supervisor, Priority.HIGH, today, LocalTime.of(9, 0),
+                        "Verificar condição da bateria com atenção especial."),
+                newInspection("Inspeção Gerador Diesel GD-002", template,
+                        "Logística ABC", "CD Campinas", "Gerador Diesel GD-002",
+                        technician, supervisor, Priority.MEDIUM, today.plusDays(1), LocalTime.of(14, 0),
+                        "Validar nível de combustível e resposta em carga."),
+                newInspection("Inspeção Extintor P12", template,
+                        "Indústria Modelo", "Unidade São Paulo", "Extintor P12",
+                        technician, supervisor, Priority.LOW, today.plusDays(2), LocalTime.of(11, 30),
+                        "Conferir lacre e validade da carga."),
+                newInspection("Inspeção Empilhadeira 01", template,
+                        "Metalúrgica Horizonte", "Centro Operacional Jundiaí", "Empilhadeira 01",
+                        technician, supervisor, Priority.CRITICAL, today.plusDays(3), LocalTime.of(16, 0),
+                        "Priorizar verificação de freio e sinais sonoros.")
+        ));
 
-        seedInspection(template, technician, supervisor,
-                "Metalúrgica Vega", "Galpão Central", "Caldeira CL-10",
-                Priority.MEDIUM, InspectionStatus.IN_PROGRESS, 40,
-                "Inspeção periódica de segurança.");
-
-        // Awaiting supervisor review — feeds the web review queue (status SUBMITTED / UNDER_REVIEW).
-        seedInspection(template, technician, supervisor,
-                "Indústria Atlas", "Unidade Sorocaba", "Bomba Centrífuga BC-200",
-                Priority.HIGH, InspectionStatus.SUBMITTED, 100,
-                "Enviada pelo técnico, aguardando aprovação.");
-
-        seedInspection(template, technician, supervisor,
-                "Logística ABC", "CD Campinas", "Empilhadeira EMP-07",
-                Priority.CRITICAL, InspectionStatus.UNDER_REVIEW, 100,
-                "Em análise pelo supervisor.");
-
-        log.info("Bootstrapped dev inspections for technician {}", technician.getEmail());
+        log.info("[DevSeed] Seeded 4 ASSIGNED inspections for technician {}.", TECHNICIAN_EMAIL);
     }
 
-    private InspectionTemplate seedTemplate(User creator) {
-        InspectionTemplate template = new InspectionTemplate();
-        template.setTitle("Checklist de Segurança de Equipamento");
-        template.setCategory("Segurança");
-        template.setDescription("Template de demonstração para o profile dev.");
-        template.setStatus(InspectionTemplateStatus.ACTIVE);
-        template.setCurrentVersion(1);
-        template.setCreatedBy(creator);
-
-        TemplateSection general = new TemplateSection();
-        general.setTemplate(template);
-        general.setTitle("Inspeção Geral");
-        general.setSortOrder(0);
-        general.getItems().add(item(general, 0,
-                "Equipamento apresenta vazamentos?", null,
-                ResponseType.CONFORMITY, true, true, true, null));
-        general.getItems().add(item(general, 1,
-                "Nível de pressão dentro do especificado?", "Comparar com a placa do fabricante.",
-                ResponseType.CONFORMITY, true, true, false, null));
-        general.getItems().add(item(general, 2,
-                "Observações gerais", null,
-                ResponseType.TEXT_LONG, false, false, false, null));
-
-        TemplateSection safety = new TemplateSection();
-        safety.setTemplate(template);
-        safety.setTitle("Itens de Segurança");
-        safety.setSortOrder(1);
-        safety.getItems().add(item(safety, 0,
-                "Estado da sinalização de segurança", null,
-                ResponseType.SINGLE_CHOICE, true, false, false,
-                "[\"Bom\",\"Regular\",\"Ruim\"]"));
-        safety.getItems().add(item(safety, 1,
-                "Temperatura de operação (°C)", null,
-                ResponseType.NUMBER, false, false, false, null));
-
-        template.getSections().add(general);
-        template.getSections().add(safety);
-
-        return templateRepository.save(template);
-    }
-
-    private TemplateItem item(TemplateSection section, int sortOrder, String question, String description,
-                              ResponseType type, boolean required, boolean obsOnFailure,
-                              boolean evidenceOnFailure, String options) {
-        TemplateItem item = new TemplateItem();
-        item.setSection(section);
-        item.setSortOrder(sortOrder);
-        item.setQuestion(question);
-        item.setDescription(description);
-        item.setResponseType(type);
-        item.setRequired(required);
-        item.setRequireObservationOnFailure(obsOnFailure);
-        item.setRequireEvidenceOnFailure(evidenceOnFailure);
-        item.setOptions(options);
-        return item;
-    }
-
-    private void seedInspection(InspectionTemplate template, User technician, User supervisor,
-                                String clientName, String siteName, String equipmentName,
-                                Priority priority, InspectionStatus status, int progress,
-                                String instructions) {
+    private Inspection newInspection(String title, InspectionTemplate template,
+                                     String clientName, String siteName, String equipmentName,
+                                     User technician, User supervisor, Priority priority,
+                                     LocalDate dueDate, LocalTime dueTime, String instructions) {
         Inspection inspection = new Inspection();
-        inspection.setTitle(template.getTitle() + " — " + equipmentName);
+        inspection.setTitle(title);
         inspection.setTemplate(template);
         inspection.setClientName(clientName);
         inspection.setSiteName(siteName);
         inspection.setEquipmentName(equipmentName);
         inspection.setTechnician(technician);
         inspection.setSupervisor(supervisor);
+        inspection.setStatus(InspectionStatus.ASSIGNED);
         inspection.setPriority(priority);
-        inspection.setStatus(status);
-        inspection.setProgress(progress);
-        inspection.setDueDate(LocalDate.now().plusDays(3));
-        inspection.setDueTime(LocalTime.of(9, 0));
+        inspection.setDueDate(dueDate);
+        inspection.setDueTime(dueTime);
         inspection.setSupervisorInstructions(instructions);
-        inspectionRepository.save(inspection);
+        inspection.setProgress(0);
+        return inspection;
+    }
+
+    private InspectionTemplate seedTemplate(User createdBy) {
+        InspectionTemplate template = new InspectionTemplate();
+        template.setTitle("Inspeção Preventiva de Compressor");
+        template.setCategory("Manutenção");
+        template.setStatus(InspectionTemplateStatus.ACTIVE);
+        template.setVersion(3);
+        template.setCreatedBy(createdBy);
+
+        addSection(template, "Condições Gerais", 0, List.of(
+                item("A placa de identificação está legível?", ResponseType.CONFORMITY, true, true, true, null, 0),
+                item("Equipamento limpo e conservado?", ResponseType.TEXT_LONG, true, true, true, null, 1),
+                item("Estrutura externa sem danos?", ResponseType.BOOLEAN, true, false, false, null, 2)
+        ));
+        addSection(template, "Segurança", 1, List.of(
+                item("Proteções das partes móveis instaladas?", ResponseType.CONFORMITY, true, true, true, null, 0),
+                item("Etiquetas de advertência visíveis?", ResponseType.CONFORMITY, true, true, true, null, 1),
+                item("Botão de emergência funcionando?", ResponseType.SINGLE_CHOICE, true, true, false,
+                        "[\"Funcionando\",\"Intermitente\",\"Não funcionando\"]", 2)
+        ));
+        addSection(template, "Operação", 2, List.of(
+                item("Pressão dentro da faixa?", ResponseType.NUMBER, true, true, false, null, 0),
+                item("Vibração dentro do limite?", ResponseType.CONFORMITY, true, true, true, null, 1),
+                item("Equipamento operando sem ruídos anormais?", ResponseType.TEXT_SHORT, true, false, false, null, 2)
+        ));
+
+        return templateRepository.save(template);
+    }
+
+    private void addSection(InspectionTemplate template, String title, int sortOrder, List<TemplateItem> items) {
+        TemplateSection section = new TemplateSection();
+        section.setTemplate(template);
+        section.setTitle(title);
+        section.setSortOrder(sortOrder);
+        for (TemplateItem item : items) {
+            item.setSection(section);
+            section.getItems().add(item);
+        }
+        template.getSections().add(section);
+    }
+
+    private TemplateItem item(String question, ResponseType responseType, boolean required,
+                              boolean requireObservationOnFailure, boolean requireEvidenceOnFailure,
+                              String options, int sortOrder) {
+        TemplateItem item = new TemplateItem();
+        item.setQuestion(question);
+        item.setResponseType(responseType);
+        item.setRequired(required);
+        item.setRequireObservationOnFailure(requireObservationOnFailure);
+        item.setRequireEvidenceOnFailure(requireEvidenceOnFailure);
+        item.setOptions(options);
+        item.setSortOrder(sortOrder);
+        return item;
     }
 }

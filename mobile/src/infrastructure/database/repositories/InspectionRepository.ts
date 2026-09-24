@@ -7,6 +7,13 @@ import type {
   TemplateItem,
 } from '@/features/fieldops/types';
 
+// Snapshot section/item ids are unique only within a template. Scoping them to the
+// inspection keeps the global TEXT PRIMARY KEY unique when several inspections share
+// the same template, and keeps answers/evidences pointing at the right item.
+function scopedId(inspectionId: string, originalId: string): string {
+  return `${inspectionId}::${originalId}`;
+}
+
 // ─── Row types (DB shape) ──────────────────────────────────────────────────────
 
 interface InspectionRow {
@@ -34,6 +41,12 @@ interface InspectionRow {
   sync_status: string;
   pending_sync_count: number;
   updated_at: string;
+  start_latitude: number | null;
+  start_longitude: number | null;
+  start_accuracy: number | null;
+  rejection_reason: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
 }
 
 interface SectionRow {
@@ -151,6 +164,34 @@ export class InspectionRepository {
     );
   }
 
+  /**
+   * Mark an inspection as started using the device's own timestamp and,
+   * optionally, the GPS location captured at start time. Location may be null
+   * when permission was denied (RN-059) — the inspection still starts.
+   */
+  async markStartedWithDevice(
+    id: string,
+    startedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET
+         status = 'IN_PROGRESS',
+         started_at = ?,
+         start_latitude = ?,
+         start_longitude = ?,
+         start_accuracy = ?,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      startedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
+      id,
+    );
+  }
+
   async markSubmitted(id: string): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections SET status = 'SUBMITTED', completed_at = datetime('now'),
@@ -168,9 +209,14 @@ export class InspectionRepository {
 
     for (let sIdx = 0; sIdx < template.sections.length; sIdx++) {
       const section = template.sections[sIdx];
+      // Snapshot section/item ids are only unique within a template, but the
+      // section/item tables use a global TEXT PRIMARY KEY. Inspections that share
+      // the same template would collide on insert (dropping every inspection after
+      // the first). Scope the ids to the inspection to keep the primary key unique.
+      const scopedSectionId = scopedId(inspectionId, section.id);
       await this.db.runAsync(
         'INSERT INTO inspection_sections (id, inspection_id, title, sort_order) VALUES (?, ?, ?, ?)',
-        section.id,
+        scopedSectionId,
         inspectionId,
         section.title,
         sIdx,
@@ -183,8 +229,8 @@ export class InspectionRepository {
             id, section_id, inspection_id, question, description, response_type,
             required, require_observation_on_failure, require_evidence_on_failure, options, sort_order
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          item.id,
-          section.id,
+          scopedId(inspectionId, item.id),
+          scopedSectionId,
           inspectionId,
           item.question,
           item.description ?? null,
@@ -289,6 +335,12 @@ export class InspectionRepository {
     syncStatus: row.sync_status as Inspection['syncStatus'],
     pendingSyncCount: row.pending_sync_count,
     supervisorInstructions: row.supervisor_instructions ?? '',
+    startLatitude: row.start_latitude ?? undefined,
+    startLongitude: row.start_longitude ?? undefined,
+    startAccuracy: row.start_accuracy ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    rejectedBy: row.rejected_by ?? undefined,
+    rejectedAt: row.rejected_at ?? undefined,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

@@ -1,8 +1,8 @@
 package com.fieldops.inspection.service;
 
 import com.fieldops.inspection.dto.InspectionTemplateRequest;
+import com.fieldops.inspection.dto.InspectionTemplatePreviewResponse;
 import com.fieldops.inspection.dto.InspectionTemplateResponse;
-import com.fieldops.inspection.dto.TemplateVersionSummary;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
@@ -10,20 +10,24 @@ import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.user.model.User;
 import com.fieldops.user.repository.UserRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class InspectionTemplateService {
 
     private final InspectionTemplateRepository templateRepository;
     private final UserRepository userRepository;
+    private final TemplateSectionService sectionService;
+    private final InspectionTemplatePublicationValidator publicationValidator;
 
-    public InspectionTemplateService(InspectionTemplateRepository templateRepository, UserRepository userRepository) {
+    public InspectionTemplateService(InspectionTemplateRepository templateRepository, UserRepository userRepository,
+            TemplateSectionService sectionService, InspectionTemplatePublicationValidator publicationValidator) {
         this.templateRepository = templateRepository;
         this.userRepository = userRepository;
+        this.sectionService = sectionService;
+        this.publicationValidator = publicationValidator;
     }
 
     /** Creates an empty inspection template owned by the authenticated user. */
@@ -45,6 +49,14 @@ public class InspectionTemplateService {
         return toResponse(findById(id));
     }
 
+    /** Returns the read-only checklist and every issue that would prevent publication. */
+    @Transactional(readOnly = true)
+    public InspectionTemplatePreviewResponse preview(Long id) {
+        InspectionTemplate template = findById(id);
+        List<String> issues = publicationValidator.validate(template);
+        return new InspectionTemplatePreviewResponse(toResponse(template), issues.isEmpty(), issues);
+    }
+
     /** Updates metadata while the inspection template remains a draft. */
     @Transactional
     public InspectionTemplateResponse updateDraft(Long id, InspectionTemplateRequest request) {
@@ -54,35 +66,6 @@ public class InspectionTemplateService {
         }
         applyMetadata(template, request);
         return toResponse(template);
-    }
-
-    /**
-     * Returns the published versions available for scheduling a new inspection.
-     *
-     * <p>The current model stores a single {@code currentVersion} integer per template.
-     * An ACTIVE template exposes exactly one entry. A non-ACTIVE template has no schedulable
-     * versions, so the list is empty when {@code activeForNewInspections=true}.</p>
-     */
-    @Transactional(readOnly = true)
-    public List<TemplateVersionSummary> listVersions(Long templateId, Boolean activeForNewInspections) {
-        InspectionTemplate template = findById(templateId);
-        boolean isActive = template.getStatus() == InspectionTemplateStatus.ACTIVE;
-
-        // When the caller only wants versions active for new inspections, return empty for non-ACTIVE templates
-        if (Boolean.TRUE.equals(activeForNewInspections) && !isActive) {
-            return List.of();
-        }
-
-        if (!isActive) {
-            return List.of();
-        }
-
-        TemplateVersionSummary version = new TemplateVersionSummary(
-                template.getId(),
-                template.getCurrentVersion(),
-                true,
-                template.getUpdatedAt());
-        return List.of(version);
     }
 
     private InspectionTemplate findById(Long id) {
@@ -104,6 +87,6 @@ public class InspectionTemplateService {
         return new InspectionTemplateResponse(template.getId(), template.getTitle(), template.getDescription(),
                 template.getCategory(), template.getStatus(), template.getCurrentVersion(),
                 template.getCreatedBy().getId(), template.getCreatedAt(), template.getUpdatedAt(),
-                template.getRowVersion());
+                template.getRowVersion(), sectionService.toOrderedResponses(template.getSections()));
     }
 }

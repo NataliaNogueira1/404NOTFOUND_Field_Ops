@@ -24,7 +24,6 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
   const [observation, setObservation] = useState(answer?.observation ?? '');
   const isFailure = answer?.value === 'NAO_CONFORME';
   const statusLabel = useMemo(() => isFailure ? 'Não conforme' : answer ? 'Respondido' : 'Pendente', [answer, isFailure]);
-
   // Debounced save hook — handles timing per response type
   const { status: saveStatus, save, flush } = useDebouncedSave({
     responseType: item.responseType,
@@ -44,20 +43,26 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
     if (text) flush(parsed, observation || undefined);
   }, [item.responseType, text, observation, flush]);
 
-  // Selection controls: immediate save
+  // Selection controls: immediate save, preserving any existing observation
   const handleSelect = useCallback((value: ChecklistValue) => {
-    save(value);
-  }, [save]);
+    save(value, observation || undefined);
+  }, [observation, save]);
 
-  // Observation field for non-conformities
+  // Observation field — available for all items, not just non-conformities
   const handleObservationChange = useCallback((value: string) => {
     setObservation(value);
-    save('NAO_CONFORME', value);
-  }, [save]);
+    const currentValue = answer?.value;
+    if (currentValue !== undefined) {
+      save(currentValue, value || undefined);
+    }
+  }, [answer?.value, save]);
 
   const handleObservationBlur = useCallback(() => {
-    flush('NAO_CONFORME', observation);
-  }, [flush, observation]);
+    const currentValue = answer?.value;
+    if (currentValue !== undefined) {
+      flush(currentValue, observation || undefined);
+    }
+  }, [answer?.value, flush, observation]);
 
   return (
     <Card style={styles.card}>
@@ -77,7 +82,7 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
       {isFailure ? (
         <View style={styles.failureBox}>
           <Text style={styles.failureTitle}>Não conformidade criada</Text>
-          <Text style={styles.label}>Observação obrigatória</Text>
+          <Text style={styles.label}>Observação{item.requireObservationOnFailure ? ' obrigatória' : ''}</Text>
           <TextInput
             value={observation}
             onChangeText={handleObservationChange}
@@ -87,8 +92,21 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
             style={[styles.input, styles.textArea]}
             multiline
           />
-          <Text style={styles.label}>Evidência obrigatória</Text>
+          <Text style={styles.label}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
           <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=ins-compressor&itemId=${item.id}`)} variant="secondary" />
+        </View>
+      ) : answer !== undefined ? (
+        <View style={styles.observationBox}>
+          <Text style={styles.label}>Observação (opcional)</Text>
+          <TextInput
+            value={observation}
+            onChangeText={handleObservationChange}
+            onBlur={handleObservationBlur}
+            placeholder="Adicione uma observação sobre este item"
+            placeholderTextColor={Colors.gray400}
+            style={[styles.input, styles.textArea]}
+            multiline
+          />
         </View>
       ) : null}
       {evidences.length > 0 ? (
@@ -118,17 +136,45 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
   if (item.responseType === ResponseType.BOOLEAN) return <Segmented options={[[true, 'Sim'], [false, 'Não']]} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} />;
   if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} />;
-  return (
+  if (item.responseType === ResponseType.NUMBER) return (
     <TextInput
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
-      keyboardType={item.responseType === ResponseType.NUMBER ? 'numeric' : 'default'}
-      placeholder={item.responseType === ResponseType.NUMBER ? 'Informe o valor' : 'Digite a resposta'}
+      keyboardType="numeric"
+      placeholder="Informe o valor"
       placeholderTextColor={Colors.gray400}
-      style={[styles.input, item.responseType === ResponseType.TEXT_LONG && styles.textArea]}
-      multiline={item.responseType === ResponseType.TEXT_LONG}
+      style={styles.input}
     />
+  );
+  if (item.responseType === ResponseType.TEXT_SHORT) return (
+    <TextInput
+      value={text}
+      onChangeText={onText}
+      onBlur={onTextBlur}
+      placeholder="Digite a resposta"
+      placeholderTextColor={Colors.gray400}
+      style={styles.input}
+      maxLength={255}
+    />
+  );
+  if (item.responseType === ResponseType.TEXT_LONG) return (
+    <TextInput
+      value={text}
+      onChangeText={onText}
+      onBlur={onTextBlur}
+      placeholder="Digite a resposta"
+      placeholderTextColor={Colors.gray400}
+      style={[styles.input, styles.textArea]}
+      multiline
+      maxLength={2000}
+    />
+  );
+  // PBI-035: fallback para tipos desconhecidos — não crasha no TextInput genérico
+  return (
+    <View style={styles.incompatibleBox}>
+      <Text style={styles.incompatibleText}>Tipo incompatível: {item.responseType}</Text>
+    </View>
   );
 }
 
@@ -184,6 +230,9 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, paddingHorizontal: Spacing.md, color: Colors.text, fontSize: FontSize.md },
   textArea: { minHeight: 92, paddingTop: Spacing.sm, textAlignVertical: 'top' },
   failureBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.dangerLight, backgroundColor: '#FFF7F7', padding: Spacing.md },
+  observationBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, padding: Spacing.md },
+  incompatibleBox: { borderRadius: 10, borderWidth: 1, borderColor: Colors.warningLight, backgroundColor: Colors.warningLight, padding: Spacing.md },
+  incompatibleText: { fontSize: FontSize.sm, color: Colors.warningDark },
   failureTitle: { color: Colors.dangerDark, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },

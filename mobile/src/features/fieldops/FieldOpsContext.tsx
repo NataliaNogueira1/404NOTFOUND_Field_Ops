@@ -1,4 +1,5 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { useAuth } from '@/features/auth';
 import { useDatabase } from '@/infrastructure/database/DatabaseProvider';
@@ -31,7 +32,13 @@ interface FieldOpsContextValue {
   evidences: Evidence[];
   nonConformities: NonConformity[];
   syncOperations: SyncOperation[];
-  startInspection: (inspectionId: string) => void;
+  startInspection: (
+    inspectionId: string,
+    options?: {
+      startedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+    },
+  ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
@@ -40,6 +47,20 @@ interface FieldOpsContextValue {
   resetSession: () => void;
   isSyncing: boolean;
   lastSyncError: string | null;
+}
+
+// Downloads the technician's inspections from the API into SQLite. Failures are
+// swallowed (logged) on purpose: the app must keep working offline from the local
+// cache, so a pull error never blocks the UI.
+async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
+  try {
+    const syncService = new InspectionSyncService(db);
+    console.log('[FieldOps] Pulling inspections from API...');
+    const result = await syncService.pullInspections(token);
+    console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
+  } catch (apiError) {
+    console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+  }
 }
 
 const FieldOpsContext = createContext<FieldOpsContextValue | undefined>(undefined);
@@ -53,6 +74,8 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   // Refs to avoid stale closures and prevent re-init loops
   const initDoneRef = useRef(false);
   const inspectionsRef = useRef<Inspection[]>([]);
+  // Tracks the token we last pulled with, so the post-login effect pulls once per session.
+  const lastPulledTokenRef = useRef<string | null>(null);
 
   // State
   const [inspections, setInspections] = useState<Inspection[]>([]);
@@ -69,74 +92,90 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Initialize DB once ──────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!db || initDoneRef.current) return;
-    initDoneRef.current = true;
-
+  // Loads every entity from SQLite into React state. Shared by the initial DB load
+  // and by the post-login pull, so both paths hydrate the UI the same way.
+  const loadFromDb = useCallback(async () => {
+    if (!db) return;
     const inspRepo = new InspectionRepository(db);
     const ansRepo = new AnswerRepository(db);
     const evRepo = new EvidenceRepository(db);
     const ncRepo = new NonConformityRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
+    const dbInspections = await inspRepo.getAll();
+    setInspections(dbInspections);
+
+    const allAnswers: Record<string, ChecklistAnswer> = {};
+    for (const insp of dbInspections) {
+      const a = await ansRepo.getByInspection(insp.id);
+      Object.assign(allAnswers, a);
+    }
+    setAnswers(allAnswers);
+
+    const allEvs: Evidence[] = [];
+    for (const insp of dbInspections) {
+      const e = await evRepo.getByInspection(insp.id);
+      allEvs.push(...e);
+    }
+    setEvidences(allEvs);
+
+    const allNCs: NonConformity[] = [];
+    for (const insp of dbInspections) {
+      const n = await ncRepo.getByInspection(insp.id);
+      allNCs.push(...n);
+    }
+    setNonConformities(allNCs);
+
+    const queue = await sqRepo.getAll();
+    setSyncOperations(queue.map((entry) => ({
+      id: entry.id,
+      title: `${entry.entityType}: ${entry.entityId}`,
+      status: entry.status === 'sent' ? 'Enviada' as const :
+              entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
+    })));
+
+    console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
+  }, [db]);
+
+  // ─── Initialize DB once ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db || initDoneRef.current) return;
+    initDoneRef.current = true;
+
     (async () => {
       try {
-        // Try to pull from API first (if we have a token)
+        // Try to pull from API first (if we already have a token at startup).
         if (token) {
-          try {
-            const syncService = new InspectionSyncService(db);
-            console.log('[FieldOps] Pulling inspections from API...');
-            const result = await syncService.pullInspections(token);
-            console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
-          } catch (apiError) {
-            console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
-          }
+          await pullFromApi(db, token);
         }
-
-        let dbInspections = await inspRepo.getAll();
-
-        // Load everything from DB
-        setInspections(dbInspections);
-
-        const allAnswers: Record<string, ChecklistAnswer> = {};
-        for (const insp of dbInspections) {
-          const a = await ansRepo.getByInspection(insp.id);
-          Object.assign(allAnswers, a);
-        }
-        setAnswers(allAnswers);
-
-        const allEvs: Evidence[] = [];
-        for (const insp of dbInspections) {
-          const e = await evRepo.getByInspection(insp.id);
-          allEvs.push(...e);
-        }
-        setEvidences(allEvs);
-
-        const allNCs: NonConformity[] = [];
-        for (const insp of dbInspections) {
-          const n = await ncRepo.getByInspection(insp.id);
-          allNCs.push(...n);
-        }
-        setNonConformities(allNCs);
-
-        const queue = await sqRepo.getAll();
-        if (queue.length > 0) {
-          setSyncOperations(queue.map((entry) => ({
-            id: entry.id,
-            title: `${entry.entityType}: ${entry.entityId}`,
-            status: entry.status === 'sent' ? 'Enviada' as const :
-                    entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
-          })));
-        }
-
-        console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
+        await loadFromDb();
       } catch (error) {
         console.warn('[FieldOps] DB init failed:', error);
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [db, token]);
+  }, [db, loadFromDb, token]);
+
+  // ─── Pull from the server when the technician logs in ─────────────────────
+  // The DB init above runs once and may execute before the user authenticates
+  // (no token yet), which would skip the download and leave the stale local
+  // cache on screen. This effect re-runs the pull as soon as a token becomes
+  // available, then re-hydrates the UI from SQLite.
+  useEffect(() => {
+    if (!db || !token) return;
+    if (lastPulledTokenRef.current === token) return;
+    lastPulledTokenRef.current = token;
+
+    (async () => {
+      try {
+        await pullFromApi(db, token);
+        await loadFromDb();
+      } catch (error) {
+        console.warn('[FieldOps] Post-login pull failed:', error);
+      }
+    })();
+  }, [db, token, loadFromDb]);
 
   // ─── Helper: get repos (only if db available) ────────────────────────────
 
@@ -158,21 +197,51 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
-  const startInspection = useCallback((inspectionId: string) => {
-    setInspections((current) =>
-      current.map((inspection) =>
-        inspection.id === inspectionId
-          ? { ...inspection, status: InspectionStatus.IN_PROGRESS, startedAt: inspection.startedAt ?? new Date().toISOString(), syncStatus: 'pending' as const }
-          : inspection,
-      ),
-    );
-    const repos = getRepos();
-    const sync = getSyncService();
-    if (repos && sync) {
-      repos.inspection.markStarted(inspectionId).catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
-    }
-  }, [getRepos, getSyncService]);
+  const startInspection = useCallback(
+    (
+      inspectionId: string,
+      options?: {
+        startedAtDevice?: string;
+        location?: { latitude: number; longitude: number; accuracy?: number } | null;
+      },
+    ) => {
+      const startedAtDevice = options?.startedAtDevice ?? new Date().toISOString();
+      const location = options?.location ?? null;
+
+      setInspections((current) =>
+        current.map((inspection) =>
+          inspection.id === inspectionId
+            ? {
+                ...inspection,
+                status: InspectionStatus.IN_PROGRESS,
+                startedAt: inspection.startedAt ?? startedAtDevice,
+                startLatitude: location?.latitude ?? inspection.startLatitude,
+                startLongitude: location?.longitude ?? inspection.startLongitude,
+                startAccuracy: location?.accuracy ?? inspection.startAccuracy,
+                syncStatus: 'pending' as const,
+                pendingSyncCount: Math.max(inspection.pendingSyncCount, 1),
+              }
+            : inspection,
+        ),
+      );
+      const repos = getRepos();
+      const sync = getSyncService();
+      if (repos && sync) {
+        repos.inspection
+          .markStartedWithDevice(inspectionId, startedAtDevice, location)
+          .catch(console.warn);
+        // Outbox: TRANSITION carrying device timestamp + optional location (PBI-034).
+        sync
+          .enqueueTransition(inspectionId, {
+            status: 'IN_PROGRESS',
+            startedAtDevice,
+            location,
+          })
+          .catch(console.warn);
+      }
+    },
+    [getRepos, getSyncService],
+  );
 
   const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string) => {
     setAnswers((current) => {

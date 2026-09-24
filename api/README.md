@@ -20,6 +20,32 @@ cp .env.example .env          # then edit DB + JWT values
 
 The app starts on `http://localhost:8080`; Swagger UI at `http://localhost:8080/swagger-ui`.
 
+## Demonstration via Docker (PBI-070)
+
+A single command builds the API image and starts PostgreSQL + API in containers, ready to demo:
+
+```bash
+cd api
+docker compose up --build
+```
+
+On the first start the container (profile `demo`):
+
+- runs the Flyway migrations automatically;
+- seeds the demo users (see the credentials table below), a set of ASSIGNED inspections for
+  the technician, and a coherent catalog dataset (client, site, equipment, published template
+  and one assigned inspection — the compressor example).
+
+Then open:
+
+- Swagger UI: `http://localhost:8080/swagger-ui`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Health: `http://localhost:8080/actuator/health`
+
+Log in at `POST /api/v1/auth/login` with any account from the credentials table. The API port
+is overridable with `API_EXTERNAL_PORT`; `JWT_SECRET` has a demo default and should be
+overridden for any real deployment. Stop and reset with `docker compose down -v`.
+
 ## Database
 
 Schema is managed by **Flyway** (`src/main/resources/db/migration`). Hibernate runs with
@@ -51,6 +77,18 @@ The default `dev` profile creates three intentionally fictitious local accounts 
 These accounts are created only by the `dev` profile and are never created in production. Set
 `FIELDOPS_DEV_USERS_ENABLED=false` to disable them, or override each `FIELDOPS_DEV_*` variable
 when needed. Passwords in this table are for local demonstration only.
+
+## Demonstration data (seed)
+
+On top of the users above, the `dev` profile seeds a coherent demonstration dataset on startup
+(PBI-066): one client (`Industria Modelo Ltda.`), one site (`Unidade Sorocaba - Galpao de
+Producao 02`), one equipment (`Compressor de Ar XPTO 500`, QR `COMP-004`), one published
+inspection template (`Inspecao Preventiva de Compressor`, 2 sections) and one inspection
+**assigned to the technician above**. Log in as `technician@fieldops.local` and the inspection
+appears at `GET /api/v1/mobile/inspections`.
+
+The seed is idempotent (guarded by the client document) and safe to re-run. Disable it with
+`FIELDOPS_DEMO_SEED_ENABLED=false`.
 
 ## Commands
 

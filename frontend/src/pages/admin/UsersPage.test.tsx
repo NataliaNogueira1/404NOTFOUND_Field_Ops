@@ -17,49 +17,63 @@ const ana = {
 }
 
 function json(body: unknown, status = 200) {
-  return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
+  return Promise.resolve(
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+  )
 }
 
 function page(content = [ana]) {
   return { content, totalElements: content.length, totalPages: 1, number: 0, size: 10 }
 }
 
-beforeEach(() => {
-  window.sessionStorage.setItem('fieldops:access-token', 'admin-token')
-})
+beforeEach(() => window.localStorage.setItem('fieldops:access-token', 'admin-token'))
 
 afterEach(cleanup)
 
 describe('UsersPage', () => {
   it('loads users and sends filters and pagination to the server', async () => {
-    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    const fetchMock = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
       .mockImplementation(() => json(page()))
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter><UsersPage /><LocationProbe /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <UsersPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    )
 
     expect(await screen.findByText('Ana Costa')).not.toBeNull()
     await userEvent.selectOptions(screen.getByLabelText('Status'), 'BLOCKED')
 
     expect(screen.getByTestId('location')).toHaveTextContent('status=BLOCKED')
 
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('status=BLOCKED'), expect.anything()))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining('status=BLOCKED'), expect.anything()),
+    )
     expect(String(fetchMock.mock.calls[0][0])).toContain('page=0')
     expect(String(fetchMock.mock.calls[0][0])).toContain('size=10')
     expect(String(fetchMock.mock.calls[0][0])).toContain('sort=name%2Casc')
   })
 
   it('reflects debounced search and column sorting in the URL', async () => {
-    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    const fetchMock = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
       .mockImplementation(() => json(page()))
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter initialEntries={['/app/users?size=25']}><UsersPage /><LocationProbe /></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/app/users?size=25']}>
+        <UsersPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    )
     await screen.findByText('Ana Costa')
 
     await userEvent.type(screen.getByLabelText('Buscar'), 'Ana')
     expect(screen.getByTestId('location')).toHaveTextContent('name=Ana')
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('name=Ana'), expect.anything()))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining('name=Ana'), expect.anything()),
+    )
 
     await userEvent.click(screen.getByRole('button', { name: 'Nome' }))
     expect(screen.getByTestId('location')).toHaveTextContent('sort=name%2Cdesc')
@@ -77,7 +91,11 @@ describe('UsersPage', () => {
       return json(page())
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <UsersPage />
+      </MemoryRouter>,
+    )
     await screen.findByText('Ana Costa')
 
     await userEvent.click(screen.getByRole('button', { name: /novo usuario/i }))
@@ -87,26 +105,42 @@ describe('UsersPage', () => {
     await userEvent.tab()
     await userEvent.type(within(dialog).getByLabelText('Senha'), 'secret1')
     await userEvent.selectOptions(within(dialog).getByLabelText('Perfil'), 'ADMIN')
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/email-availability?email=nova%40example.com'), expect.anything()))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/email-availability?email=nova%40example.com'),
+        expect.anything(),
+      ),
+    )
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }))
 
-    await waitFor(() => expect(postBody).toMatchObject({
-      name: 'Nova Admin', email: 'nova@example.com', password: 'secret1', role: 'ADMINISTRATOR',
-    }))
+    await waitFor(() =>
+      expect(postBody).toMatchObject({
+        name: 'Nova Admin',
+        email: 'nova@example.com',
+        password: 'secret1',
+        role: 'ADMINISTRATOR',
+      }),
+    )
     expect(await screen.findByText('Usuario criado com sucesso.')).not.toBeNull()
   })
 
   it('asks for confirmation before inactivating a user', async () => {
     let statusBody: Record<string, unknown> | undefined
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith('/api/v1/users/7/status')) {
-        statusBody = JSON.parse(String(init?.body)) as Record<string, unknown>
-        return json({ ...ana, status: 'INACTIVE', version: 1 })
-      }
-      return json(page())
-    }))
-    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith('/api/v1/users/7/status')) {
+          statusBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+          return json({ ...ana, status: 'INACTIVE', version: 1 })
+        }
+        return json(page())
+      }),
+    )
+    render(
+      <MemoryRouter>
+        <UsersPage />
+      </MemoryRouter>,
+    )
     await screen.findByText('Ana Costa')
 
     await userEvent.click(screen.getByRole('button', { name: 'Inativar Ana Costa' }))

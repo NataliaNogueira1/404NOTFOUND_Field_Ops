@@ -1,4 +1,14 @@
-﻿import { ArrowRight, CalendarClock, ClipboardCheck, ClipboardPlus, ClockAlert, Eye, FilePlus2, ShieldAlert, TriangleAlert } from 'lucide-react'
+import {
+  ArrowRight,
+  CalendarClock,
+  ClipboardCheck,
+  ClipboardPlus,
+  ClockAlert,
+  Eye,
+  FilePlus2,
+  ShieldAlert,
+  TriangleAlert,
+} from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
@@ -8,25 +18,31 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
 import { useReviewCount } from '@/hooks/useReviewCount'
-import { dashboardStats, inspections, inspectionsByStatus, nonConformitiesBySeverity, byId, clients, equipment } from '@/mocks/domain'
+import {
+  dashboardStats,
+  inspections,
+  inspectionsByStatus,
+  nonConformitiesBySeverity,
+  byId,
+  clients,
+  equipment,
+} from '@/mocks/domain'
 
 export function DashboardPage() {
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const reviewCount = useReviewCount()
 
   const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
-  const pendingLabel = reviewCount === null
-    ? 'aguardando revisão'
-    : reviewCount === 1
-      ? '1 aguardando revisão'
-      : `${reviewCount} aguardando revisão`
+  const pendingLabel =
+    reviewCount === null
+      ? 'aguardando revisão'
+      : reviewCount === 1
+        ? '1 aguardando revisão'
+        : `${reviewCount} aguardando revisão`
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`Olá, ${firstName}`}
-        description="Aqui está um resumo das operações de hoje."
-      />
+      <PageHeader title={`Olá, ${firstName}`} description="Aqui está um resumo das operações de hoje." />
 
       {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -55,7 +71,12 @@ export function DashboardPage() {
               <BarChart data={inspectionsByStatus} margin={{ left: -20, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C1CDDD" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
-                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 12 }}
+                />
                 <Tooltip cursor={{ fill: '#F2F7FF' }} contentStyle={{ borderRadius: 10, borderColor: '#C1CDDD' }} />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} />
               </BarChart>
@@ -96,7 +117,7 @@ export function DashboardPage() {
               <h2 className="text-base font-semibold">Não conformidades por criticidade</h2>
             </div>
             <div className="space-y-3">
-              {nonConformitiesBySeverity.map(item => (
+              {nonConformitiesBySeverity.map((item) => (
                 <div key={item.label} className="flex items-center justify-between">
                   <Badge tone={item.tone}>{item.label}</Badge>
                   <span className="font-semibold">{item.value}</span>
@@ -119,7 +140,7 @@ export function DashboardPage() {
           </Link>
         </div>
         <div className="divide-y divide-border">
-          {inspections.slice(0, 5).map(item => (
+          {inspections.slice(0, 5).map((item) => (
             <Link
               to={`/app/inspections/${item.id}/review`}
               key={item.id}

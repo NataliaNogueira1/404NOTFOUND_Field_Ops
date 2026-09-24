@@ -1,7 +1,58 @@
 ﻿import { forwardRef, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { cn } from '@/utils/cn'
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; error?: string }>(({ className, error, id, label, ...props }, ref) => <div className="space-y-1.5"><label htmlFor={id} className="block text-sm font-medium text-text">{label}</label><textarea id={id} ref={ref} className={cn('focus-ring min-h-24 w-full rounded-fieldops border bg-white px-3.5 py-3 text-sm text-text placeholder:text-muted/70 focus:border-primary', error ? 'border-danger' : 'border-border', className)} {...props} />{error && <p className="text-xs text-danger">{error}</p>}</div>)
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; error?: string }
+>(({ className, error, id, label, ...props }, ref) => (
+  <div className="space-y-1.5">
+    <label htmlFor={id} className="block text-sm font-medium text-text">
+      {label}
+    </label>
+    <textarea
+      id={id}
+      ref={ref}
+      className={cn(
+        'focus-ring min-h-24 w-full rounded-fieldops border bg-white px-3.5 py-3 text-sm text-text placeholder:text-muted/70 focus:border-primary',
+        error ? 'border-danger' : 'border-border',
+        className,
+      )}
+      {...props}
+    />
+    {error && <p className="text-xs text-danger">{error}</p>}
+  </div>
+))
 Textarea.displayName = 'Textarea'
-export function Select({ className, id, children, label, error, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string }) {
-  return <div className="space-y-1.5"><label htmlFor={id} className="block text-sm font-medium text-text">{label}</label><select id={id} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} className={cn('focus-ring h-11 w-full rounded-fieldops border bg-white px-3.5 text-sm text-text focus:border-primary disabled:bg-slate-50', error ? 'border-danger' : 'border-border', className)} {...props}>{children}</select>{error && <p id={`${id}-error`} className="text-xs text-danger">{error}</p>}</div>
+export function Select({
+  className,
+  id,
+  children,
+  label,
+  error,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-sm font-medium text-text">
+        {label}
+      </label>
+      <select
+        id={id}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={cn(
+          'focus-ring h-11 w-full rounded-fieldops border bg-white px-3.5 text-sm text-text focus:border-primary disabled:bg-slate-50',
+          error ? 'border-danger' : 'border-border',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </select>
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </div>
+  )
 }

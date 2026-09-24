@@ -1,6 +1,7 @@
 package com.fieldops.user.service;
 
 import com.fieldops.shared.exception.BusinessException;
+import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.user.dto.CreateUserRequest;
 import com.fieldops.user.dto.UpdateUserRequest;
@@ -119,7 +120,7 @@ public class UserService {
 
     private void ensureEmailAvailable(String email, Long excludeId) {
         if (!isEmailAvailable(email, excludeId)) {
-            throw new BusinessException("Email is already in use");
+            throw new ResourceConflictException("Email is already in use: " + email);
         }
     }
 

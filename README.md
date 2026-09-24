@@ -67,7 +67,7 @@ Inspeções técnicas em campo ainda dependem, em muitos cenários, de formulár
         │ HTTPS / JSON
 ┌───────┴─────────────────────┐
 │ Interface Administrativa    │
-│ Angular + TypeScript        │
+│ React + TypeScript + Vite   │
 └─────────────────────────────┘
 ```
 
@@ -86,7 +86,7 @@ Destinado aos técnicos de campo. Desenvolvido com **Expo + React Native + TypeS
 - **Funcionamento offline** com sincronização automática ao reconectar
 
 ### Interface Administrativa Web
-Destinada a administradores e supervisores. Desenvolvida com **Angular + TypeScript**.
+Destinada a administradores e supervisores. Desenvolvida com **React + TypeScript + Vite**.
 
 - Cadastro de clientes, locais, equipamentos e usuários
 - Criação e versionamento de modelos de inspeção
@@ -149,19 +149,21 @@ Aprovação ou solicitação de correção
 |------------|-------------|
 | **Mobile** | Expo, React Native, TypeScript, Expo Router, SQLite |
 | **Backend** | Java, Spring Boot, JPA, PostgreSQL, JWT |
-| **Web Admin** | Angular, TypeScript |
-| **Infraestrutura** | PostgreSQL, SQLite, armazenamento de objetos (evidências) |
+| **Web Admin** | React, TypeScript, Vite, React Router, React Hook Form, Zod, Tailwind CSS |
+| **Infraestrutura** | PostgreSQL, SQLite, Docker, armazenamento de objetos (evidências) |
 
 ---
 
-## Estrutura dos repositórios
+## Estrutura do repositório
 
-Este projeto é composto por três repositórios independentes:
+Este projeto é um monorepo que reúne os três componentes e a documentação:
 
 ```bash
-fieldops-api/      # API REST — Java + Spring Boot
-fieldops-mobile/   # Aplicativo mobile — Expo + React Native
-fieldops-web/      # Interface administrativa — Angular
+api/         # API REST — Java + Spring Boot
+frontend/    # Interface administrativa — React + TypeScript + Vite
+mobile/      # Aplicativo mobile — Expo + React Native
+mocks/       # Dados simulados para desenvolvimento dos frontends
+docs/        # Documentação do produto (visão, backlog, cronograma, análises)
 ```
 
 ---
@@ -210,34 +212,33 @@ A documentação completa do projeto está organizada nos seguintes documentos:
 
 ### Pré-requisitos
 
-- **Java 21+** e **Maven** (para a API)
+- **Java 21+** (a API inclui o wrapper Maven `mvnw`)
 - **Node.js 20+** e **npm** (para mobile e web)
-- **PostgreSQL 15+**
-- **Expo CLI** (`npm install -g expo-cli`)
+- **PostgreSQL 15+** (ou Docker, via `docker-compose`)
 
 ### API
 
 ```bash
-cd fieldops-api
+cd api
 cp .env.example .env
 # configure as variáveis de banco e JWT
-mvn spring-boot:run
+./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
 ```
 
 A documentação da API estará disponível em `http://localhost:8080/swagger-ui.html`.
 
-### Mobile
-
-```bash
-cd fieldops-mobile
-npm install
-npx expo start
-```
-
 ### Web Admin
 
 ```bash
-cd fieldops-web
+cd frontend
 npm install
-ng serve
+npm run dev        # inicia o servidor de desenvolvimento Vite
+```
+
+### Mobile
+
+```bash
+cd mobile
+npm install
+npx expo start
 ```

@@ -14,9 +14,13 @@ import org.springframework.stereotype.Component;
 /**
  * Creates intentionally fictitious accounts for the local dev profile only.
  * Production never loads this runner because of {@link Profile}.
+ *
+ * <p>Runs first (lowest {@link Order}) so the admin/supervisor/technician accounts
+ * exist before the seed runners that depend on them: {@link DevInspectionsBootstrapRunner}
+ * ({@code @Order(20)}) and {@link DemoSeedRunner} ({@code @Order(100)}).
  */
 @Component
-@Profile("dev")
+@Profile({"dev", "demo"})
 @Order(10)
 public class DevUsersBootstrapRunner implements ApplicationRunner {
 

@@ -140,6 +140,18 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
     `,
   },
+  {
+    version: 2,
+    description: 'Add start-location and rejection metadata to inspections',
+    sql: `
+      ALTER TABLE inspections ADD COLUMN start_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN start_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN start_accuracy REAL;
+      ALTER TABLE inspections ADD COLUMN rejection_reason TEXT;
+      ALTER TABLE inspections ADD COLUMN rejected_by TEXT;
+      ALTER TABLE inspections ADD COLUMN rejected_at TEXT;
+    `,
+  },
 ];
 
 /**

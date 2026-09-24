@@ -1,4 +1,17 @@
-import { ClipboardCheck, ClipboardList, Eye, FileSearch, Gauge, Menu, ShieldCheck, TriangleAlert, Users, Warehouse, Wrench, X } from 'lucide-react'
+import {
+  ClipboardCheck,
+  ClipboardList,
+  Eye,
+  FileSearch,
+  Gauge,
+  Menu,
+  ShieldCheck,
+  TriangleAlert,
+  Users,
+  Warehouse,
+  Wrench,
+  X,
+} from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { NavLink } from 'react-router-dom'
 import { authSession } from '@/auth/session'
@@ -10,7 +23,7 @@ interface NavItem {
   to: string
   icon: React.ElementType
   adminOnly?: boolean
-  reviewBadge?: boolean   // when true, renders the live review-queue counter
+  reviewBadge?: boolean // when true, renders the live review-queue counter
 }
 
 interface NavGroup {
@@ -60,10 +73,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         onClick={onClose}
       />
 
-      <aside className={cn(
-        'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-sidebar text-text transition-transform lg:translate-x-0',
-        open ? 'translate-x-0' : '-translate-x-full',
-      )}>
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-sidebar text-text transition-transform lg:translate-x-0',
+          open ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
         {/* Brand */}
         <div className="flex h-18 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-3">
@@ -82,19 +97,17 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
         {/* Nav */}
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5" aria-label="Menu principal">
-          {navigation.map(group => (
+          {navigation.map((group) => (
             <div key={group.label}>
-              <p className="mb-2 px-3 text-[11px] font-bold tracking-widest text-muted">
-                {group.label}
-              </p>
+              <p className="mb-2 px-3 text-[11px] font-bold tracking-widest text-muted">{group.label}</p>
               <div className="space-y-1">
                 {group.items
-                  .filter(item => !item.adminOnly || session.user?.role === 'ADMIN')
+                  .filter((item) => !item.adminOnly || session.user?.role === 'ADMIN')
                   .map(({ label, to, icon: Icon, reviewBadge }) => (
                     <NavLink
                       key={to}
                       to={to}
-                      end={to === '/app/inspections'}  // exact match so /inspections/review doesn't highlight both
+                      end={to === '/app/inspections'} // exact match so /inspections/review doesn't highlight both
                       onClick={onClose}
                       className={({ isActive }) =>
                         cn(

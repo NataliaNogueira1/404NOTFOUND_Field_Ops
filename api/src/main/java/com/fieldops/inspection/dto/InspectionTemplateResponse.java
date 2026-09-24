@@ -3,6 +3,7 @@ package com.fieldops.inspection.dto;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 
 import java.time.Instant;
+import java.util.List;
 
 public record InspectionTemplateResponse(
         Long id,
@@ -14,5 +15,6 @@ public record InspectionTemplateResponse(
         Long createdBy,
         Instant createdAt,
         Instant updatedAt,
-        Integer version) {
+        Integer version,
+        List<TemplateSectionResponse> sections) {
 }

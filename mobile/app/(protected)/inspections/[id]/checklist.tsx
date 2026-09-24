@@ -1,4 +1,5 @@
-﻿import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import { useCallback, useMemo, useRef } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -13,10 +14,35 @@ export default function ChecklistScreen() {
   const router = useRouter();
   const { inspections, answers, evidences, answerItem } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
+  const scrollRef = useRef<ScrollView>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
 
-  if (templateLoading || !template) {
+  const allItems = useMemo(() => (template ? template.sections.flatMap((section) => section.items) : []), [template]);
+  const hasChecklist = Boolean(template && allItems.length > 0);
+  const total = allItems.length;
+  const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
+  const pending = total - answered;
+
+  // Scroll to first unanswered item — must be defined before any early return
+  const handleScrollToPending = useCallback(() => {
+    if (!template || !scrollRef.current) return;
+    const firstPendingItem = allItems.find((item) => answers[item.id] === undefined);
+    if (!firstPendingItem) return;
+
+    let itemsBefore = 0;
+    for (const section of template.sections) {
+      for (const item of section.items) {
+        if (item.id === firstPendingItem.id) break;
+        itemsBefore++;
+      }
+      if (section.items.some((i) => i.id === firstPendingItem.id)) break;
+    }
+    // Approximate scroll: header (~120px) + cards (~180px each)
+    scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
+  }, [allItems, answers, template]);
+
+  if (templateLoading) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.centered}>
@@ -27,23 +53,44 @@ export default function ChecklistScreen() {
     );
   }
 
-  const allItems = template.sections.flatMap((section) => section.items);
-  const total = allItems.length;
-  const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
+  // Loading is done but there is no snapshot in SQLite (e.g. the inspection was
+  // never synced from the server). Show an actionable empty state instead of
+  // freezing forever on the spinner.
+  if (!template || !hasChecklist) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.centered}>
+          <Text style={styles.title}>Checklist indisponível</Text>
+          <Text style={styles.muted}>
+            Esta inspeção ainda não tem o checklist baixado. Sincronize na aba Sync e tente
+            novamente.
+          </Text>
+          <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <Text style={styles.title}>{template.title}</Text>
         <Text style={styles.muted}>
           {template.sections.length} seções / {total} itens
         </Text>
 
         <Card style={styles.card}>
-          <ProgressBar value={inspection.progress} />
-          <Text style={styles.muted}>
-            {answered} de {total} itens respondidos
-          </Text>
+          <ProgressBar value={inspection?.progress ?? 0} />
+          <View style={styles.progressRow}>
+            <Text style={styles.muted}>
+              {answered} de {total} itens respondidos
+            </Text>
+            {pending > 0 ? (
+              <Text style={styles.pendingLink} onPress={handleScrollToPending}>
+                {pending} pendente{pending > 1 ? 's' : ''} ↓
+              </Text>
+            ) : null}
+          </View>
         </Card>
 
         {template.sections.map((section) => (
@@ -64,13 +111,13 @@ export default function ChecklistScreen() {
 
         <Button
           label="Ver resumo"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/summary`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
           fullWidth
           size="lg"
         />
         <Button
           label="Não conformidades"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/non-conformities`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
           variant="secondary"
           fullWidth
         />
@@ -86,4 +133,6 @@ const styles = StyleSheet.create({
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
   muted: { color: Colors.textSecondary },
   card: { gap: Spacing.sm },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pendingLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
 });

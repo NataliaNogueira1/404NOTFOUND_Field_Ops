@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminCatalogApi, type TemplateSummary, type TemplateVersionSummary } from '@/api/adminCatalog'
+import { adminCatalogApi, type InspectionTemplateVersion, type TemplateSummary } from '@/api/adminCatalog'
 import { ClientStatus, clientsApi } from '@/api/clients'
 import { EquipmentStatus, equipmentApi } from '@/api/equipment'
 import { InspectionSiteStatus, sitesApi } from '@/api/sites'
@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { clients, equipment, sites, users } from '@/mocks/domain'
 import { Priority, UserRole, UserStatus } from '@/types/domain'
 
-function formatVersionLabel(v: TemplateVersionSummary): string {
+function formatVersionLabel(v: InspectionTemplateVersion): string {
   const date = new Date(v.publishedAt).toLocaleDateString('pt-BR')
   return `Versão ${v.versionNumber} (publicada em ${date})`
 }
@@ -25,28 +25,30 @@ export function NewInspectionPage() {
   // ── Template & version ─────────────────────────────────────────────────────
   const [availableTemplates, setAvailableTemplates] = useState<TemplateSummary[]>([])
   const [templateId, setTemplateId] = useState('')
-  const [availableVersions, setAvailableVersions] = useState<TemplateVersionSummary[]>([])
-  const [selectedVersion, setSelectedVersion] = useState<TemplateVersionSummary | null>(null)
+  const [availableVersions, setAvailableVersions] = useState<InspectionTemplateVersion[]>([])
+  const [selectedVersion, setSelectedVersion] = useState<InspectionTemplateVersion | null>(null)
   const [templatesLoading, setTemplatesLoading] = useState(true)
   const [versionsLoading, setVersionsLoading] = useState(false)
 
   // ── Location ───────────────────────────────────────────────────────────────
   const [selectableClients, setSelectableClients] = useState(
-    clients.filter(c => c.active).map(c => ({ id: c.id, name: c.name })),
+    clients.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name })),
   )
   const [clientId, setClientId] = useState('')
-  const [clientName, setClientName] = useState('')
   const [availableSites, setAvailableSites] = useState<{ id: string; clientId: string; name: string }[]>([])
   const [siteId, setSiteId] = useState('')
-  const [siteName, setSiteName] = useState('')
   const [availableEquipment, setAvailableEquipment] = useState<{ id: string; siteId: string; name: string }[]>([])
   const [equipmentId, setEquipmentId] = useState('')
   const [equipmentName, setEquipmentName] = useState('')
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [sitesLoading, setSitesLoading] = useState(false)
+  const [equipmentLoading, setEquipmentLoading] = useState(false)
 
   // ── Assignment ─────────────────────────────────────────────────────────────
   const [technicians, setTechnicians] = useState(
-    users.filter(u => u.role === UserRole.TECHNICIAN && u.active).map(u => ({ id: String(u.id), name: u.name })),
+    users.filter((u) => u.role === UserRole.TECHNICIAN && u.active).map((u) => ({ id: String(u.id), name: u.name })),
   )
+  const [techniciansLoading, setTechniciansLoading] = useState(true)
   const [technicianId, setTechnicianId] = useState('')
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM)
   const [dueDate, setDueDate] = useState('')
@@ -61,13 +63,15 @@ export function NewInspectionPage() {
   useEffect(() => {
     adminCatalogApi
       .listTemplates({ name: '', status: 'ACTIVE', page: 0, size: 100, sort: 'title,asc' })
-      .then(result => {
+      .then((result) => {
         setAvailableTemplates(result.content)
         if (result.content.length > 0) {
           setTemplateId(result.content[0].id)
         }
       })
-      .catch(() => { /* Templates failed to load — user will see empty select */ })
+      .catch(() => {
+        /* Templates failed to load — user will see empty select */
+      })
       .finally(() => setTemplatesLoading(false))
   }, [])
 
@@ -113,59 +117,89 @@ export function NewInspectionPage() {
   useEffect(() => {
     clientsApi
       .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 100 })
-      .then(result => setSelectableClients(result.content.map(c => ({ id: c.id, name: c.name }))))
-      .catch(() => { /* Keep mock fallback */ })
+      .then((result) => setSelectableClients(result.content.map((c) => ({ id: c.id, name: c.name }))))
+      .catch(() => {
+        /* Keep mock fallback */
+      })
+      .finally(() => setClientsLoading(false))
   }, [])
 
   // ── Load sites when client changes ─────────────────────────────────────────
   useEffect(() => {
-    if (!clientId) return
+    if (!clientId) {
+      return
+    }
     sitesApi
       .list({ name: '', clientId, status: InspectionSiteStatus.ACTIVE, page: 0, size: 100 })
-      .then(result => setAvailableSites(result.content.map(s => ({ id: s.id, clientId: s.clientId, name: s.name }))))
-      .catch(() => setAvailableSites(
-        sites.filter(s => s.active && s.clientId === clientId).map(s => ({ id: s.id, clientId: s.clientId, name: s.name })),
-      ))
+      .then((result) =>
+        setAvailableSites(result.content.map((s) => ({ id: s.id, clientId: s.clientId, name: s.name }))),
+      )
+      .catch(() =>
+        setAvailableSites(
+          sites
+            .filter((s) => s.active && s.clientId === clientId)
+            .map((s) => ({ id: s.id, clientId: s.clientId, name: s.name })),
+        ),
+      )
+      .finally(() => setSitesLoading(false))
   }, [clientId])
 
   // ── Load equipment when site changes ───────────────────────────────────────
   useEffect(() => {
-    if (!siteId) return
+    if (!siteId) {
+      return
+    }
     equipmentApi
       .list({ siteId, status: EquipmentStatus.ACTIVE, page: 0, size: 100 })
-      .then(result => setAvailableEquipment(result.content.map(e => ({ id: e.id, siteId: e.siteId, name: e.name }))))
-      .catch(() => setAvailableEquipment(
-        equipment.filter(e => e.active && e.siteId === siteId).map(e => ({ id: e.id, siteId: e.siteId, name: e.name })),
-      ))
+      .then((result) =>
+        setAvailableEquipment(result.content.map((e) => ({ id: e.id, siteId: e.siteId, name: e.name }))),
+      )
+      .catch(() =>
+        setAvailableEquipment(
+          equipment
+            .filter((e) => e.active && e.siteId === siteId)
+            .map((e) => ({ id: e.id, siteId: e.siteId, name: e.name })),
+        ),
+      )
+      .finally(() => setEquipmentLoading(false))
   }, [siteId])
 
   // ── Load active technicians on mount ──────────────────────────────────────
   useEffect(() => {
     usersApi
       .list({ name: '', role: UserRole.TECHNICIAN, status: UserStatus.ACTIVE, page: 0, size: 100, sort: 'name,asc' })
-      .then(result => setTechnicians(result.content.map(u => ({ id: String(u.id), name: u.name }))))
-      .catch(() => { /* Keep mock fallback */ })
+      .then((result) => setTechnicians(result.content.map((u) => ({ id: String(u.id), name: u.name }))))
+      .catch(() => {
+        /* Keep mock fallback */
+      })
+      .finally(() => setTechniciansLoading(false))
   }, [])
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   async function submit() {
-    if (!templateId || !selectedVersion || !clientId || !siteId || !equipmentId || !technicianId || !dueDate) {
-      setError('Preencha modelo, versão, cliente, local, equipamento, técnico e data prevista.')
+    if (!templateId || !selectedVersion || !clientId || !siteId || !technicianId || !dueDate) {
+      setError('Preencha modelo, versão, cliente, local, técnico e data prevista.')
       return
     }
     setError('')
     setSubmitting(true)
     try {
-      await adminCatalogApi.scheduleInspection({
-        templateId: Number(templateId),
+      const templateTitle = availableTemplates.find((t) => t.id === templateId)?.title ?? 'Inspeção'
+      const siteName = availableSites.find((site) => site.id === siteId)?.name ?? 'local selecionado'
+      const titleSuffix = equipmentName || siteName
+      const title = `${templateTitle} — ${titleSuffix}`.slice(0, 300)
+      const request = {
+        title,
+        templateVersionId: Number(selectedVersion.id),
+        clientId: Number(clientId),
+        siteId: Number(siteId),
         technicianId: Number(technicianId),
-        clientName,
-        siteName,
-        equipmentName,
         priority,
         dueDate,
         supervisorInstructions: instructions || undefined,
-      })
+        ...(equipmentId ? { equipmentId: Number(equipmentId) } : {}),
+      }
+      await adminCatalogApi.createInspection(request)
       setToast(true)
       setTimeout(() => navigate('/app/inspections'), 700)
     } catch (err: unknown) {
@@ -179,8 +213,13 @@ export function NewInspectionPage() {
     <div className="space-y-6">
       <PageHeader title="Nova inspeção" description="Agende uma atividade para execução em campo." />
 
-      <form className="space-y-5" onSubmit={e => { e.preventDefault(); void submit() }}>
-
+      <form
+        className="space-y-5"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void submit()
+        }}
+      >
         {/* ── Modelo ──────────────────────────────────────────────────────── */}
         <Card className="grid gap-4 p-5 md:grid-cols-2">
           <h2 className="md:col-span-2 text-base font-semibold">Modelo</h2>
@@ -190,39 +229,45 @@ export function NewInspectionPage() {
             id="new-template"
             value={templateId}
             disabled={templatesLoading}
-            onChange={e => {
+            onChange={(e) => {
               setTemplateId(e.target.value)
               setError('')
             }}
           >
-            {templatesLoading
-              ? <option>Carregando...</option>
-              : availableTemplates.length === 0
-                ? <option value="">Nenhum modelo publicado</option>
-                : availableTemplates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)
-            }
+            {templatesLoading ? (
+              <option>Carregando...</option>
+            ) : availableTemplates.length === 0 ? (
+              <option value="">Nenhum resultado</option>
+            ) : (
+              availableTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))
+            )}
           </Select>
 
           <Select
             label="Versão"
             id="new-version"
-            value={selectedVersion?.versionNumber ?? ''}
+            value={selectedVersion?.id ?? ''}
             disabled={versionsLoading || availableVersions.length === 0}
-            onChange={e => {
-              const num = Number(e.target.value)
-              setSelectedVersion(availableVersions.find(v => v.versionNumber === num) ?? null)
+            onChange={(e) => {
+              const id = e.target.value
+              setSelectedVersion(availableVersions.find((v) => v.id === id) ?? null)
             }}
           >
-            {versionsLoading
-              ? <option>Carregando...</option>
-              : availableVersions.length === 0
-                ? <option value="">—</option>
-                : availableVersions.map(v => (
-                    <option key={v.versionNumber} value={v.versionNumber}>
-                      {formatVersionLabel(v)}
-                    </option>
-                  ))
-            }
+            {versionsLoading ? (
+              <option>Carregando...</option>
+            ) : availableVersions.length === 0 ? (
+              <option value="">Nenhum resultado</option>
+            ) : (
+              availableVersions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {formatVersionLabel(v)}
+                </option>
+              ))
+            )}
           </Select>
         </Card>
 
@@ -234,53 +279,88 @@ export function NewInspectionPage() {
             label="Cliente"
             id="new-client"
             value={clientId}
-            onChange={e => {
+            disabled={clientsLoading}
+            onChange={(e) => {
               const id = e.target.value
-              const name = selectableClients.find(c => c.id === id)?.name ?? ''
               setClientId(id)
-              setClientName(name)
-              setSiteId(''); setSiteName('')
-              setEquipmentId(''); setEquipmentName('')
+              setAvailableSites([])
+              setAvailableEquipment([])
+              setSitesLoading(Boolean(id))
+              setEquipmentLoading(false)
+              setSiteId('')
+              setEquipmentId('')
+              setEquipmentName('')
               setError('')
             }}
           >
-            <option value="">Selecione</option>
-            {selectableClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="">{clientsLoading ? 'Carregando clientes...' : 'Selecione'}</option>
+            {!clientsLoading && selectableClients.length === 0 && (
+              <option value="" disabled>
+                Nenhum resultado
+              </option>
+            )}
+            {!clientsLoading &&
+              selectableClients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </Select>
 
           <Select
             label="Local"
             id="new-site"
             value={siteId}
-            disabled={!clientId}
-            onChange={e => {
+            disabled={!clientId || sitesLoading}
+            onChange={(e) => {
               const id = e.target.value
-              const name = availableSites.find(s => s.id === id)?.name ?? ''
               setSiteId(id)
-              setSiteName(name)
-              setEquipmentId(''); setEquipmentName('')
+              setAvailableEquipment([])
+              setEquipmentLoading(Boolean(id))
+              setEquipmentId('')
+              setEquipmentName('')
               setError('')
             }}
           >
-            <option value="">Selecione</option>
-            {availableSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <option value="">{sitesLoading ? 'Carregando locais...' : 'Selecione'}</option>
+            {clientId && !sitesLoading && availableSites.length === 0 && (
+              <option value="" disabled>
+                Nenhum resultado
+              </option>
+            )}
+            {!sitesLoading &&
+              availableSites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
           </Select>
 
           <Select
             label="Equipamento"
             id="new-equipment"
             value={equipmentId}
-            disabled={!siteId}
-            onChange={e => {
+            disabled={!siteId || equipmentLoading}
+            onChange={(e) => {
               const id = e.target.value
-              const name = availableEquipment.find(eq => eq.id === id)?.name ?? ''
+              const name = availableEquipment.find((eq) => eq.id === id)?.name ?? ''
               setEquipmentId(id)
               setEquipmentName(name)
               setError('')
             }}
           >
-            <option value="">Selecione</option>
-            {availableEquipment.map(eq => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+            <option value="">{equipmentLoading ? 'Carregando equipamentos...' : 'Sem equipamento'}</option>
+            {siteId && !equipmentLoading && availableEquipment.length === 0 && (
+              <option value="" disabled>
+                Nenhum resultado
+              </option>
+            )}
+            {!equipmentLoading &&
+              availableEquipment.map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.name}
+                </option>
+              ))}
           </Select>
         </Card>
 
@@ -292,19 +372,37 @@ export function NewInspectionPage() {
             label="Técnico"
             id="new-tech"
             value={technicianId}
-            onChange={e => { setTechnicianId(e.target.value); setError('') }}
+            disabled={techniciansLoading}
+            onChange={(e) => {
+              setTechnicianId(e.target.value)
+              setError('')
+            }}
           >
-            <option value="">Selecione</option>
-            {technicians.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            <option value="">{techniciansLoading ? 'Carregando técnicos...' : 'Selecione'}</option>
+            {!techniciansLoading && technicians.length === 0 && (
+              <option value="" disabled>
+                Nenhum resultado
+              </option>
+            )}
+            {!techniciansLoading &&
+              technicians.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
           </Select>
 
           <Select
             label="Prioridade"
             id="new-priority"
             value={priority}
-            onChange={e => setPriority(e.target.value as Priority)}
+            onChange={(e) => setPriority(e.target.value as Priority)}
           >
-            {Object.values(Priority).map(v => <option key={v} value={v}>{v}</option>)}
+            {Object.values(Priority).map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </Select>
 
           <Input
@@ -312,7 +410,10 @@ export function NewInspectionPage() {
             id="new-date"
             type="date"
             value={dueDate}
-            onChange={e => { setDueDate(e.target.value); setError('') }}
+            onChange={(e) => {
+              setDueDate(e.target.value)
+              setError('')
+            }}
           />
         </Card>
 
@@ -322,7 +423,7 @@ export function NewInspectionPage() {
             label="Instruções do supervisor"
             id="instructions"
             value={instructions}
-            onChange={e => setInstructions(e.target.value)}
+            onChange={(e) => setInstructions(e.target.value)}
             placeholder="Orientações para o técnico"
           />
         </Card>

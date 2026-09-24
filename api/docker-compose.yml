@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: ${DB_USER:-fieldops}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-fieldops}
     ports:
-      - "${DB_EXTERNAL_PORT:-5433}:5432"
+      # Host port only for optional external access; internal API talks to db:5432 directly.
+      # Default moved off 5433 to avoid clashing with other local Postgres containers.
+      - "${DB_EXTERNAL_PORT:-5434}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -23,20 +25,19 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      # Demo profile: runs Flyway migrations and seeds users + demo dataset on first start.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-fieldops}
       DB_USER: ${DB_USER:-fieldops}
       DB_PASSWORD: ${DB_PASSWORD:-fieldops}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:-demo-secret-demo-secret-demo-secret-demo-secret-32b}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-8h}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8081,http://localhost:5173}
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
-      SERVER_PORT: 8085
+      SERVER_PORT: 8080
     ports:
-      - "8085:8085"
+      - "${API_EXTERNAL_PORT:-8080}:8080"
 
 volumes:
   db-data:

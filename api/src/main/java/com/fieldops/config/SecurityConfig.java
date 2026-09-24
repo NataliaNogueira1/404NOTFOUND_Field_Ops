@@ -3,6 +3,7 @@ package com.fieldops.config;
 import com.fieldops.shared.security.JwtFilter;
 import com.fieldops.shared.security.RestAccessDeniedHandler;
 import com.fieldops.shared.security.RestAuthenticationEntryPoint;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -57,6 +58,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
+                        // Reading users (e.g. the technician picker when scheduling an inspection, UC-06)
+                        // is allowed to SUPERVISOR too; user management (writes) stays ADMINISTRATOR-only.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/**")
+                        .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR")
                         .requestMatchers("/api/v1/users/**").hasAuthority("ADMINISTRATOR")
                         .requestMatchers("/api/v1/mobile/**").hasAuthority("TECHNICIAN")
                         .requestMatchers("/api/v1/equipment/by-qr/**")
