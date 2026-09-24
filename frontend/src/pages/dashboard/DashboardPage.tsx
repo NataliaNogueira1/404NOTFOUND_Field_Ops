@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowRight,
   CalendarClock,
   ClipboardCheck,
@@ -9,12 +9,15 @@
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react'
+import { useSyncExternalStore } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
+import { authSession } from '@/auth/session'
 import { Badge } from '@/components/badges/Badge'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
+import { useReviewCount } from '@/hooks/useReviewCount'
 import {
   dashboardStats,
   inspections,
@@ -24,21 +27,44 @@ import {
   clients,
   equipment,
 } from '@/mocks/domain'
+
 export function DashboardPage() {
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  const reviewCount = useReviewCount()
+
+  const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
+  const pendingLabel =
+    reviewCount === null
+      ? 'aguardando revisão'
+      : reviewCount === 1
+        ? '1 aguardando revisão'
+        : `${reviewCount} aguardando revisão`
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Ola, Marina" description="Aqui esta um resumo das operacoes de hoje." />
+      <PageHeader title={`Olá, ${firstName}`} description="Aqui está um resumo das operações de hoje." />
+
+      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total de inspecoes" value={dashboardStats.total} icon={ClipboardCheck} tone="blue" />
-        <StatCard title="Revisoes pendentes" value={dashboardStats.pending} icon={CalendarClock} tone="amber" />
-        <StatCard title="Inspecoes atrasadas" value={dashboardStats.overdue} icon={ClockAlert} tone="red" />
-        <StatCard title="NCs criticas" value={dashboardStats.critical} icon={ShieldAlert} tone="green" />
+        <StatCard title="Total de inspeções" value={dashboardStats.total} icon={ClipboardCheck} tone="blue" />
+        <Link to="/app/inspections/review" className="focus-ring rounded-card">
+          <StatCard
+            title="Revisões pendentes"
+            value={reviewCount ?? dashboardStats.pending}
+            icon={CalendarClock}
+            tone="amber"
+          />
+        </Link>
+        <StatCard title="Inspeções atrasadas" value={dashboardStats.overdue} icon={ClockAlert} tone="red" />
+        <StatCard title="NCs críticas" value={dashboardStats.critical} icon={ShieldAlert} tone="green" />
       </section>
+
+      {/* ── Charts + quick actions ─────────────────────────────────────────── */}
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <Card className="p-5 lg:p-6">
           <div className="mb-6">
-            <h2 className="text-base font-semibold">Inspecoes por estado</h2>
-            <p className="text-sm text-muted">Distribuicao das inspecoes ativas</p>
+            <h2 className="text-base font-semibold">Inspeções por estado</h2>
+            <p className="text-sm text-muted">Distribuição das inspeções ativas</p>
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -57,35 +83,38 @@ export function DashboardPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
         <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="text-base font-semibold">Acoes rapidas</h2>
+            <h2 className="text-base font-semibold">Ações rápidas</h2>
             <p className="mb-4 text-sm text-muted">Atalhos para tarefas frequentes</p>
             <div className="space-y-3">
               <QuickAction
                 to="/app/inspections/new"
                 icon={ClipboardPlus}
-                title="Nova inspecao"
+                title="Nova inspeção"
                 description="Agendar atividade"
               />
               <QuickAction
-                to="/app/inspection-templates/tpl-compressor/edit"
+                to="/app/inspection-templates/new"
                 icon={FilePlus2}
                 title="Criar modelo"
                 description="Abrir construtor"
               />
+              {/* Deep-link direto para a fila de revisão, com contagem dinâmica */}
               <QuickAction
-                to="/app/inspections"
+                to="/app/inspections/review"
                 icon={Eye}
                 title="Revisar pendentes"
-                description="3 aguardando revisao"
+                description={pendingLabel}
               />
             </div>
           </Card>
+
           <Card className="p-5">
             <div className="mb-4 flex items-center gap-2">
               <TriangleAlert className="text-warning" size={20} />
-              <h2 className="text-base font-semibold">Nao conformidades por criticidade</h2>
+              <h2 className="text-base font-semibold">Não conformidades por criticidade</h2>
             </div>
             <div className="space-y-3">
               {nonConformitiesBySeverity.map((item) => (
@@ -98,11 +127,13 @@ export function DashboardPage() {
           </Card>
         </div>
       </section>
+
+      {/* ── Recent inspections ─────────────────────────────────────────────── */}
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">Inspecoes recentes</h2>
-            <p className="text-sm text-muted">Ultimos registros movimentados</p>
+            <h2 className="text-base font-semibold">Inspeções recentes</h2>
+            <p className="text-sm text-muted">Últimos registros movimentados</p>
           </div>
           <Link className="text-sm font-semibold text-primary" to="/app/inspections">
             Ver todas
@@ -129,6 +160,7 @@ export function DashboardPage() {
     </div>
   )
 }
+
 function QuickAction({
   to,
   icon: Icon,
