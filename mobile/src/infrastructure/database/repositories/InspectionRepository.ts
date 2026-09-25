@@ -106,13 +106,39 @@ export class InspectionRepository {
     equipmentName: string;
     supervisorName: string;
   }): Promise<void> {
+    // IMPORTANT: use a real UPSERT (ON CONFLICT DO UPDATE), never INSERT OR REPLACE.
+    // REPLACE deletes the existing inspection row before re-inserting it, which
+    // triggers ON DELETE CASCADE on answers/evidences/non_conformities — wiping
+    // the technician's local work (and captured photos) on every pull. An UPSERT
+    // keeps the same row, so child records and their files survive (RN-047/RN-066).
+    //
+    // We also DO NOT overwrite locally-owned execution fields (status, progress,
+    // started_at, sync_status, pending_sync_count) here so a re-pull cannot revert
+    // an in-progress inspection. Those transition to the server via the outbox.
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO inspections (
+      `INSERT INTO inspections (
         id, title, template_id, client_id, client_name, site_id, site_name,
         equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
         progress, supervisor_instructions, sync_status, pending_sync_count, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        template_id = excluded.template_id,
+        client_id = excluded.client_id,
+        client_name = excluded.client_name,
+        site_id = excluded.site_id,
+        site_name = excluded.site_name,
+        equipment_id = excluded.equipment_id,
+        equipment_name = excluded.equipment_name,
+        technician_id = excluded.technician_id,
+        supervisor_id = excluded.supervisor_id,
+        supervisor_name = excluded.supervisor_name,
+        priority = excluded.priority,
+        due_date = excluded.due_date,
+        due_time = excluded.due_time,
+        supervisor_instructions = excluded.supervisor_instructions,
+        updated_at = datetime('now')`,
       inspection.id,
       inspection.title,
       inspection.templateId,
@@ -137,6 +163,20 @@ export class InspectionRepository {
       inspection.syncStatus,
       inspection.pendingSyncCount,
     );
+  }
+
+  /**
+   * Whether a template snapshot already exists locally for this inspection.
+   * Used by the pull to avoid rewriting an existing snapshot (which would cascade
+   * -delete the technician's evidences), honouring the immutable-snapshot rule
+   * (RN-021).
+   */
+  async hasSnapshot(inspectionId: string): Promise<boolean> {
+    const row = await this.db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM inspection_items WHERE inspection_id = ?',
+      inspectionId,
+    );
+    return (row?.count ?? 0) > 0;
   }
 
   async updateStatus(id: string, status: string): Promise<void> {
