@@ -39,7 +39,8 @@ interface FieldOpsContextValue {
       location?: { latitude: number; longitude: number; accuracy?: number } | null;
     },
   ) => void;
-  answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
+  answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
+  reopenForCorrection: (inspectionId: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
@@ -243,14 +244,21 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     [getRepos, getSyncService],
   );
 
-  const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string) => {
+  const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => {
+    // Resolve the target inspection explicitly when the caller knows it (checklist
+    // screen passes the route id). Falling back to "the IN_PROGRESS one" is fragile
+    // during correction of a REJECTED inspection, where the fallback could write to
+    // the wrong inspection (PBI-062).
+    const resolveTargetId = () =>
+      inspectionId
+      ?? inspectionsRef.current.find((i) => i.status === InspectionStatus.IN_PROGRESS)?.id
+      ?? inspectionsRef.current[0]?.id;
+
     setAnswers((current) => {
       const next = { ...current, [itemId]: { itemId, value, observation, savedAt: new Date().toISOString() } };
 
-      // Update progress — count answered vs total items for the active inspection
-      const activeId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      // Update progress — count answered vs total items for the target inspection
+      const activeId = resolveTargetId();
 
       if (activeId) {
         // Get total items count asynchronously, update progress
@@ -274,9 +282,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       // Persist to DB
       const repos2 = getRepos();
       const sync = getSyncService();
-      const persistId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      const persistId = resolveTargetId();
       if (repos2 && sync && persistId) {
         repos2.answer.save(persistId, itemId, value, observation).catch(console.warn);
         sync.enqueueAnswer(persistId, itemId, value, observation).catch(console.warn);
@@ -287,9 +293,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-create non-conformity for NAO_CONFORME
     if (value === 'NAO_CONFORME') {
-      const activeId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      const activeId = resolveTargetId();
 
       setNonConformities((current) => {
         if (!activeId || current.some((nc) => nc.inspectionId === activeId && nc.itemId === itemId)) return current;
@@ -310,6 +314,31 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         }
         return [...current, nc];
       });
+    }
+  }, [getRepos, getSyncService]);
+
+  // PBI-062: when a technician reopens a REJECTED inspection to fix it, move it
+  // back to IN_PROGRESS so answers become editable again (RN-043). The rejection
+  // reason stays on the record so the banner keeps guiding the correction, and
+  // the transition is queued in the outbox to be pushed to the server.
+  const reopenForCorrection = useCallback((inspectionId: string) => {
+    setInspections((current) =>
+      current.map((insp) =>
+        insp.id === inspectionId && insp.status === InspectionStatus.REJECTED
+          ? {
+              ...insp,
+              status: InspectionStatus.IN_PROGRESS,
+              syncStatus: 'pending' as const,
+              pendingSyncCount: Math.max(insp.pendingSyncCount, 1),
+            }
+          : insp,
+      ),
+    );
+    const repos = getRepos();
+    const sync = getSyncService();
+    if (repos && sync) {
+      repos.inspection.updateStatus(inspectionId, 'IN_PROGRESS').catch(console.warn);
+      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
     }
   }, [getRepos, getSyncService]);
 
@@ -449,6 +478,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       syncOperations,
       startInspection,
       answerItem,
+      reopenForCorrection,
       addEvidence,
       addNonConformity,
       concludeInspection,
@@ -459,7 +489,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, syncOperations,
-      startInspection, answerItem, addEvidence, addNonConformity,
+      startInspection, answerItem, reopenForCorrection, addEvidence, addNonConformity,
       concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );
