@@ -1,5 +1,9 @@
 package com.fieldops.report.service;
 
+import com.fieldops.answer.model.InspectionAnswer;
+import com.fieldops.answer.repository.InspectionAnswerRepository;
+import com.fieldops.evidence.model.InspectionEvidence;
+import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.nonconformity.model.NonConformity;
@@ -14,13 +18,19 @@ public class InspectionReportService {
 
     private final InspectionRepository inspectionRepository;
     private final NonConformityRepository nonConformityRepository;
+    private final InspectionAnswerRepository inspectionAnswerRepository;
+    private final InspectionEvidenceRepository inspectionEvidenceRepository;
     private final InspectionReportDocument inspectionReportDocument;
 
     public InspectionReportService(InspectionRepository inspectionRepository,
             NonConformityRepository nonConformityRepository,
+            InspectionAnswerRepository inspectionAnswerRepository,
+            InspectionEvidenceRepository inspectionEvidenceRepository,
             InspectionReportDocument inspectionReportDocument) {
         this.inspectionRepository = inspectionRepository;
         this.nonConformityRepository = nonConformityRepository;
+        this.inspectionAnswerRepository = inspectionAnswerRepository;
+        this.inspectionEvidenceRepository = inspectionEvidenceRepository;
         this.inspectionReportDocument = inspectionReportDocument;
     }
 
@@ -34,6 +44,9 @@ public class InspectionReportService {
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
         List<NonConformity> nonConformities = nonConformityRepository
                 .findByInspectionIdOrderByCreatedAtAsc(inspectionId);
-        return inspectionReportDocument.generate(inspection, nonConformities);
+        List<InspectionAnswer> answers = inspectionAnswerRepository.findHistoryByInspectionId(inspectionId);
+        List<InspectionEvidence> evidences = inspectionEvidenceRepository
+                .findByInspectionIdOrderByCapturedAtAsc(inspectionId);
+        return inspectionReportDocument.generate(inspection, nonConformities, answers, evidences);
     }
 }
