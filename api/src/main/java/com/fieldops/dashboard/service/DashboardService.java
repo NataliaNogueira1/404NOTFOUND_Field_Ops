@@ -4,6 +4,8 @@ import com.fieldops.dashboard.dto.DashboardSummaryResponse;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.nonconformity.model.NonConformityStatus;
+import com.fieldops.nonconformity.repository.NonConformityRepository;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,9 +22,11 @@ public class DashboardService {
             InspectionStatus.REJECTED);
 
     private final InspectionRepository inspectionRepository;
+    private final NonConformityRepository nonConformityRepository;
 
-    public DashboardService(InspectionRepository inspectionRepository) {
+    public DashboardService(InspectionRepository inspectionRepository, NonConformityRepository nonConformityRepository) {
         this.inspectionRepository = inspectionRepository;
+        this.nonConformityRepository = nonConformityRepository;
     }
 
     /**
@@ -43,9 +47,10 @@ public class DashboardService {
                 TERMINAL_STATUSES, from, to, normalizedClientName, technicianId));
         long overdue = inspectionRepository.countOverdue(
                 LocalDate.now(), TERMINAL_STATUSES, from, to, normalizedClientName, technicianId);
+        long openNonConformities = nonConformityRepository.countByStatusAndInspectionFilters(
+                NonConformityStatus.OPEN, from, to, normalizedClientName, technicianId);
 
-        // The API has no non-conformity entity yet, so the aggregate is explicitly zero until its PBI lands.
-        return new DashboardSummaryResponse(byStatus, byCriticality, 0L, overdue);
+        return new DashboardSummaryResponse(byStatus, byCriticality, openNonConformities, overdue);
     }
 
     private String normalizeClientName(String clientName) {

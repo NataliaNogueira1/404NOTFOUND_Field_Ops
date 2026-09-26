@@ -5,6 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fieldops.dashboard.dto.DashboardSummaryResponse;
+import com.fieldops.nonconformity.model.NonConformityStatus;
+import com.fieldops.nonconformity.repository.NonConformityRepository;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.repository.InspectionRepository;
@@ -21,6 +23,9 @@ class DashboardServiceTest {
 
     @Mock
     private InspectionRepository inspectionRepository;
+
+    @Mock
+    private NonConformityRepository nonConformityRepository;
 
     @InjectMocks
     private DashboardService dashboardService;
@@ -45,6 +50,9 @@ class DashboardServiceTest {
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
                 from, to, "Industria Modelo Ltda.", 12L))
                 .thenReturn(3L);
+        when(nonConformityRepository.countByStatusAndInspectionFilters(
+                NonConformityStatus.OPEN, from, to, "Industria Modelo Ltda.", 12L))
+                .thenReturn(5L);
 
         DashboardSummaryResponse summary = dashboardService.getSummary(
                 from, to, "  Industria Modelo Ltda.  ", 12L);
@@ -56,7 +64,7 @@ class DashboardServiceTest {
         assertThat(summary.byCriticality())
                 .containsEntry("HIGH", 2L)
                 .containsEntry("CRITICAL", 0L);
-        assertThat(summary.openNonConformities()).isZero();
+        assertThat(summary.openNonConformities()).isEqualTo(5L);
         assertThat(summary.overdue()).isEqualTo(3L);
 
         verify(inspectionRepository).countByStatus(from, to, "Industria Modelo Ltda.", 12L);
@@ -67,5 +75,7 @@ class DashboardServiceTest {
                 LocalDate.now(),
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
                 from, to, "Industria Modelo Ltda.", 12L);
+        verify(nonConformityRepository).countByStatusAndInspectionFilters(
+                NonConformityStatus.OPEN, from, to, "Industria Modelo Ltda.", 12L);
     }
 }
