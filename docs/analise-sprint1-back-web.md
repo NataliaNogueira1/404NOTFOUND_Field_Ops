@@ -270,7 +270,7 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-063 | Auditoria de mudanças de estado | [#83](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/83) | ✅ Concluído — tabela imutável `audit_events` (migration V17) + `AuditService`; `GET /api/v1/inspections/{id}/history`; eventos de criar/atribuir/aprovar/reprovar/cancelar (PRs #132/#134) |
 | PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ✅ Concluído — `DemoSeedRunner` cria dataset coerente (cliente + local + equipamento com QR + modelo publicado + inspeção ASSIGNED), idempotente por `existsByDocument`; **restrição: só roda no profile `dev` com `fieldops.bootstrap.demo-seed.enabled`, não em `prod`** |
 | PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | ✅ Concluído — `docker compose up --build` validado em 25/09/2026: API e PostgreSQL saudáveis, Flyway/seed do perfil `demo`, health, OpenAPI, login e listagem de inspeções retornando 200. A história exige API publicada **ou** executável por contêiner; não requer hospedagem externa. |
-| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | 🟡 Parcial — OpenAPI gerado via springdoc + `OpenApiConfig`; falta contrato completo revisado e diagramas |
+| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | ✅ Concluído — contrato gerado pelo springdoc validado com 39 rotas, esquema Bearer JWT e endpoints críticos; `OpenApiConfig` traz metadados de uso e [`docs/api-diagrams.md`](./api-diagrams.md) documenta os diagramas Mermaid de entidades e estados da inspeção (commit `62495b0`). |
 | PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
@@ -282,11 +282,11 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 7 |
-| 🟡 Parcial | 1 |
+| ✅ Concluído | 8 |
+| 🟡 Parcial | 0 |
 | ❌ Não feito | 6 |
 
-**Porcentagem: 50%** concluído (7/14; 1 parcial: PBI-071 OpenAPI).
+**Porcentagem: ~57%** concluído (8/14; sem itens parciais).
 
 > Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — restrito ao profile `dev`).
 >
