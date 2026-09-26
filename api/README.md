@@ -104,6 +104,13 @@ The seed is idempotent (guarded by the client document) and safe to re-run. Disa
 The app exposes Spring Boot Actuator: `GET http://localhost:8080/actuator/health` returns `200`
 with `{"status":"UP"}` once the database is reachable.
 
+## Push notifications
+
+Authenticated devices register an Expo push token at `POST /api/v1/devices/register`. Push delivery
+is disabled by default; enable it in an environment that can call Expo with `FIELDOPS_PUSH_ENABLED=true`.
+When enabled, an inspection assignment notifies every active token of the assigned technician; Expo
+responses that report `DeviceNotRegistered` remove the stale token.
+
 ## Docker
 
 Run PostgreSQL and the API together (builds the app image from `Dockerfile`):
