@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface InspectionRepository extends JpaRepository<Inspection, Long>, JpaSpecificationExecutor<Inspection> {
@@ -26,4 +27,54 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
     );
 
     List<Inspection> findByTechnicianIdOrderByDueDateAsc(Long technicianId);
+
+    @Query("""
+        SELECT i.status, COUNT(i)
+        FROM Inspection i
+        WHERE (:from IS NULL OR i.dueDate >= :from)
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+        GROUP BY i.status
+    """)
+    List<Object[]> countByStatus(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
+
+    @Query("""
+        SELECT i.priority, COUNT(i)
+        FROM Inspection i
+        WHERE i.status NOT IN :terminalStatuses
+          AND (:from IS NULL OR i.dueDate >= :from)
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+        GROUP BY i.priority
+    """)
+    List<Object[]> countByPriority(
+            @Param("terminalStatuses") List<InspectionStatus> terminalStatuses,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
+
+    @Query("""
+        SELECT COUNT(i)
+        FROM Inspection i
+        WHERE i.dueDate < :today
+          AND i.status NOT IN :terminalStatuses
+          AND (:from IS NULL OR i.dueDate >= :from)
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+    """)
+    long countOverdue(
+            @Param("today") LocalDate today,
+            @Param("terminalStatuses") List<InspectionStatus> terminalStatuses,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
 }

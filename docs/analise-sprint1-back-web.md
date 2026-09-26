@@ -269,24 +269,24 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-061 | Reprovar inspeção com motivo obrigatório | [#82](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/82) | ✅ Concluído — `POST /api/v1/inspections/{id}/reject`; motivo obrigatório (min 10), UNDER_REVIEW → REJECTED, auditoria (PR #131) |
 | PBI-063 | Auditoria de mudanças de estado | [#83](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/83) | ✅ Concluído — tabela imutável `audit_events` (migration V17) + `AuditService`; `GET /api/v1/inspections/{id}/history`; eventos de criar/atribuir/aprovar/reprovar/cancelar (PRs #132/#134) |
 | PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ✅ Concluído — `DemoSeedRunner` cria dataset coerente (cliente + local + equipamento com QR + modelo publicado + inspeção ASSIGNED), idempotente por `existsByDocument`; **restrição: só roda no profile `dev` com `fieldops.bootstrap.demo-seed.enabled`, não em `prod`** |
-| PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | 🟡 Parcial — há `Dockerfile` e `docker-compose.yml`; falta validar/publicar o build de demonstração |
-| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | 🟡 Parcial — OpenAPI gerado via springdoc + `OpenApiConfig`; falta contrato completo revisado e diagramas |
-| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | ✅ Concluído — `docker compose up --build` validado em 25/09/2026: API e PostgreSQL saudáveis, Flyway/seed do perfil `demo`, health, OpenAPI, login e listagem de inspeções retornando 200. A história exige API publicada **ou** executável por contêiner; não requer hospedagem externa. |
+| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | ✅ Concluído — contrato gerado pelo springdoc validado com 39 rotas, esquema Bearer JWT e endpoints críticos; `OpenApiConfig` traz metadados de uso e [`docs/api-diagrams.md`](./api-diagrams.md) documenta os diagramas Mermaid de entidades e estados da inspeção (commit `62495b0`). |
+| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ✅ Concluído — `GET /api/v1/dashboard/summary` agrega estados, prioridades, atrasos e não conformidades abertas em quatro queries (sem N+1), aceita `from`, `to`, `client` e `technicianId`, e restringe acesso a ADMINISTRATOR/SUPERVISOR. O domínio `NonConformity` (migration V20) preserva inspeção, item opcional, criticidade e estados OPEN/CLOSED. |
+| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `POST /api/v1/devices/register` persiste múltiplos tokens por usuário, envio Expo assíncrono é disparado na atribuição e tokens inválidos são removidos. No mobile, `expo-notifications` solicita permissão, registra o Expo token e abre a inspeção pelo `inspectionId` ao toque. |
+| PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ✅ Concluído — `GET /api/v1/inspections/{id}/report.pdf` gera `application/pdf` via OpenPDF com cabeçalho, decisão, snapshot, respostas registradas, NCs e referências/checksums de evidências persistidas em `inspection_evidences` (migration V24); protegido para ADMINISTRATOR/SUPERVISOR, com 403/404 validados. |
+| PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ✅ Concluído — migration V22 cria o histórico imutável `inspection_answers`; `GET /api/v1/inspections/{id}/answers/history` retorna item, seção, valor, observação, data e autor, ordenado por seção/item/data e protegido para ADMINISTRATOR/SUPERVISOR (403/404 validados). |
+| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ✅ Concluído — migration V23 cria `review_comments` imutáveis por inspeção/snapshot; `POST /api/v1/inspections/{id}/items/{itemId}/review-comment` e `GET /api/v1/inspections/{id}/review-comments` registram/listam orientação por item, ordenada, e gravam `REVIEW_COMMENT_ADDED` na auditoria. Escrita é restrita a ADMINISTRATOR/SUPERVISOR (403 validado). |
+| PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ✅ Concluído — `GET /api/v1/inspections/export.csv` exporta inspeções filtradas por estado/período/cliente, com colunas operacionais e contagem de NCs. O CSV inclui BOM UTF-8, escape de vírgulas/aspas/quebras de linha e proteção contra CSV injection; é exclusivo para ADMINISTRATOR e retorna só cabeçalho quando vazio. |
 
 ### Resumo Sprint 2 Backend (14 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 6 |
-| 🟡 Parcial | 2 |
-| ❌ Não feito | 6 |
+| ✅ Concluído | 14 |
+| 🟡 Parcial | 0 |
+| ❌ Não feito | 0 |
 
-**Porcentagem: ~43%** concluído (6/14; 2 parciais: PBI-070 Docker e PBI-071 OpenAPI).
+**Porcentagem: 100%** concluído (14/14).
 
 > Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — restrito ao profile `dev`).
 >
@@ -306,7 +306,7 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-064 | Estados de carregamento, vazio, erro e offline | [#84](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/84) | ❌ Não feito — não confirmado como cobertura sistemática no código |
 | PBI-069 | Build e publicação do painel web admin | [#89](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/89) | 🟡 Parcial — CI existe (`.github/workflows/frontend-ci.yml`); publicação ainda não configurada |
 | PBI-083 | *P1:* Dashboard com indicadores (telas) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | 🟡 Parcial — rota de relatório, prévia e download via jsPDF existem, com estado de geração; a tela ainda usa dados mockados e não consome o endpoint do backend. |
 | PBI-088 | *P1:* Histórico detalhado de respostas (telas) | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-089 | *P1:* Comentários de revisão por item (telas) | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ❌ Não feito (sem código) — issue criada no backlog |
@@ -317,10 +317,10 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | Categoria | Qtd |
 |-----------|-----|
 | ✅ Concluído | 0 |
-| 🟡 Parcial | 5 |
-| ❌ Não feito | 8 |
+| 🟡 Parcial | 6 |
+| ❌ Não feito | 7 |
 
-**Porcentagem: 0%** concluído. Parciais (protótipo/mock): PBI-047, 056, 057, 058 e 069.
+**Porcentagem: 0%** concluído. Parciais (protótipo/mock): PBI-047, 056, 057, 058, 069 e 087.
 
 > A tela de revisão (aprovar/reprovar com motivo obrigatório, respostas por seção, lightbox) já existe no frontend, porém está explicitamente marcada como protótipo e roda sobre mocks — depende dos endpoints de revisão/aprovação do backend (PBI-060/061), que ainda não existem.
 
