@@ -1,5 +1,7 @@
 package com.fieldops.report.service;
 
+import com.fieldops.answer.model.InspectionAnswer;
+import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.nonconformity.model.NonConformity;
@@ -28,7 +30,8 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
             .ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
     @Override
-    public byte[] generate(Inspection inspection, List<NonConformity> nonConformities) {
+    public byte[] generate(Inspection inspection, List<NonConformity> nonConformities,
+            List<InspectionAnswer> answers, List<InspectionEvidence> evidences) {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Document document = new Document();
             PdfWriter.getInstance(document, output);
@@ -36,7 +39,9 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
             addHeader(document, inspection);
             addDecision(document, inspection);
             addChecklist(document, inspection.getItemSnapshots());
+            addAnswers(document, answers);
             addNonConformities(document, nonConformities);
+            addEvidences(document, evidences);
             document.close();
             return output.toByteArray();
         } catch (DocumentException exception) {
@@ -121,6 +126,40 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
         for (NonConformity nonConformity : nonConformities) {
             document.add(new Paragraph(nonConformity.getSeverity() + " — " + nonConformity.getTitle()));
             document.add(new Paragraph(value(nonConformity.getDescription())));
+        }
+    }
+
+    private void addAnswers(Document document, List<InspectionAnswer> answers) throws DocumentException {
+        document.add(new Paragraph("Recorded answers", SECTION_FONT));
+        if (answers.isEmpty()) {
+            document.add(new Paragraph("No answers were recorded."));
+        }
+        for (InspectionAnswer answer : answers) {
+            InspectionItemSnapshot item = answer.getItemSnapshot();
+            document.add(new Paragraph(item.getSectionTitle() + " — " + item.getItemTitle()));
+            document.add(new Paragraph("Value: " + value(answer.getValue())));
+            addOptionalLine(document, "Observation", answer.getObservation());
+            addOptionalLine(document, "Answered at", answer.getAnsweredAt());
+            document.add(new Paragraph("Answered by: " + value(answer.getAnsweredBy().getName())));
+        }
+        document.add(new Paragraph(" "));
+    }
+
+    private void addEvidences(Document document, List<InspectionEvidence> evidences)
+            throws DocumentException {
+        document.add(new Paragraph("Evidence references", SECTION_FONT));
+        if (evidences.isEmpty()) {
+            document.add(new Paragraph("No evidence references were recorded."));
+        }
+        for (InspectionEvidence evidence : evidences) {
+            if (evidence.getItemSnapshot() != null) {
+                document.add(new Paragraph(evidence.getItemSnapshot().getSectionTitle() + " — "
+                        + evidence.getItemSnapshot().getItemTitle()));
+            }
+            document.add(new Paragraph("Reference: " + value(evidence.getReference())));
+            document.add(new Paragraph("Checksum: " + value(evidence.getChecksum())));
+            addOptionalLine(document, "Description", evidence.getDescription());
+            addOptionalLine(document, "Captured at", evidence.getCapturedAt());
         }
     }
 
