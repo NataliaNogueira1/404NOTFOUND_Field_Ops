@@ -101,9 +101,10 @@ export default function ChecklistScreen() {
                 key={item.id}
                 item={item}
                 index={allItems.findIndex((candidate) => candidate.id === item.id) + 1}
+                inspectionId={inspection?.id ?? id}
                 answer={answers[item.id]}
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
-                onAnswer={(value, observation) => answerItem(item.id, value, observation)}
+                onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
               />
             ))}
           </View>

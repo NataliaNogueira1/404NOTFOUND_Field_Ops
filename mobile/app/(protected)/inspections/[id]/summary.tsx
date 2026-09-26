@@ -16,14 +16,41 @@ export default function SummaryScreen() {
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
 
-  const items = template?.sections.flatMap((section) => section.items) ?? [];
-  const total = items.length;
-  const answered = Object.keys(answers).length;
-
-  const pendings = useMemo(
-    () => items.filter((item) => item.required && !answers[item.id]).map((item) => item.question),
-    [answers, items],
+  const items = useMemo(
+    () => template?.sections.flatMap((section) => section.items) ?? [],
+    [template],
   );
+  const total = items.length;
+  const answered = items.filter((item) => answers[item.id] !== undefined).length;
+
+  // Validação de conclusão (RN-037/RN-038/RN-039). Cada pendência descreve
+  // exatamente o que falta para o técnico corrigir antes de concluir:
+  //  - item obrigatório sem resposta (RN-037);
+  //  - item NÃO CONFORME sem a observação exigida pelo modelo (RN-038);
+  //  - item NÃO CONFORME sem a evidência exigida pelo modelo (RN-039).
+  const pendings = useMemo(() => {
+    const problems: string[] = [];
+    for (const item of items) {
+      const answer = answers[item.id];
+      const isAnswered = answer !== undefined && answer.value !== '' && answer.value !== null;
+
+      if (item.required && !isAnswered) {
+        problems.push(`${item.question} — resposta obrigatória`);
+        continue;
+      }
+
+      const isFailure = answer?.value === 'NAO_CONFORME';
+      if (!isFailure) continue;
+
+      if (item.requireObservationOnFailure && !answer?.observation?.trim()) {
+        problems.push(`${item.question} — observação obrigatória na não conformidade`);
+      }
+      if (item.requireEvidenceOnFailure && !evidences.some((e) => e.itemId === item.id)) {
+        problems.push(`${item.question} — evidência obrigatória na não conformidade`);
+      }
+    }
+    return problems;
+  }, [answers, evidences, items]);
 
   const conformes = Object.values(answers).filter((a) => a.value === 'CONFORME' || a.value === true).length;
   const naoConformes = Object.values(answers).filter((a) => a.value === 'NAO_CONFORME').length;
@@ -82,7 +109,7 @@ export default function SummaryScreen() {
             </Text>
             {pendings.length
               ? pendings.map((item, index) => (
-                  <Text key={item} style={styles.muted}>Item {index + 1}: {item}</Text>
+                  <Text key={`${item}-${index}`} style={styles.muted}>{index + 1}. {item}</Text>
                 ))
               : <Text style={styles.muted}>Nenhuma pendência obrigatória no momento.</Text>}
             <Button
