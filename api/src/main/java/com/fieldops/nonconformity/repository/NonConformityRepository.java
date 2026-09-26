@@ -3,11 +3,14 @@ package com.fieldops.nonconformity.repository;
 import com.fieldops.nonconformity.model.NonConformity;
 import com.fieldops.nonconformity.model.NonConformityStatus;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface NonConformityRepository extends JpaRepository<NonConformity, Long> {
+
+    List<NonConformity> findByInspectionIdOrderByCreatedAtAsc(Long inspectionId);
 
     /** Counts non-conformities without loading inspections or item snapshots. */
     @Query("""
