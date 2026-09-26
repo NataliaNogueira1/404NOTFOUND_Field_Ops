@@ -12,6 +12,14 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
 
     List<NonConformity> findByInspectionIdOrderByCreatedAtAsc(Long inspectionId);
 
+    @Query("""
+        SELECT n.inspection.id, COUNT(n)
+        FROM NonConformity n
+        WHERE n.inspection.id IN :inspectionIds
+        GROUP BY n.inspection.id
+    """)
+    List<Object[]> countByInspectionIds(@Param("inspectionIds") List<Long> inspectionIds);
+
     /** Counts non-conformities without loading inspections or item snapshots. */
     @Query("""
         SELECT COUNT(n)
