@@ -275,18 +275,18 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `POST /api/v1/devices/register` persiste múltiplos tokens por usuário, envio Expo assíncrono é disparado na atribuição e tokens inválidos são removidos. No mobile, `expo-notifications` solicita permissão, registra o Expo token e abre a inspeção pelo `inspectionId` ao toque. |
 | PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | 🟡 Parcial — `GET /api/v1/inspections/{id}/report.pdf` gera e baixa `application/pdf` via OpenPDF, com cabeçalho, decisão, snapshot do checklist e NCs; protegido para ADMINISTRATOR/SUPERVISOR, com 404 validado. O relatório ainda não consome o histórico de respostas nem referencia evidências. |
 | PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ✅ Concluído — migration V22 cria o histórico imutável `inspection_answers`; `GET /api/v1/inspections/{id}/answers/history` retorna item, seção, valor, observação, data e autor, ordenado por seção/item/data e protegido para ADMINISTRATOR/SUPERVISOR (403/404 validados). |
-| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ✅ Concluído — migration V23 cria `review_comments` imutáveis por inspeção/snapshot; `POST /api/v1/inspections/{id}/items/{itemId}/review-comment` e `GET /api/v1/inspections/{id}/review-comments` registram/listam orientação por item, ordenada, e gravam `REVIEW_COMMENT_ADDED` na auditoria. Escrita é restrita a ADMINISTRATOR/SUPERVISOR (403 validado). |
 | PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
 
 ### Resumo Sprint 2 Backend (14 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 11 |
+| ✅ Concluído | 12 |
 | 🟡 Parcial | 1 |
-| ❌ Não feito | 2 |
+| ❌ Não feito | 1 |
 
-**Porcentagem: ~79%** concluído (11/14; 1 item parcial).
+**Porcentagem: ~86%** concluído (12/14; 1 item parcial).
 
 > Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — restrito ao profile `dev`).
 >
