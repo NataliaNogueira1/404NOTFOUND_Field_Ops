@@ -54,6 +54,12 @@
           "locationAlwaysAndWhenInUsePermission": "O FieldOps usa sua localização para registrar onde a inspeção foi iniciada."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "inspections"
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-font",
