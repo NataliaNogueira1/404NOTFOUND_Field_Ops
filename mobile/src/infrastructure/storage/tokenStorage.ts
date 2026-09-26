@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_TOKEN_KEY = 'fieldops_access_token';
 const REFRESH_TOKEN_KEY = 'fieldops_refresh_token';
+const BIOMETRIC_ENABLED_KEY = 'fieldops_biometric_enabled';
 
 /**
  * On native (iOS/Android) we use SecureStore.
@@ -45,5 +46,23 @@ export const tokenStorage = {
   async clearTokens(): Promise<void> {
     await store.deleteItem(ACCESS_TOKEN_KEY);
     await store.deleteItem(REFRESH_TOKEN_KEY);
+  },
+};
+
+// ─── Biometric preference ──────────────────────────────────────────────────────
+
+export const biometricStorage = {
+  /** Returns true if the user has opted in to biometric unlock. */
+  async isEnabled(): Promise<boolean> {
+    const value = await store.getItem(BIOMETRIC_ENABLED_KEY);
+    return value === 'true';
+  },
+
+  async enable(): Promise<void> {
+    await store.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+  },
+
+  async disable(): Promise<void> {
+    await store.setItem(BIOMETRIC_ENABLED_KEY, 'false');
   },
 };
