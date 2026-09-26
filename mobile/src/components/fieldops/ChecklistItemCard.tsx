@@ -13,12 +13,13 @@ import { SaveStatusIndicator } from './SaveStatusIndicator';
 interface ChecklistItemProps {
   item: TemplateItem;
   index: number;
+  inspectionId: string;
   answer?: ChecklistAnswer;
   evidences: Evidence[];
   onAnswer: (value: ChecklistValue, observation?: string) => void;
 }
 
-export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: ChecklistItemProps) {
+export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer }: ChecklistItemProps) {
   const router = useRouter();
   const [text, setText] = useState(answer?.value?.toString() ?? '');
   const [observation, setObservation] = useState(answer?.observation ?? '');
@@ -93,7 +94,7 @@ export function ChecklistItemCard({ item, index, answer, evidences, onAnswer }: 
             multiline
           />
           <Text style={styles.label}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
-          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=ins-compressor&itemId=${item.id}`)} variant="secondary" />
+          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
         </View>
       ) : answer !== undefined ? (
         <View style={styles.observationBox}>

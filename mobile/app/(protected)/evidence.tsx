@@ -1,5 +1,5 @@
 ﻿import { useCallback, useRef, useState } from 'react';
-import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -13,7 +13,7 @@ import { useImagePicker, type CapturedImage } from '@/infrastructure/media';
 type ScreenMode = 'idle' | 'camera' | 'preview';
 
 export default function EvidenceScreen() {
-  const { inspectionId = 'ins-compressor', itemId = 'item-4' } = useLocalSearchParams<{
+  const { inspectionId, itemId } = useLocalSearchParams<{
     inspectionId?: string;
     itemId?: string;
   }>();
@@ -63,7 +63,12 @@ export default function EvidenceScreen() {
   }, [pickFromGallery]);
 
   function usePhoto() {
-    if (!captured) return;
+    // Guard against opening this route without the required context params —
+    // an evidence must always be bound to a real inspection + item (RN-045).
+    if (!captured || !inspectionId || !itemId) {
+      router.back();
+      return;
+    }
     addEvidence(inspectionId, itemId, description, captured.uri);
     router.back();
   }
