@@ -272,7 +272,7 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | ✅ Concluído — `docker compose up --build` validado em 25/09/2026: API e PostgreSQL saudáveis, Flyway/seed do perfil `demo`, health, OpenAPI, login e listagem de inspeções retornando 200. A história exige API publicada **ou** executável por contêiner; não requer hospedagem externa. |
 | PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | ✅ Concluído — contrato gerado pelo springdoc validado com 39 rotas, esquema Bearer JWT e endpoints críticos; `OpenApiConfig` traz metadados de uso e [`docs/api-diagrams.md`](./api-diagrams.md) documenta os diagramas Mermaid de entidades e estados da inspeção (commit `62495b0`). |
 | PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ✅ Concluído — `GET /api/v1/dashboard/summary` agrega estados, prioridades, atrasos e não conformidades abertas em quatro queries (sem N+1), aceita `from`, `to`, `client` e `technicianId`, e restringe acesso a ADMINISTRATOR/SUPERVISOR. O domínio `NonConformity` (migration V20) preserva inspeção, item opcional, criticidade e estados OPEN/CLOSED. |
-| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | 🟡 Parcial — backend concluído: `POST /api/v1/devices/register` persiste múltiplos tokens por usuário, envio Expo assíncrono é disparado na atribuição e tokens inválidos são removidos. Pendente no mobile: permissão, registro do token e deep link ao toque. |
+| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `POST /api/v1/devices/register` persiste múltiplos tokens por usuário, envio Expo assíncrono é disparado na atribuição e tokens inválidos são removidos. No mobile, `expo-notifications` solicita permissão, registra o Expo token e abre a inspeção pelo `inspectionId` ao toque. |
 | PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
@@ -282,11 +282,11 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 9 |
-| 🟡 Parcial | 1 |
+| ✅ Concluído | 10 |
+| 🟡 Parcial | 0 |
 | ❌ Não feito | 4 |
 
-**Porcentagem: ~64%** concluído (9/14; 1 parcial: PBI-085 Push).
+**Porcentagem: ~71%** concluído (10/14; sem itens parciais).
 
 > Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — restrito ao profile `dev`).
 >

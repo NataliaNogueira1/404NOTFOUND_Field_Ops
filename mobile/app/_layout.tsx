@@ -1,5 +1,6 @@
 ﻿import { useFonts } from 'expo-font';
 import { Slot, useRouter, useSegments } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, StyleSheet, View } from 'react-native';
@@ -11,6 +12,7 @@ import { FieldOpsProvider } from '@/features/fieldops';
 import { ConnectivityProvider } from '@/infrastructure/connectivity';
 import { DatabaseProvider } from '@/infrastructure/database/DatabaseProvider';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
+import { inspectionIdFromNotification } from '@/infrastructure/notifications/pushNotifications';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -93,6 +95,23 @@ function AuthGate() {
   return <Slot />;
 }
 
+function useNotificationNavigation() {
+  const router = useRouter();
+
+  useEffect(() => {
+    function openInspection(notification: Notifications.Notification) {
+      const inspectionId = inspectionIdFromNotification(notification);
+      if (inspectionId) router.push(`/(protected)/inspections/${inspectionId}`);
+    }
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse?.notification) openInspection(lastResponse.notification);
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      openInspection(response.notification);
+    });
+    return () => subscription.remove();
+  }, [router]);
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -100,6 +119,7 @@ export default function RootLayout() {
     // on-demand asset download (which fails intermittently under Expo Go).
     Ionicons: require('@react-native-vector-icons/ionicons/fonts/Ionicons.ttf'),
   });
+  useNotificationNavigation();
   useEffect(() => { if (error) throw error; }, [error]);
   useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
   if (!loaded) return null;

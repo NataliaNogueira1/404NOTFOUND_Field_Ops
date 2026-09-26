@@ -60,6 +60,12 @@
           "faceIDPermission": "O FieldOps usa o Face ID para desbloquear sua sessão local com segurança."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "inspections"
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-font",
