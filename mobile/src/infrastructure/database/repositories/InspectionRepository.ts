@@ -111,8 +111,9 @@ export class InspectionRepository {
         id, title, template_id, client_id, client_name, site_id, site_name,
         equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
-        progress, supervisor_instructions, sync_status, pending_sync_count, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        progress, supervisor_instructions, sync_status, pending_sync_count,
+        rejection_reason, rejected_by, rejected_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       inspection.id,
       inspection.title,
       inspection.templateId,
@@ -136,6 +137,11 @@ export class InspectionRepository {
       inspection.supervisorInstructions ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
+      // PBI-062: persist the rejection metadata pulled from the server so the
+      // RejectionBanner and the "Corrigir" action have the reason offline.
+      inspection.rejectionReason ?? null,
+      inspection.rejectedBy ?? null,
+      inspection.rejectedAt ?? null,
     );
   }
 
