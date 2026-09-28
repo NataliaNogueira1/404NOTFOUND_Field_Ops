@@ -145,6 +145,17 @@ class InspectionAnswerHistoryControllerTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
+    // 4b. A non-numeric id must yield 400 (invalid parameter), never a 500 from the catch-all.
+    @Test
+    void nonNumericIdReturnsBadRequest() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+
+        mockMvc.perform(get("/api/v1/inspections/{id}/answers/history", "ins-compressor")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+    }
+
     // 5 + 6. Existing inspection returns history with all contract fields.
     @Test
     void returnsHistoryWithContractFields() throws Exception {
