@@ -1,6 +1,15 @@
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { jsPDF } from 'jspdf'
+import autoTableImport from 'jspdf-autotable'
 import type { Inspection, NonConformity, ReviewAnswer } from '@/types/domain'
+
+// jspdf-autotable exposes the callable as the module default in ESM builds, but
+// depending on the bundler interop the imported value can be the module namespace
+// object instead of the function. Normalise it so `autoTable(doc, ...)` always works.
+const autoTable = (
+  typeof autoTableImport === 'function'
+    ? autoTableImport
+    : (autoTableImport as { default: typeof autoTableImport }).default
+) as typeof autoTableImport
 import { Priority, InspectionStatus } from '@/types/domain'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
