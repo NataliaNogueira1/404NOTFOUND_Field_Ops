@@ -52,8 +52,12 @@ const SHARED_OPTIONS: Partial<ImagePicker.ImagePickerOptions> = {
  */
 export function useImagePicker(onPendingResult?: (image: CapturedImage) => void) {
   const pendingCallbackRef = useRef(onPendingResult);
-  pendingCallbackRef.current = onPendingResult;
   const [recovering, setRecovering] = useState(false);
+
+  // Keep the latest callback in a ref without writing during render.
+  useEffect(() => {
+    pendingCallbackRef.current = onPendingResult;
+  }, [onPendingResult]);
 
   // On Android, if the activity was destroyed while the camera was open,
   // getPendingResultAsync() returns the result when the app restarts.
