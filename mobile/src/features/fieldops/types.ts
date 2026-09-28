@@ -50,7 +50,23 @@ export interface Inspection {
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
 }
-export interface Evidence { id: string; inspectionId: string; itemId: string; description: string; uri?: string; capturedAt: string; syncStatus: SyncStatus }
+export interface Evidence {
+  id: string;
+  inspectionId: string;
+  itemId: string;
+  description: string;
+  uri?: string;
+  capturedAt: string;
+  syncStatus: SyncStatus;
+  /** Outbox operation id of the photo upload (idempotency key, PBI-052). */
+  operationId?: string;
+  /** Outbox operation id of the answer this photo depends on (RN-069). */
+  responseId?: string;
+  /** Last upload error, persisted so it survives an app restart (RN-066). */
+  lastError?: string;
+  /** How many times the upload has been retried (powers "Tentar novamente"). */
+  retryCount?: number;
+}
 export interface ChecklistAnswer { itemId: string; value: ChecklistValue; observation?: string; savedAt: string }
 export interface NonConformity { id: string; inspectionId: string; itemId: string; title: string; description: string; severity: Severity; evidenceCount: number }
-export interface SyncOperation { id: string; title: string; status: 'Enviada' | 'Upload concluído' | 'Pendente' | 'Erro' }
+export interface SyncOperation { id: string; title: string; status: 'Enviada' | 'Upload concluído' | 'Pendente' | 'Erro'; error?: string }

@@ -41,6 +41,7 @@ interface FieldOpsContextValue {
   ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
+  retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
   syncNow: () => void;
@@ -60,6 +61,23 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
     console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
   } catch (apiError) {
     console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+  }
+}
+
+// Friendly label for a queued operation shown on the sync screen. Photos get a
+// distinct label so a failed upload reads like "Foto: <id>" (PBI-044).
+function describeOperation(entityType: string, entityId: string): string {
+  switch (entityType) {
+    case 'evidence':
+      return `Foto: ${entityId}`;
+    case 'answer':
+      return `Resposta: ${entityId}`;
+    case 'inspection':
+      return `Inspeção: ${entityId}`;
+    case 'non_conformity':
+      return `Não conformidade: ${entityId}`;
+    default:
+      return `${entityType}: ${entityId}`;
   }
 }
 
@@ -129,9 +147,10 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const queue = await sqRepo.getAll();
     setSyncOperations(queue.map((entry) => ({
       id: entry.id,
-      title: `${entry.entityType}: ${entry.entityId}`,
+      title: describeOperation(entry.entityType, entry.entityId),
       status: entry.status === 'sent' ? 'Enviada' as const :
               entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
+      error: entry.lastError ?? undefined,
     })));
 
     console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
@@ -314,14 +333,20 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   }, [getRepos, getSyncService]);
 
   const addEvidence = useCallback((inspectionId: string, itemId: string, description: string, uri?: string) => {
+    const evidenceId = `ev-${itemId}-${Date.now()}`;
     const evidence: Evidence = {
-      id: `ev-${itemId}-${Date.now()}`,
+      id: evidenceId,
       inspectionId,
       itemId,
       description,
       uri,
       capturedAt: new Date().toISOString(),
       syncStatus: 'pending',
+      operationId: InspectionSyncService.evidenceOperationId(evidenceId),
+      // The photo upload depends on the answer operation of the same item, so it
+      // waits for the answer to be synced before running (RN-069).
+      responseId: InspectionSyncService.answerOperationId(inspectionId, itemId),
+      retryCount: 0,
     };
     setEvidences((current) => [...current, evidence]);
     setNonConformities((current) =>
@@ -347,6 +372,23 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
     return evidence;
   }, [getRepos, getSyncService]);
+
+  // Retry a failed photo upload. Reuses the existing file and outbox op (no new
+  // capture, no duplicate evidence — PBI-044) and flips the UI back to pending.
+  const retryEvidenceUpload = useCallback((evidenceId: string) => {
+    setEvidences((current) =>
+      current.map((ev) =>
+        ev.id === evidenceId
+          ? { ...ev, syncStatus: 'pending' as const, lastError: undefined, retryCount: (ev.retryCount ?? 0) + 1 }
+          : ev,
+      ),
+    );
+    const target = evidences.find((ev) => ev.id === evidenceId);
+    const sync = getSyncService();
+    if (sync && target) {
+      sync.retryEvidenceUpload(target).catch(console.warn);
+    }
+  }, [evidences, getSyncService]);
 
   const addNonConformity = useCallback((input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => {
     const nc: NonConformity = { ...input, id: `nc-manual-${Date.now()}`, evidenceCount: input.evidenceCount ?? 0 };
@@ -450,6 +492,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       startInspection,
       answerItem,
       addEvidence,
+      retryEvidenceUpload,
       addNonConformity,
       concludeInspection,
       syncNow,
@@ -459,7 +502,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, syncOperations,
-      startInspection, answerItem, addEvidence, addNonConformity,
+      startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
       concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -15,7 +15,7 @@ interface SaveStatusIndicatorProps {
  * - saved: "✓ Salvo no dispositivo" in green
  */
 export function SaveStatusIndicator({ status }: SaveStatusIndicatorProps) {
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [opacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (status === 'idle') {
