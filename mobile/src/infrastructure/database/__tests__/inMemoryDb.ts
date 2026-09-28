@@ -6,8 +6,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
  * Minimal in-memory implementation of the subset of the expo-sqlite
  * `SQLiteDatabase` API used by the repositories, backed by better-sqlite3.
  *
- * This lets the PBI-044 tests run the REAL migrations + repository SQL in Node,
- * so the offline/outbox logic is validated end-to-end without a device.
+ * This lets the sync/offline tests (PBI-044 and PBI-054) run the REAL
+ * migrations + repository SQL in Node, so the outbox/metadata logic is
+ * validated end-to-end without a device.
  */
 export function createInMemoryDb(): SQLiteDatabase {
   const db = new Database(':memory:');
