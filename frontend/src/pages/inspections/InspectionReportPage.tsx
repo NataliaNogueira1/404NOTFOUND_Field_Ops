@@ -46,9 +46,16 @@ export function InspectionReportPage() {
 
   const conformeCount = reviewAnswers.filter(a => !a.nonConformityId).length
   const ncCount = reviewAnswers.filter(a => Boolean(a.nonConformityId)).length
+  const conformityPercent =
+    reviewAnswers.length > 0 ? Math.round((conformeCount / reviewAnswers.length) * 100) : 0
+  const conformityColor =
+    conformityPercent >= 80 ? 'text-success-dark' : conformityPercent >= 50 ? 'text-warning' : 'text-danger'
+
+  const [error, setError] = useState<string | null>(null)
 
   function handleDownload() {
     setDownloading(true)
+    setError(null)
     // Small timeout to let the button state render before the (sync) PDF generation
     setTimeout(() => {
       try {
@@ -62,6 +69,9 @@ export function InspectionReportPage() {
           reviewAnswers,
           nonConformities: inspectionNcs,
         })
+      } catch (err) {
+        console.error('Falha ao gerar o PDF da inspecao:', err)
+        setError('Nao foi possivel gerar o PDF. Tente novamente.')
       } finally {
         setDownloading(false)
       }
@@ -102,6 +112,12 @@ export function InspectionReportPage() {
         </div>
       </Card>
 
+      {error && (
+        <Card className="border-danger/30 bg-danger/5 p-4" role="alert">
+          <p className="text-sm font-semibold text-danger">{error}</p>
+        </Card>
+      )}
+
       {/* Info grid */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <InfoCard label="Tecnico" value={tech?.name} />
@@ -122,10 +138,11 @@ export function InspectionReportPage() {
       </section>
 
       {/* Summary stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatBox label="Total de itens" value={reviewAnswers.length} color="text-primary" />
-        <StatBox label="Conformes" value={conformeCount} color="text-success-dark" />
-        <StatBox label="Nao conformes" value={ncCount} color="text-danger" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatBox label="Total de itens" value={String(reviewAnswers.length)} color="text-primary" />
+        <StatBox label="Conformes" value={String(conformeCount)} color="text-success-dark" />
+        <StatBox label="Nao conformes" value={String(ncCount)} color="text-danger" />
+        <StatBox label="Conformidade" value={`${conformityPercent}%`} color={conformityColor} />
       </div>
 
       {/* Checklist preview */}
@@ -190,14 +207,6 @@ export function InspectionReportPage() {
           <p className="text-sm text-muted">{inspection.supervisorInstructions}</p>
         </Card>
       )}
-
-      {/* Download CTA (bottom) */}
-      <div className="flex justify-end border-t border-border pt-4">
-        <Button onClick={handleDownload} disabled={downloading}>
-          <Download size={17} />
-          {downloading ? 'Gerando PDF...' : 'Baixar PDF'}
-        </Button>
-      </div>
     </div>
   )
 }
@@ -223,7 +232,7 @@ function InfoCard({
   )
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <Card className="p-4 text-center">
       <p className={`text-3xl font-bold ${color}`}>{value}</p>
