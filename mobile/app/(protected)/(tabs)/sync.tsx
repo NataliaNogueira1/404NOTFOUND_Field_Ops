@@ -47,6 +47,16 @@ export default function SyncScreen() {
       ? 'Sincronizar agora'
       : 'Sincronizar agora (offline)';
 
+  // Photos that failed to upload (PBI-044), derived from the REAL outbox: an
+  // evidence operation sitting in the "error" bucket is a failed photo upload.
+  const failedPhotos = operations.filter(
+    (operation) => operation.entityType === 'evidence' && operation.displayStatus === 'error',
+  ).length;
+
+  const hasFailedOperations = operations.some(
+    (operation) => operation.displayStatus === 'error',
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Reactive offline banner — driven by the global connectivity provider. */}
@@ -99,6 +109,24 @@ export default function SyncScreen() {
             <OperationRow key={operation.id} operation={operation} />
           ))
         )}
+
+        {/* Retry action for failed operations (PBI-044): reuses the existing
+            sync mechanism, disabled while offline or already syncing. */}
+        {hasFailedOperations ? (
+          <Button
+            label="Tentar novamente"
+            onPress={triggerSync}
+            variant="secondary"
+            disabled={!isOnline || isSyncing}
+            fullWidth
+          />
+        ) : null}
+
+        {/* Device card (PBI-044): failed photo uploads count, from real data. */}
+        <Card style={styles.card}>
+          <Text style={styles.section}>Dispositivo</Text>
+          <Row label="Fotos com falha" value={String(failedPhotos)} />
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );
@@ -120,6 +148,15 @@ function OperationRow({ operation }: { operation: SyncOperationView }) {
         ) : null}
       </View>
     </Card>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.muted}>{label}</Text>
+      <Text style={styles.rowValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -148,4 +185,12 @@ const styles = StyleSheet.create({
   operationTitle: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.semibold },
   operationStatus: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   errorText: { fontSize: FontSize.sm, color: Colors.danger },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+  },
+  rowValue: { color: Colors.text, fontWeight: FontWeight.semibold },
 });

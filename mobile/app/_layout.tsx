@@ -43,7 +43,12 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({ SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf') });
+  const [loaded, error] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    // Pre-load the Ionicons font at boot so tab icons don't depend on an
+    // on-demand asset download (which fails intermittently under Expo Go).
+    Ionicons: require('@react-native-vector-icons/ionicons/fonts/Ionicons.ttf'),
+  });
   useEffect(() => { if (error) throw error; }, [error]);
   useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
   if (!loaded) return null;

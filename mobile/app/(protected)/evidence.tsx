@@ -1,5 +1,5 @@
 ﻿import { useCallback, useRef, useState } from 'react';
-import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -8,7 +8,7 @@ import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
-import { useImagePicker, type CapturedImage } from '@/infrastructure/media';
+import { useImagePicker, persistEvidenceFile, type CapturedImage } from '@/infrastructure/media';
 
 type ScreenMode = 'idle' | 'camera' | 'preview';
 
@@ -45,8 +45,11 @@ export default function EvidenceScreen() {
     if (!cameraRef.current) return;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
     if (photo) {
+      // Copy the camera capture out of the temporary cache into persistent
+      // storage so an evidence pending upload survives offline (RN-047 / PBI-044).
+      const persistedUri = await persistEvidenceFile(photo.uri);
       setCaptured({
-        uri: photo.uri,
+        uri: persistedUri,
         width: photo.width,
         height: photo.height,
       });

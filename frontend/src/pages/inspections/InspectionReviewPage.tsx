@@ -1,6 +1,6 @@
-﻿import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
+﻿import { ArrowLeft, CheckCircle2, FileText, XCircle } from 'lucide-react'
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SeverityBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Lightbox, PhotoThumbnails, type LightboxPhoto } from '@/components/feedback/Lightbox'
@@ -14,6 +14,7 @@ import { InspectionStatus } from '@/types/domain'
 
 export function InspectionReviewPage() {
   const { id = 'ins-compressor' } = useParams()
+  const navigate = useNavigate()
   const inspections = useSyncExternalStore(inspectionStore.subscribe, inspectionStore.adminSnapshot, inspectionStore.adminSnapshot)
   const inspection = byId(inspections, id) ?? inspections[0]
   const client = byId(clients, inspection.clientId)
@@ -80,6 +81,9 @@ export function InspectionReviewPage() {
           <p className="text-sm text-muted">{inspection.title} - {item?.name}</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}>
+            <FileText size={17} />Relatorio PDF
+          </Button>
           {canceled
             ? <Button disabled>Inspecao cancelada</Button>
             : <>

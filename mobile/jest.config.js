@@ -1,10 +1,10 @@
 /**
  * Jest configuration for the FieldOps mobile app.
  *
- * Uses ts-jest in a Node environment for the offline/sync unit tests (PBI-054),
- * which exercise the repositories/service logic against an in-memory fake SQLite
- * DB (better-sqlite3) and mocked network — no native React Native runtime
- * required.
+ * Uses ts-jest in a Node environment for the offline/sync unit tests
+ * (PBI-044 and PBI-054), which exercise the repositories/service logic against
+ * an in-memory fake SQLite DB (better-sqlite3) and mocked network — no native
+ * React Native runtime required.
  */
 module.exports = {
   preset: 'ts-jest',
