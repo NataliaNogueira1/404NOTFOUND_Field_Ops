@@ -1,7 +1,8 @@
-import { Ban, Plus } from 'lucide-react'
+import { Ban, Download, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { type AdminInspectionSummary, adminCatalogApi } from '@/api/adminCatalog'
+import { authSession } from '@/auth/session'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { byId, clients, equipment, users } from '@/mocks/domain'
 import { inspectionStore } from '@/state/mockStores'
-import { InspectionStatus, Priority, type Inspection } from '@/types/domain'
+import { InspectionStatus, Priority, UserRole, type Inspection } from '@/types/domain'
 
 const cancelable = [
   InspectionStatus.DRAFT,
@@ -27,6 +28,8 @@ const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority
 
 export function InspectionsPage() {
   const navigate = useNavigate()
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  const isAdmin = session.user?.role === UserRole.ADMIN
   const source = useSyncExternalStore(
     inspectionStore.subscribe,
     inspectionStore.adminSnapshot,
@@ -46,6 +49,8 @@ export function InspectionsPage() {
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
   const [canceling, setCanceling] = useState<AdminInspectionSummary | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -141,6 +146,23 @@ export function InspectionsPage() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true)
+    setExportError('')
+    try {
+      await adminCatalogApi.exportCsv({
+        status,
+        from: dueDate,   // "Período" field maps to the from filter
+        to: '',
+        clientName,
+      })
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Erro ao exportar CSV.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const columns: Column<AdminInspectionSummary>[] = [
     {
       header: 'Inspecao',
@@ -205,12 +227,25 @@ export function InspectionsPage() {
         title="Inspecoes"
         description="Acompanhe e gerencie as inspecoes de campo."
         action={
-          <Link to="/app/inspections/new">
-            <Button>
-              <Plus size={17} />
-              Nova inspecao
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                disabled={exporting}
+                onClick={() => void handleExport()}
+                title="Exportar inspeções filtradas como CSV"
+              >
+                <Download size={17} />
+                {exporting ? 'Exportando...' : 'Exportar CSV'}
+              </Button>
+            )}
+            <Link to="/app/inspections/new">
+              <Button>
+                <Plus size={17} />
+                Nova inspecao
+              </Button>
+            </Link>
+          </div>
         }
       />
       <Card className="grid gap-4 p-4 xl:grid-cols-4">
@@ -300,6 +335,11 @@ export function InspectionsPage() {
           </div>
         )}
       </Card>
+      {exportError && (
+        <p role="alert" className="text-sm font-medium text-danger">
+          {exportError}
+        </p>
+      )}
       <DataTable
         columns={columns}
         rows={rows}
