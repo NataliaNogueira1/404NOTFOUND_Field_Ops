@@ -20,6 +20,10 @@ export function InspectionReviewPage() {
   const { id = 'ins-compressor' } = useParams()
   const inspections = useSyncExternalStore(inspectionStore.subscribe, inspectionStore.adminSnapshot, inspectionStore.adminSnapshot)
   const inspection = byId(inspections, id) ?? inspections[0]
+  // The answer-history tab reads from the real API, so it must use the inspection id from the
+  // route (e.g. "1"), not the mock's id. The rest of this page still renders mock data until the
+  // review screen is fully wired to the API (separate PBI).
+  const answerHistoryInspectionId = id
   const client = byId(clients, inspection.clientId)
   const site = byId(sites, inspection.siteId)
   const item = byId(equipment, inspection.equipmentId)
@@ -110,7 +114,7 @@ export function InspectionReviewPage() {
         </TabButton>
       </div>
 
-      {activeTab === 'answer-history' && <AnswerHistoryTab inspectionId={inspection.id} />}
+      {activeTab === 'answer-history' && <AnswerHistoryTab inspectionId={answerHistoryInspectionId} />}
 
       {activeTab === 'review' && (
       <>
