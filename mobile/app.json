@@ -54,6 +54,12 @@
           "locationAlwaysAndWhenInUsePermission": "O FieldOps usa sua localização para registrar onde a inspeção foi iniciada."
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "O FieldOps usa o Face ID para desbloquear sua sessão local com segurança."
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-font",
