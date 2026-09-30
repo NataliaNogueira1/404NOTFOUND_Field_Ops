@@ -2,13 +2,13 @@ package com.fieldops.report.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fieldops.answer.model.InspectionAnswer;
 import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.user.model.User;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -27,13 +27,8 @@ class OpenPdfInspectionReportDocumentTest {
         InspectionItemSnapshot item = mock(InspectionItemSnapshot.class);
         given(item.getSectionTitle()).willReturn("Electrical safety");
         given(item.getItemTitle()).willReturn("Grounding verified");
-        InspectionAnswer answer = mock(InspectionAnswer.class);
-        given(answer.getItemSnapshot()).willReturn(item);
-        given(answer.getValue()).willReturn("PASS");
-        given(answer.getObservation()).willReturn("No defect found");
-        User answerAuthor = new User();
-        answerAuthor.setName("Alex Technician");
-        given(answer.getAnsweredBy()).willReturn(answerAuthor);
+        ReportAnswer answer = new ReportAnswer("Electrical safety", "Grounding verified", "PASS",
+                "No defect found", Instant.parse("2026-09-26T10:30:00Z"), "Alex Technician");
         InspectionEvidence evidence = mock(InspectionEvidence.class);
         given(evidence.getItemSnapshot()).willReturn(item);
         given(evidence.getReference()).willReturn("https://storage.example/evidence/grounding.jpg");
