@@ -110,7 +110,6 @@ export function useBiometricAuth() {
         case 'system_cancel':
           return { success: false, error: 'Autenticação interrompida pelo sistema.' };
         case 'lockout':
-        case 'lockout_permanent':
           return {
             success: false,
             error: 'Muitas tentativas. Use sua senha para desbloquear.',
