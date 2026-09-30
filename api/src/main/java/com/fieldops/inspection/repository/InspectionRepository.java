@@ -33,7 +33,7 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
         FROM Inspection i
         WHERE (:from IS NULL OR i.dueDate >= :from)
           AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:technicianId IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.status
     """)
@@ -49,7 +49,7 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
         WHERE i.status NOT IN :terminalStatuses
           AND (:from IS NULL OR i.dueDate >= :from)
           AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:technicianId IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.priority
     """)
@@ -67,7 +67,7 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
           AND i.status NOT IN :terminalStatuses
           AND (:from IS NULL OR i.dueDate >= :from)
           AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:technicianId IS NULL OR i.technician.id = :technicianId)
     """)
     long countOverdue(

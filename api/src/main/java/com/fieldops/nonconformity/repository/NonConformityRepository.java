@@ -28,7 +28,7 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
         WHERE n.status = :status
           AND (:from IS NULL OR i.dueDate >= :from)
           AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:technicianId IS NULL OR i.technician.id = :technicianId)
     """)
     long countByStatusAndInspectionFilters(

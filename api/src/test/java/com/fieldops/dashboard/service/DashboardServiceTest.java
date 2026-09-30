@@ -39,19 +39,19 @@ class DashboardServiceTest {
                 new Object[]{InspectionStatus.APPROVED, 4L});
         List<Object[]> priorityRows = List.<Object[]>of(new Object[]{Priority.HIGH, 2L});
 
-        when(inspectionRepository.countByStatus(from, to, "Industria Modelo Ltda.", 12L))
+        when(inspectionRepository.countByStatus(from, to, "industria modelo ltda.", 12L))
                 .thenReturn(statusRows);
         when(inspectionRepository.countByPriority(
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
-                from, to, "Industria Modelo Ltda.", 12L))
+                from, to, "industria modelo ltda.", 12L))
                 .thenReturn(priorityRows);
         when(inspectionRepository.countOverdue(
                 LocalDate.now(),
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
-                from, to, "Industria Modelo Ltda.", 12L))
+                from, to, "industria modelo ltda.", 12L))
                 .thenReturn(3L);
         when(nonConformityRepository.countByStatusAndInspectionFilters(
-                NonConformityStatus.OPEN, from, to, "Industria Modelo Ltda.", 12L))
+                NonConformityStatus.OPEN, from, to, "industria modelo ltda.", 12L))
                 .thenReturn(5L);
 
         DashboardSummaryResponse summary = dashboardService.getSummary(
@@ -67,15 +67,15 @@ class DashboardServiceTest {
         assertThat(summary.openNonConformities()).isEqualTo(5L);
         assertThat(summary.overdue()).isEqualTo(3L);
 
-        verify(inspectionRepository).countByStatus(from, to, "Industria Modelo Ltda.", 12L);
+        verify(inspectionRepository).countByStatus(from, to, "industria modelo ltda.", 12L);
         verify(inspectionRepository).countByPriority(
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
-                from, to, "Industria Modelo Ltda.", 12L);
+                from, to, "industria modelo ltda.", 12L);
         verify(inspectionRepository).countOverdue(
                 LocalDate.now(),
                 List.of(InspectionStatus.APPROVED, InspectionStatus.CANCELED, InspectionStatus.REJECTED),
-                from, to, "Industria Modelo Ltda.", 12L);
+                from, to, "industria modelo ltda.", 12L);
         verify(nonConformityRepository).countByStatusAndInspectionFilters(
-                NonConformityStatus.OPEN, from, to, "Industria Modelo Ltda.", 12L);
+                NonConformityStatus.OPEN, from, to, "industria modelo ltda.", 12L);
     }
 }

@@ -54,7 +54,12 @@ public class DashboardService {
     }
 
     private String normalizeClientName(String clientName) {
-        return clientName == null || clientName.isBlank() ? null : clientName.trim();
+        // The queries compare LOWER(i.clientName) against this raw parameter, so lowercase it here.
+        // Passing LOWER(:clientName) in JPQL instead makes Postgres bind a NULL as bytea and fail
+        // (function lower(bytea) does not exist) when no client filter is provided.
+        return clientName == null || clientName.isBlank()
+                ? null
+                : clientName.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private Map<String, Long> statusCounts(List<Object[]> rows) {
