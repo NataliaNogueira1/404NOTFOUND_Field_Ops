@@ -56,12 +56,7 @@ export default function ProfileScreen() {
     capability.isHardwareAvailable &&
     capability.isEnrolled;
 
-  const biometricLabel =
-    capability.biometricType === 'facial'
-      ? 'Desbloquear com Face ID'
-      : capability.biometricType === 'fingerprint'
-        ? 'Desbloquear com digital'
-        : 'Desbloqueio biométrico';
+  const biometricLabel = 'Desbloquear com biometria';
 
   const biometricUnavailableHint = isCheckingBiometric
     ? 'Verificando sensor...'
