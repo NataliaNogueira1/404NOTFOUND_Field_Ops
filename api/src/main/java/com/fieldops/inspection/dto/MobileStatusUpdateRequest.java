@@ -11,5 +11,6 @@ import java.util.UUID;
  */
 public record MobileStatusUpdateRequest(
         @NotNull(message = "operationId is required") UUID operationId,
+        @NotNull(message = "baseVersion is required") Long baseVersion,
         @NotNull(message = "status is required") InspectionStatus status) {
 }

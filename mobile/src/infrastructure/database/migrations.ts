@@ -173,6 +173,13 @@ const migrations: Migration[] = [
       ALTER TABLE sync_queue ADD COLUMN dependency_ids TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 4,
+    description: 'PBI-055: store server versions and conflict outbox status',
+    sql: `
+      ALTER TABLE inspections ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /**

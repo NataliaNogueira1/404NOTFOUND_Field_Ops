@@ -19,6 +19,7 @@ const STATUS_META: Record<
   pending: { icon: '⏳', label: 'Pendente', color: Colors.warningDark },
   error: { icon: '❌', label: 'Falha', color: Colors.danger },
   waiting: { icon: '⚠️', label: 'Aguardando', color: Colors.warningDark },
+  conflict: { icon: '⚠️', label: 'Conflito de versão', color: Colors.danger },
 };
 
 export default function SyncScreen() {
@@ -56,6 +57,7 @@ export default function SyncScreen() {
   const hasFailedOperations = operations.some(
     (operation) => operation.displayStatus === 'error',
   );
+  const conflictCount = operations.filter((operation) => operation.displayStatus === 'conflict').length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -99,6 +101,14 @@ export default function SyncScreen() {
         </Card>
 
         <Text style={styles.section}>Operações</Text>
+
+        {conflictCount > 0 ? (
+          <View style={styles.conflictBanner} accessibilityRole="alert">
+            <Text style={styles.conflictText}>
+              ⚠️ {conflictCount === 1 ? '1 conflito de versão preservado no dispositivo.' : `${conflictCount} conflitos de versão preservados no dispositivo.`}
+            </Text>
+          </View>
+        ) : null}
 
         {operations.length === 0 ? (
           <Card style={styles.card}>
@@ -146,6 +156,9 @@ function OperationRow({ operation }: { operation: SyncOperationView }) {
         {operation.displayStatus === 'error' && operation.error ? (
           <Text style={styles.errorText} numberOfLines={2}>{`Erro: ${operation.error}`}</Text>
         ) : null}
+        {operation.displayStatus === 'conflict' && operation.error ? (
+          <Text style={styles.errorText} numberOfLines={3}>{`Conflito: ${operation.error}`}</Text>
+        ) : null}
       </View>
     </Card>
   );
@@ -185,6 +198,8 @@ const styles = StyleSheet.create({
   operationTitle: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.semibold },
   operationStatus: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   errorText: { fontSize: FontSize.sm, color: Colors.danger },
+  conflictBanner: { backgroundColor: Colors.dangerLight, borderRadius: 8, padding: Spacing.sm },
+  conflictText: { color: Colors.danger, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

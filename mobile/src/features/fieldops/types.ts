@@ -37,6 +37,8 @@ export interface Inspection {
   pendingSyncCount: number;
   supervisorInstructions: string;
   startedAt?: string;
+  /** Last version received from the server; used for optimistic offline sync. */
+  serverVersion?: number;
   /** GPS latitude captured when the inspection was started (offline). */
   startLatitude?: number;
   /** GPS longitude captured when the inspection was started (offline). */

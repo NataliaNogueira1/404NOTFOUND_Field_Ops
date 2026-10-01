@@ -4,6 +4,7 @@ import { apiClient, onSessionChanged } from '@/infrastructure/api/client';
 import { getDatabase } from '@/infrastructure/database';
 import { InspectionRepository } from '@/infrastructure/database/repositories';
 import { biometricStorage, tokenStorage } from '@/infrastructure/storage/tokenStorage';
+import { registerPushToken } from '@/infrastructure/notifications/pushNotifications';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -249,6 +250,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       void handleSessionExpired();
     });
   }, [handleSessionExpired]);
+
+  useEffect(() => {
+    if (!authState.isAuthenticated || !authState.token) return;
+    void registerPushToken(authState.token).catch(() => undefined);
+  }, [authState.isAuthenticated, authState.token]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
