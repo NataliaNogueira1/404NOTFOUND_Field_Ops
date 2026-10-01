@@ -1,12 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
+import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useTheme, type ThemePreference } from './ThemeContext';
 
 /**
  * Accessible theme switcher (PBI-091). Three options: Claro / Escuro / Sistema.
  * State is conveyed by text + accessibility props (not color alone), and the
  * selected option exposes accessibilityState.selected for screen readers.
+ *
+ * Colors come from the active palette (`useTheme().colors`) instead of the
+ * static `Colors`, so the selector itself follows the theme — it is the first
+ * control to visibly reflect the chosen mode.
  */
 const OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'claro', label: 'Claro' },
@@ -15,7 +19,7 @@ const OPTIONS: { value: ThemePreference; label: string }[] = [
 ];
 
 export function ThemeSelector() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, colors } = useTheme();
 
   return (
     <View style={styles.container} accessibilityRole="radiogroup" accessibilityLabel="Tema do aplicativo">
@@ -28,9 +32,20 @@ export function ThemeSelector() {
             accessibilityRole="radio"
             accessibilityState={{ selected }}
             accessibilityLabel={`Tema ${option.label}`}
-            style={[styles.option, selected && styles.optionSelected]}
+            style={[
+              styles.option,
+              {
+                borderColor: selected ? colors.primary : colors.border,
+                backgroundColor: selected ? colors.primary : colors.surface,
+              },
+            ]}
           >
-            <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+            <Text
+              style={[
+                styles.optionText,
+                { color: selected ? colors.white : colors.textSecondary },
+              ]}
+            >
               {option.label}
             </Text>
           </Pressable>
@@ -53,19 +68,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  optionSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
   },
   optionText: {
-    color: Colors.textSecondary,
     fontWeight: FontWeight.semibold,
     fontSize: FontSize.sm,
-  },
-  optionTextSelected: {
-    color: Colors.white,
   },
 });
