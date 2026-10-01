@@ -104,23 +104,29 @@ The seed is idempotent (guarded by the client document) and safe to re-run. Disa
 The app exposes Spring Boot Actuator: `GET http://localhost:8080/actuator/health` returns `200`
 with `{"status":"UP"}` once the database is reachable.
 
+## Push notifications
+
+Authenticated devices register an Expo push token at `POST /api/v1/devices/register`. Push delivery
+is disabled by default; enable it in an environment that can call Expo with `FIELDOPS_PUSH_ENABLED=true`.
+When enabled, an inspection assignment notifies every active token of the assigned technician; Expo
+responses that report `DeviceNotRegistered` remove the stale token.
+
 ## Docker
 
 Run PostgreSQL and the API together (builds the app image from `Dockerfile`):
 
 ```bash
 cd api
-cp .env.example .env          # set at least JWT_SECRET (>= 32 bytes)
 docker compose up --build
 ```
 
-- API: `http://localhost:8080` (prod profile; Flyway runs migrations on startup)
+- API: `http://localhost:8080` (perfil `demo`; Flyway roda as migrations e o seed de demonstração é carregado)
 - Swagger UI: `http://localhost:8080/swagger-ui`
 - Health: `http://localhost:8080/actuator/health`
-- DB: `localhost:5432`, persisted in the `db-data` volume
+- DB: `localhost:5434` por padrão (configurável por `DB_EXTERNAL_PORT`), persistido no volume `db-data`
 
 For a host-run backend with the Compose database, start only PostgreSQL with
-`docker compose up -d db`, set `DB_PORT=5433` in `api/.env`, and run `./mvnw spring-boot:run`.
+`docker compose up -d db`, set `DB_PORT=5434` in `api/.env`, and run `./mvnw spring-boot:run`.
 The frontend can then run with `VITE_API_URL=http://localhost:8080`.
 
 Swagger UI is available at `http://localhost:8080/swagger-ui`.

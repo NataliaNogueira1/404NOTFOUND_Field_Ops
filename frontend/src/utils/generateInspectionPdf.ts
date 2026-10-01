@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import autoTableImport from 'jspdf-autotable'
+import autoTableImport, { type CellHookData } from 'jspdf-autotable'
 import type { Inspection, NonConformity, ReviewAnswer } from '@/types/domain'
 
 // jspdf-autotable exposes the callable as the module default in ESM builds, but
@@ -217,7 +217,7 @@ export function generateInspectionPdf(data: PdfInspectionData): void {
       alternateRowStyles: { fillColor: [248, 250, 252] },
       margin: { left: MARGIN, right: MARGIN },
       styles: { overflow: 'linebreak', cellPadding: 2.5 },
-      didParseCell(hookData) {
+      didParseCell(hookData: CellHookData) {
         // Color the result column based on value
         if (hookData.section === 'body' && hookData.column.index === 2) {
           const val: string = String(hookData.cell.raw ?? '')
@@ -278,7 +278,7 @@ export function generateInspectionPdf(data: PdfInspectionData): void {
       alternateRowStyles: { fillColor: [255, 241, 242] },
       margin: { left: MARGIN, right: MARGIN },
       styles: { overflow: 'linebreak', cellPadding: 2.5 },
-      didParseCell(hookData) {
+      didParseCell(hookData: CellHookData) {
         if (hookData.section === 'body' && hookData.column.index === 3) {
           const val = String(hookData.cell.raw ?? '').toUpperCase()
           const key = Object.keys(severityLabel).find(k => severityLabel[k] === val || k === val)
