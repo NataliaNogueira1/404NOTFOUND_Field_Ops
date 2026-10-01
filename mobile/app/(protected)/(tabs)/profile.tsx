@@ -7,6 +7,7 @@ import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useAuth } from '@/features/auth';
 import { useFieldOps } from '@/features/fieldops';
+import { ThemeSelector } from '@/features/theme';
 import { useBiometricAuth } from '@/hooks';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
 
@@ -93,6 +94,11 @@ export default function ProfileScreen() {
         <Text style={styles.email}>{user?.email ?? '—'}</Text>
 
         {/* App info */}
+        <Card style={styles.card}>
+          <Text style={styles.cardTitle}>Aparência</Text>
+          <ThemeSelector />
+        </Card>
+
         <Card style={styles.card}>
           <Row label="Versão" value="1.0.0" />
           <Row label="Dispositivo" value="Expo Android" />
@@ -190,6 +196,7 @@ const styles = StyleSheet.create({
 
   // Cards
   card: { width: '100%', gap: Spacing.sm },
+  cardTitle: { color: Colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
 
   // App info rows
   row: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.sm },
