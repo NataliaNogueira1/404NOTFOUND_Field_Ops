@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/features/auth';
 import { FieldOpsProvider } from '@/features/fieldops';
+import { ThemeProvider } from '@/features/theme';
 import { ConnectivityProvider } from '@/infrastructure/connectivity';
 import { DatabaseProvider } from '@/infrastructure/database/DatabaseProvider';
 
@@ -55,15 +56,17 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ConnectivityProvider>
-        <DatabaseProvider>
-          <AuthProvider>
-            <FieldOpsProvider>
-              <AuthGate />
-            </FieldOpsProvider>
-          </AuthProvider>
-        </DatabaseProvider>
-      </ConnectivityProvider>
+      <ThemeProvider>
+        <ConnectivityProvider>
+          <DatabaseProvider>
+            <AuthProvider>
+              <FieldOpsProvider>
+                <AuthGate />
+              </FieldOpsProvider>
+            </AuthProvider>
+          </DatabaseProvider>
+        </ConnectivityProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

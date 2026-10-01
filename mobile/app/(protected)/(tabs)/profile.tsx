@@ -7,6 +7,7 @@ import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useAuth } from '@/features/auth';
 import { useFieldOps } from '@/features/fieldops';
+import { ThemeSelector } from '@/features/theme';
 
 function getInitials(name: string): string {
   return name
@@ -46,6 +47,11 @@ export default function ProfileScreen() {
         <Text style={styles.name}>{user?.name ?? 'Usuário'}</Text>
         <Text style={styles.role}>{user?.role ?? '—'}</Text>
         <Text style={styles.email}>{user?.email ?? '—'}</Text>
+
+        <Card style={styles.card}>
+          <Text style={styles.cardTitle}>Aparência</Text>
+          <ThemeSelector />
+        </Card>
 
         <Card style={styles.card}>
           <Row label="Versão" value="1.0.0" />
@@ -96,6 +102,7 @@ const styles = StyleSheet.create({
   role: { color: Colors.primary, fontWeight: FontWeight.semibold },
   email: { color: Colors.textSecondary, fontSize: FontSize.sm },
   card: { width: '100%', gap: Spacing.sm },
+  cardTitle: { color: Colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
   row: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.sm },
   rowLabel: { color: Colors.textSecondary, fontSize: FontSize.sm },
   rowValue: { color: Colors.text, fontWeight: FontWeight.semibold },
