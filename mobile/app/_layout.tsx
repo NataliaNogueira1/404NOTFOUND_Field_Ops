@@ -1,6 +1,5 @@
 ﻿import { useFonts } from 'expo-font';
 import { Slot, useRouter, useSegments } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, StyleSheet, View } from 'react-native';
@@ -13,7 +12,7 @@ import { ThemeProvider } from '@/features/theme';
 import { ConnectivityProvider } from '@/infrastructure/connectivity';
 import { DatabaseProvider } from '@/infrastructure/database/DatabaseProvider';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
-import { inspectionIdFromNotification } from '@/infrastructure/notifications/pushNotifications';
+import { subscribeToNotificationTaps } from '@/infrastructure/notifications/pushNotifications';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -100,16 +99,10 @@ function useNotificationNavigation() {
   const router = useRouter();
 
   useEffect(() => {
-    function openInspection(notification: Notifications.Notification) {
-      const inspectionId = inspectionIdFromNotification(notification);
-      if (inspectionId) router.push(`/(protected)/inspections/${inspectionId}`);
-    }
-    const lastResponse = Notifications.getLastNotificationResponse();
-    if (lastResponse?.notification) openInspection(lastResponse.notification);
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      openInspection(response.notification);
+    // Push is unavailable under Expo Go (SDK 53+); subscribe is a no-op there.
+    return subscribeToNotificationTaps((inspectionId) => {
+      router.push(`/(protected)/inspections/${inspectionId}`);
     });
-    return () => subscription.remove();
   }, [router]);
 }
 
