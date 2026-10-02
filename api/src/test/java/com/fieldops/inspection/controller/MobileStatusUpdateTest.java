@@ -90,7 +90,7 @@ class MobileStatusUpdateTest {
         Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
         String token = obtainToken();
         String operationId = UUID.randomUUID().toString();
-        String body = "{\"operationId\":\"" + operationId + "\",\"status\":\"IN_PROGRESS\"}";
+        String body = "{\"operationId\":\"" + operationId + "\",\"baseVersion\":0,\"status\":\"IN_PROGRESS\"}";
 
         // First send: applied.
         mockMvc.perform(post("/api/v1/mobile/inspections/{id}/status", inspection.getId())
@@ -119,7 +119,7 @@ class MobileStatusUpdateTest {
     void rejectsIllegalTransitionWith422() throws Exception {
         Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
         String token = obtainToken();
-        String body = "{\"operationId\":\"" + UUID.randomUUID() + "\",\"status\":\"APPROVED\"}";
+        String body = "{\"operationId\":\"" + UUID.randomUUID() + "\",\"baseVersion\":0,\"status\":\"APPROVED\"}";
 
         mockMvc.perform(post("/api/v1/mobile/inspections/{id}/status", inspection.getId())
                         .header("Authorization", "Bearer " + token)
@@ -135,7 +135,7 @@ class MobileStatusUpdateTest {
         User otherTech = persistUser("other@fieldops.com", Role.TECHNICIAN);
         Inspection inspection = saveInspectionFor(otherTech, InspectionStatus.ASSIGNED);
         String token = obtainToken();
-        String body = "{\"operationId\":\"" + UUID.randomUUID() + "\",\"status\":\"IN_PROGRESS\"}";
+        String body = "{\"operationId\":\"" + UUID.randomUUID() + "\",\"baseVersion\":0,\"status\":\"IN_PROGRESS\"}";
 
         mockMvc.perform(post("/api/v1/mobile/inspections/{id}/status", inspection.getId())
                         .header("Authorization", "Bearer " + token)

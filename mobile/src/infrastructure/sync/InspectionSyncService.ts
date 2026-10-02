@@ -44,6 +44,7 @@ interface ApiInspection {
   startedAt?: string;
   progress: number;
   supervisorInstructions?: string;
+  version: number;
   template: ApiTemplate;
 }
 
@@ -78,6 +79,7 @@ interface ApiItem {
 interface SyncPushOperation {
   operationId: string;
   type: 'INSPECTION_STATUS';
+  baseVersion: number;
   dependencyIds: string[];
   payload: { inspectionId: string; status: string };
 }
@@ -89,7 +91,7 @@ interface SyncPushBody {
 interface SyncPushResult {
   results: Array<{
     operationId: string;
-    status: 'APPLIED' | 'ALREADY_APPLIED' | 'DEFERRED' | 'FAILED';
+    status: 'APPLIED' | 'ALREADY_APPLIED' | 'CONFLICT' | 'DEFERRED' | 'FAILED';
     detail?: string | null;
   }>;
 }
@@ -185,6 +187,7 @@ export class InspectionSyncService {
       startedAt: apiInsp.startedAt,
       progress: apiInsp.progress,
       supervisorInstructions: apiInsp.supervisorInstructions ?? '',
+      serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,
       overdue: false,
@@ -256,6 +259,11 @@ export class InspectionSyncService {
         sent++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
+        if (err instanceof VersionConflictError) {
+          await this.syncQueueRepo.markConflict(operation.id, msg);
+          errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
+          continue;
+        }
         // Failure never deletes the file or the evidence: we only flag it FAILED
         // and persist the error so the photo stays available for retry (RN-047).
         await this.syncQueueRepo.markError(operation.id, msg);
@@ -348,14 +356,18 @@ export class InspectionSyncService {
   private async pushInspectionStatus(
     token: string,
     inspectionId: string,
-    payload: { operationId?: string; status: string },
+    payload: { operationId?: string; status: string; baseVersion?: number },
   ): Promise<void> {
+    if (payload.baseVersion === undefined) {
+      throw new Error('Operation is missing its base server version.');
+    }
     const operationId = payload.operationId ?? randomUuidV4();
     const body: SyncPushBody = {
       operations: [
         {
           operationId,
           type: 'INSPECTION_STATUS',
+          baseVersion: payload.baseVersion,
           dependencyIds: [],
           payload: { inspectionId, status: payload.status },
         },
@@ -369,6 +381,9 @@ export class InspectionSyncService {
     );
 
     const result = response.results?.[0];
+    if (result && result.status === 'CONFLICT') {
+      throw new VersionConflictError(result.detail ?? `Inspection changed on the server for ${inspectionId}`);
+    }
     if (result && result.status === 'FAILED') {
       throw new Error(result.detail ?? `Inspection status transition failed for ${inspectionId}`);
     }
@@ -508,9 +523,11 @@ export class InspectionSyncService {
    * Enqueue a status change to be synced later.
    */
   async enqueueStatusChange(inspectionId: string, status: string): Promise<void> {
+    const inspection = await this.requireInspection(inspectionId);
     const id = `status-${inspectionId}-${Date.now()}`;
     await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
       status,
+      baseVersion: inspection.serverVersion ?? 0,
     });
   }
 
@@ -526,6 +543,7 @@ export class InspectionSyncService {
       location: { latitude: number; longitude: number; accuracy?: number } | null;
     },
   ): Promise<void> {
+    const inspection = await this.requireInspection(inspectionId);
     const id = `transition-${inspectionId}-${Date.now()}`;
     // operationId is the server-side idempotency key (PBI-052): a stable UUID kept
     // in the payload so a resend of this same outbox row never applies twice.
@@ -534,8 +552,18 @@ export class InspectionSyncService {
     await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
       operationId: randomUuidV4(),
       status: input.status,
+      baseVersion: inspection.serverVersion ?? 0,
       startedAtDevice: input.startedAtDevice,
       location: input.location,
     });
   }
+
+  private async requireInspection(inspectionId: string): Promise<Inspection> {
+    const inspection = await this.inspectionRepo.getById(inspectionId);
+    if (!inspection) throw new Error(`Inspection not found locally: ${inspectionId}`);
+    return inspection;
+  }
 }
+
+/** A terminal sync outcome: preserve the local operation for technician review. */
+class VersionConflictError extends Error {}

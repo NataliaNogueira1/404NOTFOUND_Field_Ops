@@ -7,6 +7,8 @@
 > **Revisão de setembro (código atual):** nova verificação no código mudou vereditos adicionais. Backend: **PBI-066** (seed de demonstração `DemoSeedRunner`, restrito ao profile `dev`) passou a ✅. Mobile: com `expo-location` presente, **PBI-034** (iniciar com horário + GPS local) e **PBI-039** (observação por item) passaram a ✅; **PBI-045** passou de ❌ para 🟡 (GPS capturado no início, mas ainda não na conclusão nem enviado ao servidor). READMEs: **PBI-067** e **PBI-001 (mobile)** passaram a ✅ (existem `api/`, `frontend/` e `mobile/README.md`). Com isso, a Sprint 1 Mobile fica **13/13 (100%)**.
 >
 > **Revisão após PR #142 (`fix/backend-pbi-feedback`):** **PBI-022 (prévia do checklist)** passou a ✅ — foi adicionado o endpoint `GET /api/v1/inspection-templates/{id}/preview`, deixando o **backend da Sprint 1 em 23/23 (100%)**. O agendamento (**PBI-025**) passou a reforçar versão publicada, cliente ativo e equipamento ativo.
+>
+> **Revisão de outubro (código atual):** nova verificação de toda a coluna Veredicto contra o código. Correções factuais no backend: enum `ResponseType` é `TEXT_SHORT/TEXT_LONG/...` (não `TEXT`); migrações Flyway vão até **V26** (não há V22); o `NonConformity` do dashboard é a **V26** (não V20); `DemoSeedRunner` é `@Profile({"dev","demo"})`; o resultado do batch de sync inclui também `CONFLICT`. **Frontend Web** subiu bastante: os CRUDs de catálogo, construtor de modelos, seleção encadeada, cancelamento e listagem **já consomem a API real** (Sprint 1 Web → 16/16); o refresh token single-flight **já está plugado** na sessão ativa; na Sprint 2, **PBI-056** e **PBI-088** estão integrados, e **PBI-083**/**PBI-091** saíram de "sem código" para parciais. **Mobile Sprint 2** teve várias correções: **PBI-040/044/054/055/085/090** passaram a ✅ e **PBI-065/091** a 🟡, elevando a Sprint 2 Mobile para **12/22 (~55%)**.
 
 ---
 
@@ -28,7 +30,7 @@
 | PBI-017 | Pesquisa, filtros e paginação | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ✅ Concluído — filtros + `Pageable` em usuários, clientes, locais, equipamentos e inspeções |
 | PBI-018 | Modelo de inspeção em rascunho | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ✅ Concluído — `InspectionTemplateService.createDraft` + migration V9 |
 | PBI-019 | Seções do checklist | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ✅ Concluído — `TemplateSectionService` (criar/editar/ordenar seções, DRAFT-only) + migration V10 |
-| PBI-020 | Itens com tipos de resposta | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ✅ Concluído — `TemplateItemService` + enum `ResponseType` (TEXT/NUMBER/BOOLEAN/CONFORMITY/SINGLE_CHOICE/DATE) + migrations V7/V11 |
+| PBI-020 | Itens com tipos de resposta | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ✅ Concluído — `TemplateItemService` + enum `ResponseType` (TEXT_SHORT/TEXT_LONG/NUMBER/BOOLEAN/CONFORMITY/SINGLE_CHOICE/DATE) + migrations V7/V11 |
 | PBI-021 | Obrigatoriedade e regras de evidência | [#38](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/38) | ✅ Concluído — flags `required`, `observationRequiredOnFailure`, `evidenceRequiredOnFailure` + migration V12 |
 | PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ✅ Concluído — `GET /api/v1/inspection-templates/{id}/preview` → `InspectionTemplateService.preview` retorna `InspectionTemplatePreviewResponse` (checklist read-only + `validForPublication` + `issues`), rodando o `InspectionTemplatePublicationValidator` fora do publish (PR #142) |
 | PBI-023 | Publicar versão imutável | [#40](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/40) | ✅ Concluído — `POST /api/v1/inspection-templates/{id}/publish` → `InspectionTemplateVersionService.publish` (versão imutável) + migration V13 |
@@ -40,7 +42,7 @@
 
 ### Resumo Sprint 1 Backend (23 itens)
 
-> Verificado no **código real** do módulo `api/` (controllers, services, entidades e migrações Flyway V1–V18).
+> Verificado no **código real** do módulo `api/` (controllers, services, entidades e migrações Flyway V1–V26, sem V22).
 
 | Categoria | Qtd |
 |-----------|-----|
@@ -62,7 +64,7 @@
 >
 > Atualmente, `POST /api/v1/auth/login` e `GET /api/v1/auth/me` são consumidos pela aplicação utilizando JWT Bearer, restauração de sessão e controle de acesso por perfil.
 >
-> Os demais módulos de domínio — usuários, clientes, locais, equipamentos, modelos de inspeção, inspeções, não conformidades e auditoria — possuem telas e fluxos funcionais no frontend, porém ainda utilizam mocks ou stores locais enquanto os respectivos endpoints backend não são implementados.
+> Os módulos de catálogo — usuários, clientes, locais, equipamentos — e os de modelos de inspeção, agendamento, cancelamento e acompanhamento de inspeções **já estão integrados à API real** (não são mais mocks). Os módulos que ainda utilizam mocks/stores locais são principalmente os de **revisão** (respostas por seção, lightbox de evidências/NCs), **relatório PDF** e boa parte do **dashboard**, enquanto os endpoints correspondentes não são totalmente consumidos.
 >
 > O frontend também possui lint, tipagem estrita, testes automatizados, CI e documentação de convenções.
 >
@@ -74,30 +76,30 @@
 | PBI-003 | Projeto React + Vite com layout | [#13](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/13) | ✅ Concluído — layout, rotas protegidas e estrutura modular em React + Vite |
 | PBI-005 | Lint, tipos e fluxo de PR | [#15](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/15) | ✅ Concluído |
 | PBI-009 | Login e sessão na web | [#19](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/19) | ✅ Concluído — integrado à API real |
-| PBI-011 | CRUD de usuários (telas) | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ✅ Concluído no frontend — integração do CRUD com API pendente |
-| PBI-013 | CRUD de clientes (telas) | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ✅ Concluído no frontend — integração do CRUD com API pendente |
-| PBI-014 | CRUD de locais (telas) | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ✅ Concluído no frontend — integração do CRUD com API pendente |
-| PBI-015 | CRUD de equipamentos (telas) | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ✅ Concluído no frontend — integração do CRUD com API pendente |
-| PBI-017 | Pesquisa e filtros (telas) | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ✅ Concluído no frontend |
-| PBI-018 | Modelo em rascunho (telas) | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ✅ Concluído no frontend — persistência backend pendente |
-| PBI-019 | Seções do checklist (telas) | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ✅ Concluído no frontend |
-| PBI-020 | Itens com tipos (telas) | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ✅ Concluído no frontend |
-| PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ✅ Concluído |
-| PBI-026 | Seleção encadeada cliente→local→equip | [#93](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/93) | ✅ Concluído no frontend |
-| PBI-029 | Cancelar inspeção (tela) | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ✅ Concluído no frontend — persistência backend pendente |
-| PBI-030 | Acompanhar inspeções com filtros | [#47](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/47) | ✅ Concluído no frontend |
+| PBI-011 | CRUD de usuários (telas) | [#21](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/21) | ✅ Concluído — integrado à API real (`usersApi` → `GET/POST/PUT /api/v1/users`, `PATCH /{id}/status`) |
+| PBI-013 | CRUD de clientes (telas) | [#23](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/23) | ✅ Concluído — integrado à API real (`clientsApi` → `GET/POST/PUT /api/v1/clients`, `PATCH /{id}/status`); páginas de detalhe ainda usam seeds de `@/mocks/domain` |
+| PBI-014 | CRUD de locais (telas) | [#24](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/24) | ✅ Concluído — integrado à API real (`sitesApi` → `GET/POST/PUT /api/v1/sites`, `PATCH /{id}/status`) |
+| PBI-015 | CRUD de equipamentos (telas) | [#25](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/25) | ✅ Concluído — integrado à API real (`equipmentApi` → `GET/POST/PUT /api/v1/equipment`, `PATCH /{id}/status`, `by-qr`) |
+| PBI-017 | Pesquisa e filtros (telas) | [#26](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/26) | ✅ Concluído — integrado à API via `useListQuery`/`useDebouncedValue` (filtros em query params) |
+| PBI-018 | Modelo em rascunho (telas) | [#35](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/35) | ✅ Concluído — integrado à API real (`adminCatalog` persiste template/seções/itens e publica via backend) |
+| PBI-019 | Seções do checklist (telas) | [#36](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/36) | ✅ Concluído — integrado à API real (`createTemplateSection/update/delete`) |
+| PBI-020 | Itens com tipos (telas) | [#37](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/37) | ✅ Concluído — integrado à API real (`createTemplateItem/update` com `responseType`, obrigatoriedade, evidência) |
+| PBI-022 | Prévia do checklist | [#39](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/39) | ✅ Concluído — `TemplatePreviewPage` consome o template real via `getTemplate` |
+| PBI-026 | Seleção encadeada cliente→local→equip | [#93](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/93) | ✅ Concluído — `NewInspectionPage` encadeia clientes/locais/equipamentos/técnicos da API e cria via `POST /api/v1/inspections` |
+| PBI-029 | Cancelar inspeção (tela) | [#46](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/46) | ✅ Concluído — integrado à API real (`cancelInspection` → `POST /api/v1/inspections/{id}/cancel`) |
+| PBI-030 | Acompanhar inspeções com filtros | [#47](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/47) | ✅ Concluído — integrado à API real (`listInspections` → `GET /api/v1/inspections` com filtros) |
 
 ### Resumo Sprint 1 Frontend Web (16 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído no escopo de frontend | 15 |
-| 🟡 Parcial / requer validação externa | 1 |
+| ✅ Concluído no escopo de frontend | 16 |
+| 🟡 Parcial / requer validação externa | 0 |
 | ❌ Não feito | 0 |
 
-**Porcentagem do escopo Frontend Web: ~94%** (15/16)
+**Porcentagem do escopo Frontend Web: 100%** (16/16)
 
-> O PBI-003 foi alinhado à implementação atual em React + Vite; o escopo frontend pode ser avaliado pela estrutura, layout e rotas protegidas entregues.
+> O PBI-003 foi alinhado à implementação atual em React + Vite. Revisão de outubro: os CRUDs de catálogo (usuários, clientes, locais, equipamentos), o construtor de modelos (rascunho/seções/itens/prévia), a seleção encadeada, o cancelamento e a listagem de inspeções **já consomem a API real** (não são mais mocks/telas isoladas). Restam apenas pontos de detalhe usando seeds de `@/mocks/domain` como fallback (ex.: páginas de detalhe de cliente e estado inicial de alguns selects).
 
 ### Estado atual da integração Frontend ↔ Backend
 
@@ -116,9 +118,9 @@ Já estão integrados de forma real:
 - tratamento distinto de `401 Unauthorized` e `403 Forbidden`;
 - normalização da role `ADMINISTRATOR` do backend para `ADMIN` no frontend.
 
-> ⚠️ **Ressalva sobre renovação automática (PBI-010 no cliente web):** o backend está completo (endpoint de refresh + entidade + migration). No frontend existe um interceptor de refresh single-flight já implementado e testado (`src/services/api/httpClient.ts` + `src/services/auth/tokenStorage.ts`), **porém ele ainda não está plugado na aplicação** — a via de sessão ativa (`src/auth/session.ts` + `src/api/client.ts`) guarda apenas o `accessToken` e, ao receber 401, faz logout em vez de renovar. Ou seja, a renovação transparente está codificada mas ainda precisa ser conectada ao app.
+> ✅ **Renovação automática (PBI-010 no cliente web) — atualizado:** o backend está completo (endpoint de refresh + entidade + migration) e o frontend **já tem o refresh single-flight plugado na via ativa de sessão**. Os antigos `src/services/api/httpClient.ts` e `src/services/auth/tokenStorage.ts` hoje são apenas re-exports de `@/api/client`; o interceptor real vive em `src/api/client.ts` (`renewAccessToken`/`refreshInFlight`): ao receber 401 (com token, não sendo retry nem rota de login/refresh), chama `POST /api/v1/auth/refresh`, salva o novo `accessToken` e **repete a request original**, só fazendo logout se o refresh falhar. O login (`src/auth/session.ts`) grava `accessToken` **e** `refreshToken`. Única ressalva: não há rotação do refresh token no cliente (o `/auth/refresh` devolve apenas `accessToken` + `expiresIn`).
 
-Os demais módulos continuam utilizando dados mockados/stores locais enquanto seus respectivos endpoints backend não estão disponíveis.
+Além da autenticação, os CRUDs de catálogo, o construtor de modelos, a seleção encadeada, o cancelamento e a listagem/acompanhamento de inspeções já consomem a API real. Os módulos que **ainda dependem de mocks/stores locais** são principalmente os de **revisão** (respostas por seção, lightbox de evidências), **relatório PDF** e boa parte do **dashboard** — enquanto os endpoints correspondentes não são totalmente consumidos.
 
 ### Estrutura Web atual
 
@@ -245,12 +247,15 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 ### Qualidade e validação (Mobile)
 
-> ⚠️ Diferentemente do Frontend Web, o módulo mobile **ainda não possui testes automatizados**: não há Jest nem Testing Library configurados e não existe script `test` no `package.json` (apenas `start`, `android`, `ios`, `web`, `lint`, `lint:fix`). Há apenas ESLint configurado.
+> Atualização: o módulo mobile **já possui testes automatizados** da camada de sincronização. O `package.json` tem `jest`, `jest-expo`, `ts-jest` e script `"test": "jest"`, com `jest.config.js`/`tsconfig.jest.json` e suítes como `src/infrastructure/sync/__tests__/pbi044.test.ts` e `src/features/synchronization/__tests__/pbi054.test.ts` (rodam migrations e repositórios reais em SQLite in-memory). O que ainda falta é React Testing Library para testes de componentes e cobertura dos fluxos de UI. ESLint também está configurado.
 
 ### Pequenos ajustes pendentes identificados no código
 
-- `sync.tsx` exibe métricas fixas de demonstração (ex.: "128 MB", data e "Inspeções atualizadas: 3") em vez de dados reais;
-- em `ChecklistItemCard`, o botão "Adicionar foto" de itens em falha usa `inspectionId=ins-compressor` fixo na rota de evidência, ignorando o id real da inspeção.
+- `scanner.tsx` ainda é simulado (botão "Simular leitura" com equipamento fixo), sem leitura real de QR por `expo-camera` (PBI-041);
+- o pull (`pullInspections`/`saveInspectionLocally`) não mapeia os campos de reprovação vindos do servidor (`rejectionReason`/estado), então o motivo não é propagado do backend ao dispositivo (PBI-062);
+- as telas ainda usam a paleta `Colors` estática em vez do `ThemeContext`, deixando o tema escuro só na infraestrutura (PBI-091).
+
+> Observação: o item antes listado aqui sobre o `sync.tsx` exibir métricas fixas de demonstração **não procede mais** — a tela consome dados reais do outbox via `useSyncStatus()` (ver PBI-054).
 ---
 
 # Análise PBI a PBI — Sprint 2
@@ -263,32 +268,32 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
-| PBI-051 | Envio em lote respeitando dependências | [#71](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/71) | ✅ Concluído — `POST /api/v1/mobile/sync/push` (`SyncBatchService`) ordena por `dependencyIds`, resultado por operação (APPLIED/ALREADY_APPLIED/DEFERRED/FAILED), idempotente (PR #135) |
+| PBI-051 | Envio em lote respeitando dependências | [#71](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/71) | ✅ Concluído — `POST /api/v1/mobile/sync/push` (`SyncBatchService`) ordena por `dependencyIds`, resultado por operação (APPLIED/ALREADY_APPLIED/DEFERRED/FAILED/CONFLICT), idempotente (PR #135) |
 | PBI-052 | Idempotência — impedir duplicidade no reenvio | [#72](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/72) | ✅ Concluído — store `processed_operations` (migration V18) + `IdempotencyService`; `POST /api/v1/mobile/inspections/{id}/status` retorna ALREADY_APPLIED no reenvio (PR #133) |
 | PBI-060 | Aprovar inspeção | [#81](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/81) | ✅ Concluído — `POST /api/v1/inspections/{id}/approve`; UNDER_REVIEW → APPROVED, comentário opcional, auditoria (PR #131) |
 | PBI-061 | Reprovar inspeção com motivo obrigatório | [#82](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/82) | ✅ Concluído — `POST /api/v1/inspections/{id}/reject`; motivo obrigatório (min 10), UNDER_REVIEW → REJECTED, auditoria (PR #131) |
 | PBI-063 | Auditoria de mudanças de estado | [#83](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/83) | ✅ Concluído — tabela imutável `audit_events` (migration V17) + `AuditService`; `GET /api/v1/inspections/{id}/history`; eventos de criar/atribuir/aprovar/reprovar/cancelar (PRs #132/#134) |
-| PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ✅ Concluído — `DemoSeedRunner` cria dataset coerente (cliente + local + equipamento com QR + modelo publicado + inspeção ASSIGNED), idempotente por `existsByDocument`; **restrição: só roda no profile `dev` com `fieldops.bootstrap.demo-seed.enabled`, não em `prod`** |
-| PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | 🟡 Parcial — há `Dockerfile` e `docker-compose.yml`; falta validar/publicar o build de demonstração |
-| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | 🟡 Parcial — OpenAPI gerado via springdoc + `OpenApiConfig`; falta contrato completo revisado e diagramas |
-| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-066 | Dados de demonstração reproduzíveis (seed) | [#86](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/86) | ✅ Concluído — `DemoSeedRunner` cria dataset coerente (cliente + local + equipamento com QR + modelo publicado + inspeção ASSIGNED), idempotente por `existsByDocument`; **restrição: `@Profile({"dev","demo"})` + flag `fieldops.bootstrap.demo-seed.enabled`, não roda em `prod`** |
+| PBI-070 | API em contêiner Docker para demonstração | [#90](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/90) | ✅ Concluído — `docker compose up --build` validado em 25/09/2026: API e PostgreSQL saudáveis, Flyway/seed do perfil `demo`, health, OpenAPI, login e listagem de inspeções retornando 200. A história exige API publicada **ou** executável por contêiner; não requer hospedagem externa. |
+| PBI-071 | OpenAPI completo e diagramas | [#91](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/91) | ✅ Concluído — contrato gerado pelo springdoc validado com 39 rotas, esquema Bearer JWT e endpoints críticos; `OpenApiConfig` traz metadados de uso e [`docs/api-diagrams.md`](./api-diagrams.md) documenta os diagramas Mermaid de entidades e estados da inspeção (commit `62495b0`). |
+| PBI-083 | *P1:* Dashboard com indicadores por estado e criticidade (API) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ✅ Concluído — `GET /api/v1/dashboard/summary` agrega estados, prioridades, atrasos e não conformidades abertas em quatro queries (sem N+1), aceita `from`, `to`, `client` e `technicianId`, e restringe acesso a ADMINISTRATOR/SUPERVISOR. O domínio `NonConformity` (migration V26) preserva inspeção, item opcional, criticidade e estados OPEN/CLOSED. O filtro `client` é por nome (String), não por id. |
+| PBI-085 | *P1:* Notificações push — integração servidor | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `POST /api/v1/devices/register` persiste múltiplos tokens por usuário, envio Expo assíncrono é disparado na atribuição e tokens inválidos são removidos. No mobile, `expo-notifications` solicita permissão, registra o Expo token e abre a inspeção pelo `inspectionId` ao toque. |
+| PBI-087 | *P1:* Relatório PDF básico | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ✅ Concluído — `GET /api/v1/inspections/{id}/report.pdf` gera `application/pdf` via OpenPDF com cabeçalho, decisão, snapshot, respostas registradas, NCs e referências/checksums de evidências persistidas em `inspection_evidences` (migration V24); protegido para ADMINISTRATOR/SUPERVISOR, com 403/404 validados. |
+| PBI-088 | *P1:* Histórico detalhado de respostas | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ✅ Concluído — migration V20 cria o histórico imutável `inspection_response_history`; `GET /api/v1/inspections/{id}/answers/history` retorna item, seção, valor, observação, data e autor, ordenado por seção/item/data e protegido para ADMINISTRATOR/SUPERVISOR (403/404 validados). |
+| PBI-089 | *P1:* Comentários de revisão por item | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ✅ Concluído — migration V23 cria `review_comments` imutáveis por inspeção/snapshot; `POST /api/v1/inspections/{id}/items/{itemId}/review-comment` e `GET /api/v1/inspections/{id}/review-comments` registram/listam orientação por item, ordenada, e gravam `REVIEW_COMMENT_ADDED` na auditoria. Escrita é restrita a ADMINISTRATOR/SUPERVISOR (403 validado). |
+| PBI-092 | *P1:* Exportação CSV | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ✅ Concluído — `GET /api/v1/inspections/export.csv` exporta inspeções filtradas por estado/período/cliente, com colunas operacionais e contagem de NCs. O CSV inclui BOM UTF-8, escape de vírgulas/aspas/quebras de linha e proteção contra CSV injection; é exclusivo para ADMINISTRATOR e retorna só cabeçalho quando vazio. |
 
 ### Resumo Sprint 2 Backend (14 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 6 |
-| 🟡 Parcial | 2 |
-| ❌ Não feito | 6 |
+| ✅ Concluído | 14 |
+| 🟡 Parcial | 0 |
+| ❌ Não feito | 0 |
 
-**Porcentagem: ~43%** concluído (6/14; 2 parciais: PBI-070 Docker e PBI-071 OpenAPI).
+**Porcentagem: 100%** concluído (14/14).
 
-> Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — restrito ao profile `dev`).
+> Concluídos após os merges de setembro: revisão/aprovação (**PBI-060/061**), sincronização em lote e idempotência (**PBI-051/052**), auditoria de mudanças de estado (**PBI-063**) e o seed reproduzível de demonstração (**PBI-066**, `DemoSeedRunner` — `@Profile({"dev","demo"})`).
 >
 > Ainda em aberto: os endpoints de escrita de conteúdo que o mobile chama no sync (`/answers`, `/evidences`, `/non-conformities`) **ainda não existem** — hoje o único tipo de operação aplicada no batch/idempotência é a transição de status (`/inspections/{id}/status`); os demais tipos podem reutilizar o `IdempotencyService` e o `SyncBatchService`. Os itens P1 (073–082) seguem sem código; os P1 também não têm issue correspondente (os números 073–076 no GitHub são de outras tarefas — ver ressalva ao final).
 
@@ -299,30 +304,30 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
 | PBI-047 | Visualizar evidências e NCs no admin | [#67](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/67) | 🟡 Parcial — `InspectionReviewPage` mostra NCs e modal de evidência, mas com dados mockados (protótipo) |
-| PBI-056 | Lista de inspeções aguardando revisão | [#76](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/76) | 🟡 Parcial — listagem com filtro de revisão existe; integração real com backend pendente |
+| PBI-056 | Lista de inspeções aguardando revisão | [#76](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/76) | ✅ Concluído — `ReviewQueuePage` consome `listInspections({ review: true })` (`GET /api/v1/inspections?review=true`) com paginação/busca reais; badge via `useReviewCount` também real |
 | PBI-057 | Revisão de respostas por seção e item | [#77](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/77) | 🟡 Parcial — `InspectionReviewPage` agrupa respostas por seção/item, porém em mocks |
 | PBI-058 | Lightbox de fotografias na revisão | [#78](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/78) | 🟡 Parcial — há modal de evidência fotográfica; usa dados simulados |
-| PBI-059 | Iniciar revisão formalmente | [#79](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/79) | ❌ Não feito — não há ação/estado de "iniciar revisão" formal |
-| PBI-064 | Estados de carregamento, vazio, erro e offline | [#84](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/84) | ❌ Não feito — não confirmado como cobertura sistemática no código |
+| PBI-059 | Iniciar revisão formalmente | [#79](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/79) | ❌ Não feito — não há ação/estado de "iniciar revisão" formal; aprovar/reprovar em `InspectionReviewPage` são simulados (toast "protótipo"), sem endpoint |
+| PBI-064 | Estados de carregamento, vazio, erro e offline | [#84](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/84) | 🟡 Parcial — páginas integradas (Users/Clients/Sites/Equipment/Inspections/ReviewQueue) e `AnswerHistoryTab` têm estados reais de loading/vazio/erro (com retry); falta tratamento específico de **offline** no web |
 | PBI-069 | Build e publicação do painel web admin | [#89](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/89) | 🟡 Parcial — CI existe (`.github/workflows/frontend-ci.yml`); publicação ainda não configurada |
-| PBI-083 | *P1:* Dashboard com indicadores (telas) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-088 | *P1:* Histórico detalhado de respostas (telas) | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-089 | *P1:* Comentários de revisão por item (telas) | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-092 | *P1:* Exportação CSV (botão e download) | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-083 | *P1:* Dashboard com indicadores (telas) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | 🟡 Parcial — `DashboardPage` existe e está roteado (`/app/dashboard`) com KPIs/gráficos (Recharts); dados ainda majoritariamente de `@/mocks/domain`, exceto "Revisões pendentes" (`useReviewCount`, API real). Não consome o `GET /api/v1/dashboard/summary` |
+| PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | 🟡 Parcial — `InspectionReportPage` com prévia e download via jsPDF/`jspdf-autotable`; dados mockados e **não** consome o endpoint `report.pdf` do backend |
+| PBI-088 | *P1:* Histórico detalhado de respostas (telas) | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ✅ Concluído — `AnswerHistoryTab` (aba em `InspectionReviewPage`) consome `GET /api/v1/inspections/{id}/answers/history` com agrupamento por seção/item e estados loading/ready/not-found/error; tem testes |
+| PBI-089 | *P1:* Comentários de revisão por item (telas) | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código no frontend) — issue no backlog |
+| PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | 🟡 Parcial — `ThemeProvider` (claro/escuro/sistema, classe `dark` no `<html>`, persistência em `localStorage`, segue `prefers-color-scheme`) plugado em `App.tsx`, com `ThemeToggle` acessível e testes; falta expor o toggle em algum layout visível |
+| PBI-092 | *P1:* Exportação CSV (botão e download) | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código no frontend) — issue no backlog |
 
 ### Resumo Sprint 2 Frontend Web (13 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 0 |
-| 🟡 Parcial | 5 |
-| ❌ Não feito | 8 |
+| ✅ Concluído | 2 |
+| 🟡 Parcial | 8 |
+| ❌ Não feito | 3 |
 
-**Porcentagem: 0%** concluído. Parciais (protótipo/mock): PBI-047, 056, 057, 058 e 069.
+**Porcentagem: ~15%** concluído (2/13). Concluídos: PBI-056 (fila de revisão integrada) e PBI-088 (histórico de respostas integrado). Parciais: PBI-047, 057, 058, 064, 069, 083, 087 e 091. Não feitos: PBI-059, 089 e 092.
 
-> A tela de revisão (aprovar/reprovar com motivo obrigatório, respostas por seção, lightbox) já existe no frontend, porém está explicitamente marcada como protótipo e roda sobre mocks — depende dos endpoints de revisão/aprovação do backend (PBI-060/061), que ainda não existem.
+> Revisão de outubro: a fila de revisão (PBI-056) e o histórico de respostas (PBI-088) **já estão integrados à API real**. A tela de revisão em si (aprovar/reprovar, respostas por seção, lightbox) continua como protótipo sobre mocks e, embora os endpoints de aprovação/reprovação (**PBI-060/061**) já existam no backend, ela ainda não os consome. O dashboard (PBI-083) e o tema escuro (PBI-091) saíram de "sem código" para parciais.
 
 ---
 
@@ -330,40 +335,40 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
-| PBI-040 | Conclusão com validação de obrigatórios | [#57](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/57) | 🟡 Parcial — `concludeInspection` marca SUBMITTED e enfileira status, mas não valida os itens obrigatórios antes de concluir |
+| PBI-040 | Conclusão com validação de obrigatórios | [#57](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/57) | ✅ Concluído — `summary.tsx` calcula itens obrigatórios pendentes e `tryConclude()` **bloqueia** a conclusão abrindo modal "Não é possível concluir"; só chama `conclude()` (SUBMITTED + enfileira status) quando não há obrigatórios faltando |
 | PBI-041 | Leitura de QR Code para confirmar equipamento | [#58](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/58) | 🟡 Parcial — existe tela `scanner.tsx`, mas não há confirmação real do equipamento por QR |
 | PBI-042 | Capturar fotografia e visualizar prévia | [#59](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/59) | ✅ Concluído — `(protected)/evidence.tsx` com câmera/galeria + prévia |
 | PBI-043 | Associar fotografia ao item correto | [#63](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/63) | ✅ Concluído — `addEvidence(inspectionId, itemId, ...)` grava evidência vinculada ao item |
-| PBI-044 | Foto pendente quando upload falha | [#64](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/64) | 🟡 Parcial — `sync_status='pending'` e outbox tratam pendência genérica; sem tratamento específico de falha de upload de foto |
+| PBI-044 | Foto pendente quando upload falha | [#64](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/64) | ✅ Concluído — migration v3 adiciona `operation_id/response_id/last_error/retry_count` em `evidences`; `uploadEvidence` usa `EvidenceUploadClient`, em falha chama `markFailed` (preserva o arquivo) e em sucesso `markSyncedById`; dependência foto→resposta via `getReady()`, `retryEvidenceUpload` ("Tentar novamente") e "Fotos com falha" no `sync.tsx`; coberto por `__tests__/pbi044.test.ts` |
 | PBI-045 | Registrar localização no início e conclusão | [#65](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/65) | 🟡 Parcial — `expo-location` presente; GPS é capturado e gravado localmente **no início** (`start.tsx` + `useLocation`), mas **não na conclusão** (`summary.tsx` conclui sem localização) e ainda **não é enviado ao servidor** (o batch só consome `{inspectionId, status}`) |
 | PBI-046 | Registrar não conformidade com criticidade | [#66](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/66) | ✅ Concluído — `addNonConformity` + criação automática ao responder `NAO_CONFORME`, com `Severity` |
 | PBI-049 | Respostas persistem após fechar o aplicativo | [#69](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/69) | ✅ Concluído — respostas gravadas em SQLite (`answers`) e recarregadas na inicialização |
 | PBI-050 | Registrar alterações na outbox persistente | [#70](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/70) | ✅ Concluído — tabela `sync_queue` + `SyncQueueRepository` (padrão outbox) |
-| PBI-053 | Pull de alterações com cursor de sincronização | [#73](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/73) | ❌ Não feito — `pullInspections` baixa tudo; tabela `sync_metadata` existe mas não é usada como cursor |
-| PBI-054 | Tela de status de sincronização | [#74](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/74) | 🟡 Parcial — existe a tela `(tabs)/sync.tsx`, mas com métricas fixas de demonstração |
-| PBI-055 | Detecção de conflito de versão | [#75](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/75) | ❌ Não feito — sem lógica de conflito de versão |
+| PBI-053 | Pull de alterações com cursor de sincronização | [#73](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/73) | ❌ Não feito — `pullInspections` baixa tudo; `sync_metadata`/`SyncMetadataRepository` guarda só `last_successful_sync` (timestamp), não é usado como cursor incremental |
+| PBI-054 | Tela de status de sincronização | [#74](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/74) | ✅ Concluído — `(tabs)/sync.tsx` consome `useSyncStatus()` com **dados reais** do outbox (`SyncQueueRepository.getAll/countPending`) e `SyncMetadataRepository.getLastSuccessfulSync`, conectividade via `useConnectivity` e `syncStatusMapping` (synced/pending/error/waiting/conflict); coberto por `__tests__/pbi054.test.ts` |
+| PBI-055 | Detecção de conflito de versão | [#75](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/75) | ✅ Concluído — migration v4 adiciona `server_version` em `inspections`; `enqueueTransition`/`enqueueStatusChange` enviam `baseVersion`; `pushInspectionStatus` lança `VersionConflictError` em resultado `CONFLICT`, `pushPendingOperations` chama `markConflict` e `sync.tsx` exibe banner "Conflito de versão"; coberto por `pbi054.test.ts` |
 | PBI-062 | Técnico recebe inspeção reprovada para correção | [#80](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/80) | 🟡 Parcial — há `RejectionBanner` e colunas `rejection_reason`/`rejected_by`/`rejected_at` + ação "Corrigir"; o backend de reprovação já existe (**PBI-061**), mas o `pullInspections` ainda não propaga o motivo/estado de reprovação do servidor para o dispositivo |
-| PBI-065 | Testes automatizados dos fluxos críticos | [#85](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/85) | ❌ Não feito — mobile não tem Jest/Testing Library nem script de teste |
+| PBI-065 | Testes automatizados dos fluxos críticos | [#85](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/85) | 🟡 Parcial — `package.json` tem `jest`/`jest-expo`/`ts-jest`, script `"test": "jest"`, `jest.config.js` e suítes reais da camada de sync (`pbi044.test.ts`, `pbi054.test.ts`) rodando migrations/repos em SQLite in-memory; ainda **não** há React Testing Library para componentes nem cobertura ampla dos fluxos de UI |
 | PBI-067 | READMEs com instruções de execução | [#87](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/87) | ✅ Concluído — `api/README.md`, `frontend/README.md` e `mobile/README.md` existem, com pré-requisitos, comandos de execução, estrutura e convenções de commit/PR |
 | PBI-068 | Build Android (APK) para demonstração | [#88](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/88) | ❌ Não feito — sem configuração de build de APK |
-| PBI-072 | Demonstração ponta a ponta | [#92](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/92) | ❌ Não feito — depende de itens ainda ausentes (aprovação/reprovação, sync real) |
-| PBI-084 | *P1:* Notificações locais de prazo | [#147](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/147) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-085 | *P1:* Notificações push de nova atribuição | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-072 | Demonstração ponta a ponta | [#92](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/92) | ❌ Não feito — não há roteiro/fluxo de demo integrando ponta a ponta; o sync ainda só transmite status (sem escrita de respostas/evidências/NCs no servidor) |
+| PBI-084 | *P1:* Notificações locais de prazo | [#147](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/147) | ❌ Não feito — não há `scheduleNotificationAsync`/notificação local de prazo; só push remoto |
+| PBI-085 | *P1:* Notificações push de nova atribuição | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `infrastructure/notifications/pushNotifications.ts` (expo-notifications) solicita permissão, obtém Expo push token e faz `POST /api/v1/devices/register` (chamado no `AuthContext` após login); `subscribeToNotificationTaps`/`useNotificationNavigation` abrem a inspeção pelo `inspectionId` ao toque |
 | PBI-086 | *P1:* Assinatura desenhada no dispositivo | [#148](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/148) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-090 | *P1:* Biometria para reabertura de sessão local | [#152](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/152) | ❌ Não feito (sem código) — issue criada no backlog |
-| PBI-091 | *P1:* Tema escuro (mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ❌ Não feito (sem código) — issue criada no backlog |
+| PBI-090 | *P1:* Biometria para reabertura de sessão local | [#152](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/152) | ✅ Concluído — `hooks/useBiometricAuth.ts` (expo-local-authentication) + `BiometricLockScreen`, toggle em `profile.tsx` (`biometricStorage`) e lock por AppState no `_layout.tsx` via `AuthContext.lockSession/unlockSession` |
+| PBI-091 | *P1:* Tema escuro (mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | 🟡 Parcial — infra pronta: `features/theme/ThemeContext.tsx` (claro/escuro/sistema + persistência `themeStorage`), `ThemeSelector`, `ThemeProvider` no `_layout.tsx` e paletas em `config/themes.ts`; falta migrar as telas (ainda usam `Colors` estático) |
 
 ### Resumo Sprint 2 Mobile (22 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 6 |
-| 🟡 Parcial | 6 |
-| ❌ Não feito | 10 |
+| ✅ Concluído | 12 |
+| 🟡 Parcial | 5 |
+| ❌ Não feito | 5 |
 
-**Porcentagem: ~27%** concluído (6/22).
+**Porcentagem: ~55%** concluído (12/22).
 
-> Concluídos: **PBI-042 (foto+prévia)**, **PBI-043 (associar foto ao item)**, **PBI-046 (NC com criticidade)**, **PBI-049 (persistência de respostas)**, **PBI-050 (outbox)** e **PBI-067 (READMEs)**. Parciais dependem de validação, backend ou dados reais: PBI-040, 041, 044, **045 (GPS capturado no início, mas não na conclusão nem enviado ao servidor)**, 054 e 062. Não feitos: cursor de sync (053), conflito (055), testes (065), APK (068), demo (072) e todos os P1.
+> Revisão de outubro (código atual): além dos já concluídos **PBI-042 (foto+prévia)**, **PBI-043 (associar foto ao item)**, **PBI-046 (NC com criticidade)**, **PBI-049 (persistência de respostas)**, **PBI-050 (outbox)** e **PBI-067 (READMEs)**, subiram para ✅: **PBI-040** (validação de obrigatórios na conclusão, em `summary.tsx`), **PBI-044** (foto pendente/retry com testes), **PBI-054** (tela de sync com dados reais), **PBI-055** (conflito de versão via `server_version`/`VersionConflictError`), **PBI-085** (push: registra token + abre inspeção ao toque) e **PBI-090** (biometria). Parciais: **PBI-041** (scanner simulado), **PBI-045** (GPS no início, mas não na conclusão nem enviado ao servidor), **PBI-062** (banner/colunas de reprovação existem, mas o pull não propaga o estado do servidor), **PBI-065** (há Jest + testes de sync, falta testar UI) e **PBI-091** (tema escuro: infra pronta, telas ainda em `Colors`). Não feitos: cursor de sync (053), APK (068), demo ponta a ponta (072), notificações locais (084) e assinatura (086).
 
 ---
 

@@ -11,11 +11,17 @@ import {
   type SyncOperationView,
 } from '@/features/synchronization';
 
-const STATUS_META: Record<SyncOperationDisplayStatus, { icon: string; label: string; colorKey: 'success' | 'warningDark' | 'danger' }> = {
+// Maps each real outbox display status to the acceptance-criteria icon + copy.
+// colorKey points to a theme token so the status color follows light/dark.
+const STATUS_META: Record<
+  SyncOperationDisplayStatus,
+  { icon: string; label: string; colorKey: 'success' | 'warningDark' | 'danger' }
+> = {
   synced: { icon: '✓', label: 'Sincronizada', colorKey: 'success' },
   pending: { icon: '⏳', label: 'Pendente', colorKey: 'warningDark' },
   error: { icon: '❌', label: 'Falha', colorKey: 'danger' },
   waiting: { icon: '⚠️', label: 'Aguardando', colorKey: 'warningDark' },
+  conflict: { icon: '⚠️', label: 'Conflito de versão', colorKey: 'danger' },
 };
 
 export default function SyncScreen() {
@@ -30,6 +36,7 @@ export default function SyncScreen() {
   const syncButtonLabel = isSyncing ? 'Sincronizando…' : isOnline ? 'Sincronizar agora' : 'Sincronizar agora (offline)';
   const failedPhotos = operations.filter((op) => op.entityType === 'evidence' && op.displayStatus === 'error').length;
   const hasFailedOperations = operations.some((op) => op.displayStatus === 'error');
+  const conflictCount = operations.filter((op) => op.displayStatus === 'conflict').length;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
@@ -57,6 +64,15 @@ export default function SyncScreen() {
           ) : null}
         </Card>
         <Text style={[styles.section, { color: c.text }]}>Operações</Text>
+
+        {conflictCount > 0 ? (
+          <View style={[styles.conflictBanner, { backgroundColor: c.dangerLight }]} accessibilityRole="alert">
+            <Text style={[styles.conflictText, { color: c.danger }]}>
+              ⚠️ {conflictCount === 1 ? '1 conflito de versão preservado no dispositivo.' : `${conflictCount} conflitos de versão preservados no dispositivo.`}
+            </Text>
+          </View>
+        ) : null}
+
         {operations.length === 0 ? (
           <Card style={styles.card}>
             <Text style={[styles.muted, { color: c.textSecondary }]}>Nenhuma operação na fila de sincronização.</Text>
@@ -94,6 +110,9 @@ function OperationRow({ operation }: { operation: SyncOperationView }) {
         {operation.displayStatus === 'error' && operation.error ? (
           <Text style={styles.errorText} numberOfLines={2}>{`Erro: ${operation.error}`}</Text>
         ) : null}
+        {operation.displayStatus === 'conflict' && operation.error ? (
+          <Text style={styles.errorText} numberOfLines={3}>{`Conflito: ${operation.error}`}</Text>
+        ) : null}
       </View>
     </Card>
   );
@@ -130,6 +149,8 @@ const styles = StyleSheet.create({
   operationTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
   operationStatus: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   errorText: { fontSize: FontSize.sm, color: Colors.danger },
+  conflictBanner: { borderRadius: 8, padding: Spacing.sm },
+  conflictText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   row: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, paddingTop: Spacing.sm },
   rowValue: { fontWeight: FontWeight.semibold },
 });

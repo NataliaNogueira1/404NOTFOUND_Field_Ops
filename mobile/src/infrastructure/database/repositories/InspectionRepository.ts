@@ -47,6 +47,7 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  server_version: number;
 }
 
 interface SectionRow {
@@ -120,8 +121,8 @@ export class InspectionRepository {
         id, title, template_id, client_id, client_name, site_id, site_name,
         equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
-        progress, supervisor_instructions, sync_status, pending_sync_count, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        progress, supervisor_instructions, sync_status, pending_sync_count, server_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -138,6 +139,7 @@ export class InspectionRepository {
         due_date = excluded.due_date,
         due_time = excluded.due_time,
         supervisor_instructions = excluded.supervisor_instructions,
+        server_version = excluded.server_version,
         updated_at = datetime('now')`,
       inspection.id,
       inspection.title,
@@ -162,6 +164,7 @@ export class InspectionRepository {
       inspection.supervisorInstructions ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
+      inspection.serverVersion ?? 0,
     );
   }
 
@@ -381,6 +384,7 @@ export class InspectionRepository {
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
+    serverVersion: row.server_version,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

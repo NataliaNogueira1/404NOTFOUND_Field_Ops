@@ -15,7 +15,7 @@ import type { SyncQueueEntry } from '@/infrastructure/database/repositories';
  *  - `error`   → ❌  failed (see {@link SyncOperationView.error})
  *  - `waiting` → ⚠️  deferred because a dependency is not yet synced (RN-069)
  */
-export type SyncOperationDisplayStatus = 'synced' | 'pending' | 'error' | 'waiting';
+export type SyncOperationDisplayStatus = 'synced' | 'pending' | 'error' | 'waiting' | 'conflict';
 
 export interface SyncOperationView {
   id: string;
@@ -156,6 +156,10 @@ export function mapEntryToView(
 
   if (entry.status === 'error') {
     return { ...base, displayStatus: 'error', error: entry.lastError ?? undefined };
+  }
+
+  if (entry.status === 'conflict') {
+    return { ...base, displayStatus: 'conflict', error: entry.lastError ?? undefined };
   }
 
   // 'sent'

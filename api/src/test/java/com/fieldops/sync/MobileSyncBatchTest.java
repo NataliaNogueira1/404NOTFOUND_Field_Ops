@@ -94,9 +94,9 @@ class MobileSyncBatchTest {
 
         // Submitted out of order (submit before start) to prove the server orders by dependency.
         String body = "{\"operations\":["
-                + operation(submitOp, "SUBMITTED", inspection.getId(), startOp)
+                + operation(submitOp, "SUBMITTED", inspection.getId(), 1L, startOp)
                 + ","
-                + operation(startOp, "IN_PROGRESS", inspection.getId(), null)
+                + operation(startOp, "IN_PROGRESS", inspection.getId(), 0L, null)
                 + "]}";
 
         mockMvc.perform(post("/api/v1/mobile/sync/push")
@@ -119,7 +119,7 @@ class MobileSyncBatchTest {
         Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
         String token = obtainToken();
         UUID startOp = UUID.randomUUID();
-        String body = "{\"operations\":[" + operation(startOp, "IN_PROGRESS", inspection.getId(), null) + "]}";
+        String body = "{\"operations\":[" + operation(startOp, "IN_PROGRESS", inspection.getId(), 0L, null) + "]}";
 
         mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -143,7 +143,7 @@ class MobileSyncBatchTest {
         UUID missingDependency = UUID.randomUUID(); // never submitted / never processed
 
         String body = "{\"operations\":["
-                + operation(submitOp, "SUBMITTED", inspection.getId(), missingDependency) + "]}";
+                + operation(submitOp, "SUBMITTED", inspection.getId(), 0L, missingDependency) + "]}";
 
         mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -158,9 +158,29 @@ class MobileSyncBatchTest {
 
     // --- fixtures ---
 
-    private String operation(UUID opId, String status, Long inspectionId, UUID dependencyId) {
+    @Test
+    void reportsConflictAndPreservesServerStateWhenBaseVersionIsStale() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
+        inspection.setStatus(InspectionStatus.IN_PROGRESS);
+        inspectionRepository.saveAndFlush(inspection);
+
+        String body = "{\"operations\":[" + operation(
+                UUID.randomUUID(), "SUBMITTED", inspection.getId(), 0L, null) + "]}";
+
+        mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + obtainToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results[0].status").value("CONFLICT"));
+
+        assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionStatus.IN_PROGRESS);
+        assertThat(processedOperationRepository.count()).isZero();
+    }
+
+    private String operation(UUID opId, String status, Long inspectionId, Long baseVersion, UUID dependencyId) {
         String deps = dependencyId == null ? "[]" : "[\"" + dependencyId + "\"]";
         return "{\"operationId\":\"" + opId + "\",\"type\":\"INSPECTION_STATUS\",\"dependencyIds\":" + deps
+                + ",\"baseVersion\":" + baseVersion
                 + ",\"payload\":{\"inspectionId\":" + inspectionId + ",\"status\":\"" + status + "\"}}";
     }
 

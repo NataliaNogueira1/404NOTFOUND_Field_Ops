@@ -66,6 +66,9 @@ class InspectionServiceTest {
     @Mock
     private com.fieldops.audit.service.AuditService auditService;
 
+    @Mock
+    private com.fieldops.device.service.PushNotificationService pushNotificationService;
+
     @InjectMocks
     private InspectionService inspectionService;
 
