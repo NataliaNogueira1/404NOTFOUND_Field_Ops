@@ -13,7 +13,7 @@ import { ThemeProvider } from '@/features/theme';
 import { ConnectivityProvider } from '@/infrastructure/connectivity';
 import { DatabaseProvider } from '@/infrastructure/database/DatabaseProvider';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
-import { inspectionIdFromNotification } from '@/infrastructure/notifications/pushNotifications';
+import { inspectionIdFromNotification, isPushAvailable } from '@/infrastructure/notifications/pushNotifications';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -100,6 +100,9 @@ function useNotificationNavigation() {
   const router = useRouter();
 
   useEffect(() => {
+    // Expo Go (SDK 53+) has no remote push; these native calls would throw.
+    if (!isPushAvailable()) return;
+
     function openInspection(notification: Notifications.Notification) {
       const inspectionId = inspectionIdFromNotification(notification);
       if (inspectionId) router.push(`/(protected)/inspections/${inspectionId}`);

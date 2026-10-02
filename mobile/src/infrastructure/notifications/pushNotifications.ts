@@ -6,17 +6,30 @@ import { apiClient } from '@/infrastructure/api/client';
 
 type NotificationData = { inspectionId?: unknown };
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/**
+ * Expo Go dropped remote push notifications in SDK 53, so touching the
+ * expo-notifications native module there throws and crashes app startup.
+ * Detect Expo Go (executionEnvironment === 'storeClient') and skip every push
+ * call; the feature works normally on development builds and production.
+ * See https://docs.expo.dev/develop/development-builds/introduction/.
+ */
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+// Registering the handler reaches into the native module, so guard it too —
+// otherwise importing this file under Expo Go crashes before any screen loads.
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function registerPushToken(accessToken: string): Promise<void> {
-  if (Platform.OS === 'web') return;
+  if (isExpoGo || Platform.OS === 'web') return;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('inspections', {
       name: 'Inspeções atribuídas',
@@ -43,4 +56,9 @@ export function inspectionIdFromNotification(notification: Notifications.Notific
   return typeof inspectionId === 'string' || typeof inspectionId === 'number'
     ? String(inspectionId)
     : null;
+}
+
+/** Whether push notifications are available in the current runtime (false in Expo Go). */
+export function isPushAvailable(): boolean {
+  return !isExpoGo;
 }
