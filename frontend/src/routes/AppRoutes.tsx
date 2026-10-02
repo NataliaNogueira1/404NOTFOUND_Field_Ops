@@ -48,6 +48,9 @@ const ReviewQueuePage = lazy(() =>
 const InspectionReviewPage = lazy(() =>
   import('@/pages/inspections/InspectionReviewPage').then((module) => ({ default: module.InspectionReviewPage })),
 )
+const InspectionReportPage = lazy(() =>
+  import('@/pages/inspections/InspectionReportPage').then((module) => ({ default: module.InspectionReportPage })),
+)
 const NonConformitiesPage = lazy(() =>
   import('@/pages/nonConformities/NonConformitiesPage').then((module) => ({ default: module.NonConformitiesPage })),
 )
@@ -257,6 +260,14 @@ export function AppRoutes() {
             element={
               <LazyPage>
                 <InspectionReviewPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="inspections/:id/report"
+            element={
+              <LazyPage>
+                <InspectionReportPage />
               </LazyPage>
             }
           />

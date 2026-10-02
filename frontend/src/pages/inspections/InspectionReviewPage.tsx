@@ -1,6 +1,6 @@
-﻿import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
+﻿import { ArrowLeft, CheckCircle2, FileText, XCircle } from 'lucide-react'
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SeverityBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Lightbox, PhotoThumbnails, type LightboxPhoto } from '@/components/feedback/Lightbox'
@@ -8,14 +8,23 @@ import { Toast } from '@/components/feedback/Toast'
 import { Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { cn } from '@/utils/cn'
 import { byId, clients, equipment, nonConformities, reviewAnswers, sites, users } from '@/mocks/domain'
 import { inspectionStore } from '@/state/mockStores'
 import { InspectionStatus } from '@/types/domain'
+import { AnswerHistoryTab } from './AnswerHistoryTab'
+
+type ReviewTab = 'review' | 'answer-history'
 
 export function InspectionReviewPage() {
   const { id = 'ins-compressor' } = useParams()
+  const navigate = useNavigate()
   const inspections = useSyncExternalStore(inspectionStore.subscribe, inspectionStore.adminSnapshot, inspectionStore.adminSnapshot)
   const inspection = byId(inspections, id) ?? inspections[0]
+  // The answer-history tab reads from the real API, so it must use the inspection id from the
+  // route (e.g. "1"), not the mock's id. The rest of this page still renders mock data until the
+  // review screen is fully wired to the API (separate PBI).
+  const answerHistoryInspectionId = id
   const client = byId(clients, inspection.clientId)
   const site = byId(sites, inspection.siteId)
   const item = byId(equipment, inspection.equipmentId)
@@ -25,6 +34,7 @@ export function InspectionReviewPage() {
   const [reject, setReject] = useState(false)
   const [reason, setReason] = useState('')
   const [toast, setToast] = useState(false)
+  const [activeTab, setActiveTab] = useState<ReviewTab>('review')
 
   // Lightbox state — null means closed, otherwise holds the list and starting index
   const [lightboxPhotos, setLightboxPhotos] = useState<LightboxPhoto[]>([])
@@ -80,6 +90,9 @@ export function InspectionReviewPage() {
           <p className="text-sm text-muted">{inspection.title} - {item?.name}</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}>
+            <FileText size={17} />Relatorio PDF
+          </Button>
           {canceled
             ? <Button disabled>Inspecao cancelada</Button>
             : <>
@@ -96,6 +109,19 @@ export function InspectionReviewPage() {
         </Card>
       )}
 
+      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Secoes da inspecao">
+        <TabButton active={activeTab === 'review'} onClick={() => setActiveTab('review')}>
+          Revisao
+        </TabButton>
+        <TabButton active={activeTab === 'answer-history'} onClick={() => setActiveTab('answer-history')}>
+          Historico de respostas
+        </TabButton>
+      </div>
+
+      {activeTab === 'answer-history' && <AnswerHistoryTab inspectionId={answerHistoryInspectionId} />}
+
+      {activeTab === 'review' && (
+      <>
       <section className="grid gap-4 md:grid-cols-5">
         <Summary label="Tecnico" value={tech?.name} />
         <Summary label="Cliente" value={client?.name} />
@@ -223,6 +249,8 @@ export function InspectionReviewPage() {
           )}
         </Card>
       </div>
+      </>
+      )}
 
       {/* Lightbox */}
       <Lightbox
@@ -281,5 +309,32 @@ function Summary({ label, value }: { label: string; value?: string }) {
       <p className="text-xs font-medium text-muted">{label}</p>
       <p className="mt-1 text-sm font-semibold">{value}</p>
     </Card>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        'focus-ring -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors',
+        active
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted hover:text-text',
+      )}
+    >
+      {children}
+    </button>
   )
 }

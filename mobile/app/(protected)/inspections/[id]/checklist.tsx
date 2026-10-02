@@ -12,7 +12,7 @@ import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 export default function ChecklistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { inspections, answers, evidences, answerItem } = useFieldOps();
+  const { inspections, answers, evidences, answerItem, retryEvidenceUpload } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -105,6 +105,7 @@ export default function ChecklistScreen() {
                 answer={answers[item.id]}
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
                 onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
+                onRetryEvidence={retryEvidenceUpload}
               />
             ))}
           </View>
