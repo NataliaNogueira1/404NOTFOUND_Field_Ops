@@ -6,13 +6,14 @@ inclusion: manual
 
 ## Stack Tecnológico
 
-- **Framework:** Angular 17+ (standalone components)
+- **Framework:** React 19 + Vite (function components + hooks)
 - **Linguagem:** TypeScript (strict)
-- **UI Library:** Angular Material ou PrimeNG (escolha do time)
-- **Formulários:** Reactive Forms
-- **HTTP:** HttpClient + interceptors
-- **Rotas:** Angular Router + Guards
-- **Build:** ng build (output estático hospedável)
+- **UI:** Tailwind CSS + componentes locais em `src/components`; ícones com Lucide React; gráficos com Recharts
+- **Formulários:** React Hook Form + Zod
+- **HTTP:** cliente HTTP compartilhado em `src/api/client.ts` + módulos de domínio em `src/api/`
+- **Rotas:** React Router (rotas em `src/routes/AppRoutes.tsx`) + guards de rota
+- **Testes:** Vitest + Testing Library
+- **Build:** `tsc -b && vite build` (output estático hospedável)
 
 ## Mapa de Rotas
 
@@ -355,30 +356,33 @@ Estado: SUBMITTED → [Iniciar Revisão]
 
 ---
 
-## Componentes Reutilizáveis (Shared)
+## Componentes Reutilizáveis (`src/components`)
 
 | Componente | Uso |
 |---|---|
-| `<app-data-table>` | Tabela com paginação, sort, seleção |
-| `<app-filters>` | Barra de filtros com chips |
-| `<app-status-badge>` | Badge colorido por estado |
-| `<app-priority-badge>` | Badge por prioridade |
-| `<app-confirm-dialog>` | Modal de confirmação |
-| `<app-loading-state>` | Spinner centralizado |
-| `<app-empty-state>` | Ilustração + mensagem quando lista vazia |
-| `<app-error-state>` | Mensagem de erro + retry |
-| `<app-form-field>` | Wrapper com label + erro + hint |
-| `<app-page-header>` | Título + breadcrumbs + ações |
+| `DataTable` | Tabela com paginação, sort, seleção |
+| `Filters` | Barra de filtros com chips |
+| `StatusBadge` | Badge colorido por estado |
+| `PriorityBadge` | Badge por prioridade |
+| `ConfirmDialog` | Modal de confirmação (`role="dialog"`, título e ação de fechar) |
+| `LoadingState` | Spinner centralizado |
+| `EmptyState` | Ilustração + mensagem quando lista vazia |
+| `ErrorState` | Mensagem de erro + retry |
+| `FormField` | Wrapper com label + erro + hint |
+| `PageHeader` | Título + breadcrumbs + ações |
 
 ---
 
-## Interceptors
+## Cliente HTTP e tratamento de erros (`src/api/client.ts`)
 
-### AuthInterceptor
-- Adiciona `Authorization: Bearer {token}` em toda request
-- Se 401: tenta refresh token → se falhar, redireciona para /login
+Todas as chamadas passam pelo cliente HTTP compartilhado (nada de `fetch` direto em
+páginas/componentes) e por módulos de domínio em `src/api/`.
 
-### ErrorInterceptor
+### Autenticação
+- Adiciona `Authorization: Bearer {token}` em toda request.
+- Se 401: tenta refresh token → se falhar, redireciona para /login.
+
+### Tratamento de erros (por status)
 - 400: mostrar fieldErrors no formulário
 - 403: toast "Sem permissão para esta ação"
 - 404: toast "Recurso não encontrado"
@@ -386,15 +390,21 @@ Estado: SUBMITTED → [Iniciar Revisão]
 - 422: mostrar mensagem de regra de negócio
 - 500: toast "Erro interno. Tente novamente."
 
+> Nunca exponha stack traces, segredos, tokens ou detalhes internos do servidor;
+> mensagens ao usuário em português e acionáveis.
+
 ---
 
-## Guards
+## Guards de rota (React Router)
+
+Guards protegem autenticação e acesso por perfil — esconder um botão não é autorização;
+o backend continua sendo a fonte de verdade das permissões.
 
 | Guard | Rota | Lógica |
 |---|---|---|
-| AuthGuard | /app/** | Verificar token válido, redirecionar para /login se inválido |
-| RoleGuard('ADMIN') | /app/users | Apenas ADMIN |
-| RoleGuard('ADMIN','SUPERVISOR') | /app/inspections | ADMIN ou SUPERVISOR |
+| Guard de autenticação | /app/** | Verificar token válido, redirecionar para /login se inválido |
+| Guard de perfil (`ADMIN`) | /app/users | Apenas ADMIN |
+| Guard de perfil (`ADMIN`, `SUPERVISOR`) | /app/inspections | ADMIN ou SUPERVISOR |
 
 ---
 

@@ -4,7 +4,13 @@ import { tokenStorage } from '@/services/auth/tokenStorage'
 
 import { httpClient } from './httpClient'
 
-const REFRESH_URL = '/api/v1/auth/refresh'
+const REFRESH_PATH = '/api/v1/auth/refresh'
+
+// The client prefixes every request with VITE_API_URL, so assertions match on
+// the path suffix rather than an absolute URL to stay independent of the base.
+function isRefreshCall(url: unknown): boolean {
+  return String(url).endsWith(REFRESH_PATH)
+}
 
 const fetchMock = vi.fn()
 
@@ -56,7 +62,7 @@ describe('httpClient', () => {
 
     expect(data).toEqual({ value: 42 })
     expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(requestUrl(1)).toBe(REFRESH_URL)
+    expect(isRefreshCall(requestUrl(1))).toBe(true)
     expect(requestHeaders(2).authorization).toBe('Bearer access-2')
     expect(tokenStorage.getAccessToken()).toBe('access-2')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-1')
@@ -77,7 +83,7 @@ describe('httpClient', () => {
 
     expect(first).toEqual({ value: 1 })
     expect(second).toEqual({ value: 2 })
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === REFRESH_URL)
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => isRefreshCall(url))
     expect(refreshCalls).toHaveLength(1)
   })
 

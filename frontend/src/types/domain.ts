@@ -153,6 +153,8 @@ export interface ReviewAnswer {
   result: string
   observation?: string
   evidence?: string
+  evidenceCapturedAt?: string
+  evidenceLocation?: string
   nonConformityId?: string
 }
 export interface Evidence {
@@ -162,6 +164,27 @@ export interface Evidence {
   description: string
   capturedAt: string
   syncStatus: SyncStatus
+}
+/**
+ * One version of a checklist answer as returned by the detailed answer history
+ * endpoint (PBI-088): GET /api/v1/inspections/{id}/answers/history.
+ * The same item may appear more than once, one entry per recorded change,
+ * in chronological order.
+ */
+export interface AnswerHistoryEntry {
+  itemId: string
+  section: string
+  sectionOrder?: number
+  itemTitle: string
+  itemOrder?: number
+  responseType?: string
+  /** Raw stored value, kept verbatim (string | boolean | number | enum represented as text). */
+  value: string | null
+  observation: string | null
+  answeredAt: string
+  /** Author display name. */
+  answeredBy: string | null
+  answeredById?: number | null
 }
 export interface ChecklistAnswer {
   itemId: string

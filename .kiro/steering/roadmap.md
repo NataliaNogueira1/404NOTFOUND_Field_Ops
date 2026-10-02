@@ -25,7 +25,7 @@ inclusion: manual
 
 | Sprint | Semanas | Entrega Mobile | Entrega Admin | Entrega Backend | Marco |
 |---|---|---|---|---|---|
-| 1 | 1-2 | Projeto base, rotas, design system, mocks | Projeto Angular, layout, rotas | API base, PostgreSQL, migrações, OpenAPI | M1: Apps executáveis |
+| 1 | 1-2 | Projeto base, rotas, design system, mocks | Projeto React + Vite, layout, rotas | API base, PostgreSQL, migrações, OpenAPI | M1: Apps executáveis |
 | 2 | 3-4 | Login real, sessão, logout | Login, usuários, cadastros | JWT, autorização, CRUD | M2: Auth integrada |
 | 3 | 5-6 | Lista de inspeções (mock→real) | Construtor de modelos, agendamento | Modelos versionados, snapshot, inspeções | M3: Supervisor cria e atribui |
 | 4 | 7-8 | Checklist dinâmico, respostas, progresso | Acompanhamento | Respostas, transições, validações | M4: Execução online |
@@ -62,7 +62,7 @@ inclusion: manual
 ### Sprint 1 — Fundação (PBI-001 a PBI-006)
 - Repositórios e convenções
 - Projeto Expo com TypeScript e rotas
-- Projeto Angular com layout modular
+- Projeto React + Vite com layout modular
 - API Spring Boot + PostgreSQL + migrações
 - Lint e verificação de tipos
 - Contrato OpenAPI inicial

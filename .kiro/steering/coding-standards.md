@@ -36,15 +36,15 @@ inclusion: auto
 - Virtualização em listas longas
 - Validação offline antes de enviar
 
-## Web Admin (Angular)
+## Web Admin (React + Vite)
 
-- Standalone components (Angular 17+)
-- Formulários reativos (ReactiveFormsModule)
-- Guards para proteção de rotas
-- Interceptors para auth e tratamento de erros
-- Services tipados para cada entidade
-- Componentes shared para tabelas, filtros, estados
-- Lazy loading por feature
+- Function components + hooks (React 19)
+- Formulários com React Hook Form + Zod
+- Guards de rota para proteção (React Router, rotas em `src/routes/AppRoutes.tsx`)
+- Cliente HTTP compartilhado (`src/api/client.ts`) + módulos de API por domínio em `src/api/`
+- Tipos por entidade em `src/types` (payloads do backend separados dos modelos de UI)
+- Componentes reutilizáveis em `src/components` (tabelas, filtros, estados) + Tailwind CSS
+- Lazy loading das páginas de rota
 
 ## Backend (Java + Spring Boot)
 

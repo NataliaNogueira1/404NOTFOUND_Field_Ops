@@ -431,6 +431,9 @@ export const nonConformities: NonConformity[] = [
   },
 ]
 
+const mockLocations = ['-23.5015, -47.4526', '-23.5021, -47.4531', '-23.5018, -47.4528', '-23.5009, -47.4520']
+const mockDates = ['2026-08-10T09:15:00', '2026-08-10T09:32:00', '2026-08-10T09:48:00', '2026-08-10T10:05:00']
+
 export const reviewAnswers: ReviewAnswer[] = compressorSections.flatMap((section) =>
   section.items.map((item, index) => {
     const nc = nonConformities.find((value) => value.item === item.question)
@@ -441,6 +444,8 @@ export const reviewAnswers: ReviewAnswer[] = compressorSections.flatMap((section
       result: nc ? 'NAO CONFORME' : index % 4 === 0 ? '4.2' : 'CONFORME',
       observation: nc ? nc.title : 'Item verificado em campo sem restricoes.',
       evidence: `foto-${item.id}.jpg`,
+      evidenceCapturedAt: mockDates[index % mockDates.length],
+      evidenceLocation: mockLocations[index % mockLocations.length],
       nonConformityId: nc?.id,
     }
   }),

@@ -14,7 +14,7 @@ inclusion: auto
 |---|---|---|
 | App Mobile | Expo + React Native + TypeScript + SQLite | Execução de inspeções pelo técnico, offline-first |
 | API REST | Java + Spring Boot + PostgreSQL | Regras de negócio, autenticação, persistência |
-| Web Admin | Angular + TypeScript | Gestão, planejamento e revisão |
+| Web Admin | React + Vite + TypeScript | Gestão, planejamento e revisão |
 | Infraestrutura | PostgreSQL + SQLite + Object Storage (S3-compatível) | Dados centrais + locais + evidências |
 
 ## Perfis de Usuário

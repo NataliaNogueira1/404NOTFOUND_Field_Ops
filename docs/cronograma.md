@@ -2,7 +2,7 @@
 
 ## Sprint 1
 
-> Período: 14/09/2026 → 18/09/2026
+> Período: 21/08/2026 → 14/09/2026
 
 ### Equipe Completa
 
@@ -81,7 +81,7 @@
 
 ## Sprint 2
 
-> Período: 19/09/2026 → 19/09/2026  
+> Período: 15/09/2026 → 19/09/2026  
 
 ### Backend (Lucas e Marcela)
 

@@ -14,6 +14,7 @@ import java.util.UUID;
 public record SyncOperationRequest(
         @NotNull(message = "operationId is required") UUID operationId,
         @NotNull(message = "type is required") SyncOperationType type,
+        @NotNull(message = "baseVersion is required") Long baseVersion,
         List<UUID> dependencyIds,
         JsonNode payload) {
 

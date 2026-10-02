@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -25,15 +26,20 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Seeds a handful of ASSIGNED inspections for the dev technician so the mobile
- * "start inspection" flow (PBI-034) can be exercised end-to-end.
+ * Legacy seed of standalone ASSIGNED inspections (built from detached entities, without a real
+ * client/site/equipment). Superseded by {@link DemoSeedRunner}, which now seeds a full set of
+ * inspections on top of the real catalog through the domain services. Keeping two seeders active
+ * produced an inconsistent list (only one inspection surviving), so this runner is disabled by
+ * default and only runs when {@code fieldops.bootstrap.dev-inspections.enabled=true}.
  *
- * <p>Dev profile only. Runs after {@link DevUsersBootstrapRunner} (see {@link Order})
+ * <p>Dev/demo profile only. Runs after {@link DevUsersBootstrapRunner} (see {@link Order})
  * because it needs the technician/supervisor accounts to exist. It is idempotent:
  * if the technician already has inspections, nothing is created.
  */
 @Component
 @Profile({"dev", "demo"})
+@ConditionalOnProperty(prefix = "fieldops.bootstrap.dev-inspections", name = "enabled",
+        havingValue = "true", matchIfMissing = false)
 @Order(20) // after DevUsersBootstrapRunner (default order)
 public class DevInspectionsBootstrapRunner implements ApplicationRunner {
 

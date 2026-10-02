@@ -3,3 +3,10 @@ dist
 .vite
 *.local
 *.log
+
+# Environment files (keep .env.example versioned)
+.env
+.env.local
+.env.development
+.env.production
+.env.test

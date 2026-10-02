@@ -8,9 +8,9 @@ inclusion: auto
 
 - **Nome:** FieldOps — Plataforma de Inspeção em Campo
 - **Tipo:** Projeto Integrador acadêmico (4º semestre ADS — SENAI Gaspar Ricardo Júnior)
-- **Prazo:** 16 semanas efetivas (8 sprints de 2 semanas)
+- **Prazo:** 8 semanas efetivas (2 sprints de 4 semanas)
 - **Equipe:** 9 integrantes
-- **Gerente do Projeto:** Nathalia Nogueira
+- **Gerente do Projeto:** Natália Nogueira
 - **Repositório monorepo:** `404NOTFOUND_Field_Ops` com pastas `api/`, `mobile/`, `frontend/`
 
 ## Objetivo
@@ -23,7 +23,7 @@ Desenvolver uma plataforma integrada para configurar, planejar, executar, sincro
 |---|---|---|
 | API REST | Java 21, Spring Boot, JPA, PostgreSQL, JWT, OpenAPI | `api/` |
 | Mobile | Expo, React Native, TypeScript, Expo Router, SQLite, TanStack Query | `mobile/` |
-| Web Admin | Angular, TypeScript | `frontend/` |
+| Web Admin | React 19, Vite, TypeScript, React Router, React Hook Form + Zod, Tailwind CSS | `frontend/` |
 | Banco central | PostgreSQL | via Docker (`api/docker-compose.yml`) |
 | Banco local mobile | SQLite (expo-sqlite) | dentro do app |
 

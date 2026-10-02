@@ -29,7 +29,7 @@ inclusion: auto
         │ HTTPS / JSON
 ┌───────┴─────────────────────┐
 │ Interface Administrativa    │
-│ Angular + TypeScript        │
+│ React + Vite + TypeScript   │
 └─────────────────────────────┘
 ```
 
@@ -63,32 +63,23 @@ src/
 └── config/
 ```
 
-## Estrutura do Web Admin (Angular)
+## Estrutura do Web Admin (React + Vite)
 
 ```
-src/app/
-├── core/
-│   ├── auth/
-│   ├── guards/
-│   ├── interceptors/
-│   ├── http/
-│   └── layout/
-├── shared/
-│   ├── components/
-│   ├── directives/
-│   ├── pipes/
-│   └── validators/
-├── features/
-│   ├── dashboard/
-│   ├── users/
-│   ├── clients/
-│   ├── sites/
-│   ├── equipment/
-│   ├── templates/
-│   ├── inspections/
-│   ├── reviews/
-│   └── non-conformities/
-└── app.routes.ts
+src/
+├── api/          # Cliente HTTP, endpoints por domínio e mapeamento de transporte
+├── auth/         # Sessão e autenticação de rotas
+├── components/   # UI reutilizável agrupada por responsabilidade
+├── hooks/        # Comportamento com estado reutilizável
+├── layouts/      # Shells de rota e chrome de página
+├── mocks/        # Fixtures apenas para desenvolvimento/teste
+├── pages/        # Telas de domínio por rota
+├── routes/       # Definições de rota e guards (AppRoutes.tsx)
+├── services/     # Integrações de infraestrutura não-HTTP
+├── state/        # Estado de aplicação compartilhado intencionalmente
+├── test/         # Setup global de testes
+├── types/        # Tipos de domínio compartilhados
+└── utils/        # Funções puras pequenas e transversais
 ```
 
 ## Estrutura da API (Spring Boot)
