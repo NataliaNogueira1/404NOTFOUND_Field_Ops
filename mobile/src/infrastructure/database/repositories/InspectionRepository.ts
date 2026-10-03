@@ -121,8 +121,9 @@ export class InspectionRepository {
         id, title, template_id, client_id, client_name, site_id, site_name,
         equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
-        progress, supervisor_instructions, sync_status, pending_sync_count, server_version, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        progress, supervisor_instructions, sync_status, pending_sync_count,
+        rejection_reason, rejected_by, rejected_at, server_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -139,6 +140,9 @@ export class InspectionRepository {
         due_date = excluded.due_date,
         due_time = excluded.due_time,
         supervisor_instructions = excluded.supervisor_instructions,
+        rejection_reason = excluded.rejection_reason,
+        rejected_by = excluded.rejected_by,
+        rejected_at = excluded.rejected_at,
         server_version = excluded.server_version,
         updated_at = datetime('now')`,
       inspection.id,
@@ -164,6 +168,11 @@ export class InspectionRepository {
       inspection.supervisorInstructions ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
+      // PBI-062: persist the rejection metadata pulled from the server so the
+      // RejectionBanner and the "Corrigir" action have the reason offline.
+      inspection.rejectionReason ?? null,
+      inspection.rejectedBy ?? null,
+      inspection.rejectedAt ?? null,
       inspection.serverVersion ?? 0,
     );
   }

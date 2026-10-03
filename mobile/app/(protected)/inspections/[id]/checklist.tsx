@@ -104,7 +104,7 @@ export default function ChecklistScreen() {
                 inspectionId={inspection?.id ?? id}
                 answer={answers[item.id]}
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
-                onAnswer={(value, observation) => answerItem(item.id, value, observation)}
+                onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
                 onRetryEvidence={retryEvidenceUpload}
               />
             ))}

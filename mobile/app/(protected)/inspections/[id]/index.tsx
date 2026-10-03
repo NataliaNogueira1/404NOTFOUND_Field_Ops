@@ -19,7 +19,7 @@ export default function InspectionDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const db = useDatabase();
-  const { inspections, answers, evidences, nonConformities } = useFieldOps();
+  const { inspections, answers, evidences, nonConformities, reopenForCorrection } = useFieldOps();
 
   // Detail screen must resolve the exact inspection from the route param.
   const inspection = inspections.find((item) => item.id === id);
@@ -151,7 +151,11 @@ export default function InspectionDetailsScreen() {
           </Card>
         ) : null}
 
-        <ActionButtons inspection={inspection} router={router} />
+        <ActionButtons
+          inspection={inspection}
+          router={router}
+          onCorrect={reopenForCorrection}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -160,9 +164,11 @@ export default function InspectionDetailsScreen() {
 function ActionButtons({
   inspection,
   router,
+  onCorrect,
 }: {
   inspection: ReturnType<typeof useFieldOps>['inspections'][number];
   router: ReturnType<typeof useRouter>;
+  onCorrect: (inspectionId: string) => void;
 }) {
   switch (inspection.status) {
     case InspectionStatus.ASSIGNED:
@@ -187,7 +193,12 @@ function ActionButtons({
       return (
         <Button
           label="🔧 Corrigir"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/checklist`)}
+          onPress={() => {
+            // Reopen the rejected inspection (→ IN_PROGRESS) before editing so
+            // answers become writable again, then go straight to the checklist.
+            onCorrect(inspection.id);
+            router.push(`/(protected)/inspections/${inspection.id}/checklist`);
+          }}
           variant="danger"
           fullWidth
           size="lg"

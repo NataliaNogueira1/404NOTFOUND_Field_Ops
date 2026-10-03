@@ -54,7 +54,10 @@
     "web": "expo start --web",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "test": "jest"
+    "test": "jest",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:local": "eas build --platform android --profile preview --local",
+    "build:install": "eas build:run --platform android --latest"
   },
   "private": true
 }
