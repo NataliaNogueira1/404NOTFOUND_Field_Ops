@@ -32,7 +32,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
     navigate('/login')
   }
   return (
-    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-white/95 px-5 backdrop-blur lg:px-8">
+    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-surface/95 px-5 backdrop-blur lg:px-8">
       <div className="flex items-center gap-3">
         <MobileMenuButton onClick={onMenuClick} />
         <div>

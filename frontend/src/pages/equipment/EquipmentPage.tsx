@@ -448,7 +448,7 @@ function QrModal({ item, onClose }: { item: ManagedEquipment | null; onClose: ()
         <div className="grid place-items-center gap-4">
           <div
             aria-label={`Representacao visual do QR Code ${item.qrCode}`}
-            className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-white p-4"
+            className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-surface p-4"
           >
             {Array.from({ length: 49 }, (_, index) => (
               <span key={index} className={(index + item.qrCode.length) % 3 === 0 ? 'bg-text' : 'bg-primary-light'} />
