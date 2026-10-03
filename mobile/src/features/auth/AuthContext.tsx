@@ -3,8 +3,7 @@
 import { apiClient, onSessionChanged } from '@/infrastructure/api/client';
 import { getDatabase } from '@/infrastructure/database';
 import { InspectionRepository } from '@/infrastructure/database/repositories';
-import { biometricStorage, tokenStorage } from '@/infrastructure/storage/tokenStorage';
-import { registerPushToken } from '@/infrastructure/notifications/pushNotifications';
+import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,26 +20,11 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Session expired, but local (offline) data keeps the user in the app, read-only. */
   isOfflineLimited: boolean;
-  /**
-   * The user is authenticated and tokens are valid, but the session is currently
-   * locked behind a biometric prompt (e.g. app returned to foreground).
-   */
-  isBiometricLocked: boolean;
 }
 
 interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  /**
-   * Called after a successful biometric prompt to lift the lock.
-   * Also used when biometric is unavailable and the user falls back to password.
-   */
-  unlockSession: () => void;
-  /**
-   * Puts the session back into the biometric-locked state (called when the app
-   * moves to the background while biometric unlock is enabled).
-   */
-  lockSession: () => void;
   isLoading: boolean;
   isHydrating: boolean;
 }
@@ -89,7 +73,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token: null,
     isAuthenticated: false,
     isOfflineLimited: false,
-    isBiometricLocked: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
@@ -101,10 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const storedToken = await tokenStorage.getAccessToken();
         if (!storedToken) return;
-
-        // If the user opted in to biometric unlock, start in locked state so
-        // the biometric prompt fires before any protected data is displayed.
-        const biometricEnabled = await biometricStorage.isEnabled();
 
         // Try to validate the token by calling /auth/me
         try {
@@ -123,7 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             token: storedToken,
             isAuthenticated: true,
             isOfflineLimited: false,
-            isBiometricLocked: biometricEnabled,
           });
         } catch {
           // If /me fails (network, CORS, etc), still restore session optimistically.
@@ -133,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             token: storedToken,
             isAuthenticated: true,
             isOfflineLimited: false,
-            isBiometricLocked: biometricEnabled,
           });
         }
       } catch {
@@ -158,8 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await tokenStorage.saveTokens(response.accessToken, response.refreshToken);
 
-      // After a fresh login the session is never biometric-locked — the user
-      // just proved their identity with their password.
       setAuthState({
         user: {
           id: String(response.user.id),
@@ -170,7 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token: response.accessToken,
         isAuthenticated: true,
         isOfflineLimited: false,
-        isBiometricLocked: false,
       });
     } finally {
       setIsLoading(false);
@@ -186,33 +160,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: null,
       isAuthenticated: false,
       isOfflineLimited: false,
-      isBiometricLocked: false,
     });
   }, []);
-
-  // ─── Biometric lock / unlock ──────────────────────────────────────────────────
-
-  /**
-   * Lifts the biometric gate. Called either after a successful biometric prompt
-   * or when the user chooses the password fallback (they'll be sent to login).
-   */
-  const unlockSession = useCallback(() => {
-    setAuthState((prev) => ({ ...prev, isBiometricLocked: false }));
-  }, []);
-
-  /**
-   * Re-locks the session when the app goes to the background (only meaningful
-   * when biometric unlock is enabled — AuthGate checks this before calling).
-   */
-  const lockSession = useCallback(() => {
-    setAuthState((prev) => {
-      // Only lock if there is an active, non-expired session.
-      if (!prev.isAuthenticated || prev.isOfflineLimited) return prev;
-      return { ...prev, isBiometricLocked: true };
-    });
-  }, []);
-
-  // ─── Handle session expiry from the 401 interceptor ──────────────────────────
 
   const handleSessionExpired = useCallback(async () => {
     if (await hasLocalInspections()) {
@@ -221,7 +170,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token: null,
         isAuthenticated: false,
         isOfflineLimited: true,
-        isBiometricLocked: false,
       });
       return;
     }
@@ -231,13 +179,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: null,
       isAuthenticated: false,
       isOfflineLimited: false,
-      isBiometricLocked: false,
     });
   }, []);
 
   // ─── Track transparent renewals from the 401 interceptor ─────────────────────
   // The interceptor refreshes the token below the UI layer; these events keep the
   // in-memory state in sync and drop the session when the refresh token dies.
+  // When the session dies but inspections are cached locally, the user stays in
+  // the app in a limited offline mode instead of being kicked to the login screen.
 
   useEffect(() => {
     return onSessionChanged((event) => {
@@ -251,25 +200,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [handleSessionExpired]);
 
-  useEffect(() => {
-    if (!authState.isAuthenticated || !authState.token) return;
-    void registerPushToken(authState.token).catch(() => undefined);
-  }, [authState.isAuthenticated, authState.token]);
-
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <AuthContext.Provider
-      value={{
-        ...authState,
-        signIn,
-        signOut,
-        unlockSession,
-        lockSession,
-        isLoading,
-        isHydrating,
-      }}
-    >
+    <AuthContext.Provider value={{ ...authState, signIn, signOut, isLoading, isHydrating }}>
       {children}
     </AuthContext.Provider>
   );

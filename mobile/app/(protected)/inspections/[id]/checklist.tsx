@@ -12,14 +12,13 @@ import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 export default function ChecklistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { inspections, answers, evidences, answerItem, retryEvidenceUpload } = useFieldOps();
+  const { inspections, answers, evidences, answerItem } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
   const scrollRef = useRef<ScrollView>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
 
   const allItems = useMemo(() => (template ? template.sections.flatMap((section) => section.items) : []), [template]);
-  const hasChecklist = Boolean(template && allItems.length > 0);
   const total = allItems.length;
   const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
   const pending = total - answered;
@@ -42,30 +41,12 @@ export default function ChecklistScreen() {
     scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
   }, [allItems, answers, template]);
 
-  if (templateLoading) {
+  if (templateLoading || !template) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.muted}>Carregando checklist...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Loading is done but there is no snapshot in SQLite (e.g. the inspection was
-  // never synced from the server). Show an actionable empty state instead of
-  // freezing forever on the spinner.
-  if (!template || !hasChecklist) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.centered}>
-          <Text style={styles.title}>Checklist indisponível</Text>
-          <Text style={styles.muted}>
-            Esta inspeção ainda não tem o checklist baixado. Sincronize na aba Sync e tente
-            novamente.
-          </Text>
-          <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
         </View>
       </SafeAreaView>
     );
@@ -80,7 +61,7 @@ export default function ChecklistScreen() {
         </Text>
 
         <Card style={styles.card}>
-          <ProgressBar value={inspection?.progress ?? 0} />
+          <ProgressBar value={inspection.progress} />
           <View style={styles.progressRow}>
             <Text style={styles.muted}>
               {answered} de {total} itens respondidos
@@ -101,11 +82,9 @@ export default function ChecklistScreen() {
                 key={item.id}
                 item={item}
                 index={allItems.findIndex((candidate) => candidate.id === item.id) + 1}
-                inspectionId={inspection?.id ?? id}
                 answer={answers[item.id]}
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
                 onAnswer={(value, observation) => answerItem(item.id, value, observation)}
-                onRetryEvidence={retryEvidenceUpload}
               />
             ))}
           </View>
@@ -113,13 +92,13 @@ export default function ChecklistScreen() {
 
         <Button
           label="Ver resumo"
-          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/summary`)}
           fullWidth
           size="lg"
         />
         <Button
           label="Não conformidades"
-          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/non-conformities`)}
           variant="secondary"
           fullWidth
         />

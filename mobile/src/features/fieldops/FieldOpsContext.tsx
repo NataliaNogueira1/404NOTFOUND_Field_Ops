@@ -1,5 +1,4 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { useAuth } from '@/features/auth';
 import { useDatabase } from '@/infrastructure/database/DatabaseProvider';
@@ -41,44 +40,12 @@ interface FieldOpsContextValue {
   ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
-  retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
   syncNow: () => void;
   resetSession: () => void;
   isSyncing: boolean;
   lastSyncError: string | null;
-}
-
-// Downloads the technician's inspections from the API into SQLite. Failures are
-// swallowed (logged) on purpose: the app must keep working offline from the local
-// cache, so a pull error never blocks the UI.
-async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
-  try {
-    const syncService = new InspectionSyncService(db);
-    console.log('[FieldOps] Pulling inspections from API...');
-    const result = await syncService.pullInspections(token);
-    console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
-  } catch (apiError) {
-    console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
-  }
-}
-
-// Friendly label for a queued operation shown on the sync screen. Photos get a
-// distinct label so a failed upload reads like "Foto: <id>" (PBI-044).
-function describeOperation(entityType: string, entityId: string): string {
-  switch (entityType) {
-    case 'evidence':
-      return `Foto: ${entityId}`;
-    case 'answer':
-      return `Resposta: ${entityId}`;
-    case 'inspection':
-      return `Inspeção: ${entityId}`;
-    case 'non_conformity':
-      return `Não conformidade: ${entityId}`;
-    default:
-      return `${entityType}: ${entityId}`;
-  }
 }
 
 const FieldOpsContext = createContext<FieldOpsContextValue | undefined>(undefined);
@@ -92,8 +59,6 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   // Refs to avoid stale closures and prevent re-init loops
   const initDoneRef = useRef(false);
   const inspectionsRef = useRef<Inspection[]>([]);
-  // Tracks the token we last pulled with, so the post-login effect pulls once per session.
-  const lastPulledTokenRef = useRef<string | null>(null);
 
   // State
   const [inspections, setInspections] = useState<Inspection[]>([]);
@@ -110,91 +75,74 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Initialize DB once ──────────────────────────────────────────────────
 
-  // Loads every entity from SQLite into React state. Shared by the initial DB load
-  // and by the post-login pull, so both paths hydrate the UI the same way.
-  const loadFromDb = useCallback(async () => {
-    if (!db) return;
+  useEffect(() => {
+    if (!db || initDoneRef.current) return;
+    initDoneRef.current = true;
+
     const inspRepo = new InspectionRepository(db);
     const ansRepo = new AnswerRepository(db);
     const evRepo = new EvidenceRepository(db);
     const ncRepo = new NonConformityRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
-    const dbInspections = await inspRepo.getAll();
-    setInspections(dbInspections);
-
-    const allAnswers: Record<string, ChecklistAnswer> = {};
-    for (const insp of dbInspections) {
-      const a = await ansRepo.getByInspection(insp.id);
-      Object.assign(allAnswers, a);
-    }
-    setAnswers(allAnswers);
-
-    const allEvs: Evidence[] = [];
-    for (const insp of dbInspections) {
-      const e = await evRepo.getByInspection(insp.id);
-      allEvs.push(...e);
-    }
-    setEvidences(allEvs);
-
-    const allNCs: NonConformity[] = [];
-    for (const insp of dbInspections) {
-      const n = await ncRepo.getByInspection(insp.id);
-      allNCs.push(...n);
-    }
-    setNonConformities(allNCs);
-
-    const queue = await sqRepo.getAll();
-    setSyncOperations(queue.map((entry) => ({
-      id: entry.id,
-      title: describeOperation(entry.entityType, entry.entityId),
-      status: entry.status === 'sent' ? 'Enviada' as const :
-              entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
-      error: entry.lastError ?? undefined,
-    })));
-
-    console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
-  }, [db]);
-
-  // ─── Initialize DB once ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!db || initDoneRef.current) return;
-    initDoneRef.current = true;
-
     (async () => {
       try {
-        // Try to pull from API first (if we already have a token at startup).
+        // Try to pull from API first (if we have a token)
         if (token) {
-          await pullFromApi(db, token);
+          try {
+            const syncService = new InspectionSyncService(db);
+            console.log('[FieldOps] Pulling inspections from API...');
+            const result = await syncService.pullInspections(token);
+            console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
+          } catch (apiError) {
+            console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+          }
         }
-        await loadFromDb();
+
+        let dbInspections = await inspRepo.getAll();
+
+        // Load everything from DB
+        setInspections(dbInspections);
+
+        const allAnswers: Record<string, ChecklistAnswer> = {};
+        for (const insp of dbInspections) {
+          const a = await ansRepo.getByInspection(insp.id);
+          Object.assign(allAnswers, a);
+        }
+        setAnswers(allAnswers);
+
+        const allEvs: Evidence[] = [];
+        for (const insp of dbInspections) {
+          const e = await evRepo.getByInspection(insp.id);
+          allEvs.push(...e);
+        }
+        setEvidences(allEvs);
+
+        const allNCs: NonConformity[] = [];
+        for (const insp of dbInspections) {
+          const n = await ncRepo.getByInspection(insp.id);
+          allNCs.push(...n);
+        }
+        setNonConformities(allNCs);
+
+        const queue = await sqRepo.getAll();
+        if (queue.length > 0) {
+          setSyncOperations(queue.map((entry) => ({
+            id: entry.id,
+            title: `${entry.entityType}: ${entry.entityId}`,
+            status: entry.status === 'sent' ? 'Enviada' as const :
+                    entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
+          })));
+        }
+
+        console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
       } catch (error) {
         console.warn('[FieldOps] DB init failed:', error);
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [db, loadFromDb, token]);
-
-  // ─── Pull from the server when the technician logs in ─────────────────────
-  // The DB init above runs once and may execute before the user authenticates
-  // (no token yet), which would skip the download and leave the stale local
-  // cache on screen. This effect re-runs the pull as soon as a token becomes
-  // available, then re-hydrates the UI from SQLite.
-  useEffect(() => {
-    if (!db || !token) return;
-    if (lastPulledTokenRef.current === token) return;
-    lastPulledTokenRef.current = token;
-
-    (async () => {
-      try {
-        await pullFromApi(db, token);
-        await loadFromDb();
-      } catch (error) {
-        console.warn('[FieldOps] Post-login pull failed:', error);
-      }
-    })();
-  }, [db, token, loadFromDb]);
+  }, [db, token]);
 
   // ─── Helper: get repos (only if db available) ────────────────────────────
 
@@ -333,20 +281,14 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   }, [getRepos, getSyncService]);
 
   const addEvidence = useCallback((inspectionId: string, itemId: string, description: string, uri?: string) => {
-    const evidenceId = `ev-${itemId}-${Date.now()}`;
     const evidence: Evidence = {
-      id: evidenceId,
+      id: `ev-${itemId}-${Date.now()}`,
       inspectionId,
       itemId,
       description,
       uri,
       capturedAt: new Date().toISOString(),
       syncStatus: 'pending',
-      operationId: InspectionSyncService.evidenceOperationId(evidenceId),
-      // The photo upload depends on the answer operation of the same item, so it
-      // waits for the answer to be synced before running (RN-069).
-      responseId: InspectionSyncService.answerOperationId(inspectionId, itemId),
-      retryCount: 0,
     };
     setEvidences((current) => [...current, evidence]);
     setNonConformities((current) =>
@@ -372,23 +314,6 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
     return evidence;
   }, [getRepos, getSyncService]);
-
-  // Retry a failed photo upload. Reuses the existing file and outbox op (no new
-  // capture, no duplicate evidence — PBI-044) and flips the UI back to pending.
-  const retryEvidenceUpload = useCallback((evidenceId: string) => {
-    setEvidences((current) =>
-      current.map((ev) =>
-        ev.id === evidenceId
-          ? { ...ev, syncStatus: 'pending' as const, lastError: undefined, retryCount: (ev.retryCount ?? 0) + 1 }
-          : ev,
-      ),
-    );
-    const target = evidences.find((ev) => ev.id === evidenceId);
-    const sync = getSyncService();
-    if (sync && target) {
-      sync.retryEvidenceUpload(target).catch(console.warn);
-    }
-  }, [evidences, getSyncService]);
 
   const addNonConformity = useCallback((input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => {
     const nc: NonConformity = { ...input, id: `nc-manual-${Date.now()}`, evidenceCount: input.evidenceCount ?? 0 };
@@ -492,7 +417,6 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       startInspection,
       answerItem,
       addEvidence,
-      retryEvidenceUpload,
       addNonConformity,
       concludeInspection,
       syncNow,
@@ -502,7 +426,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, syncOperations,
-      startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
+      startInspection, answerItem, addEvidence, addNonConformity,
       concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );

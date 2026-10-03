@@ -16,10 +16,7 @@ export default function SummaryScreen() {
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
 
-  const items = useMemo(
-    () => template?.sections.flatMap((section) => section.items) ?? [],
-    [template],
-  );
+  const items = template?.sections.flatMap((section) => section.items) ?? [];
   const total = items.length;
   const answered = Object.keys(answers).length;
 

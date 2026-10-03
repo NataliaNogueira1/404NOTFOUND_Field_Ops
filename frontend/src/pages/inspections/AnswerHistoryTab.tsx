@@ -115,13 +115,13 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
           <h2 className="mb-4 text-base font-semibold">{section}</h2>
           <div className="space-y-5">
             {items.map((item) => (
-              <div key={item.itemId} className="rounded-fieldops border border-border bg-slate-50 p-4">
+              <div key={item.itemId} className="rounded-fieldops border border-border bg-app-bg p-4">
                 <p className="font-medium">{item.itemTitle}</p>
                 <ol className="mt-3 space-y-3">
                   {item.versions.map((version, index) => (
                     <li
                       key={`${item.itemId}-${index}`}
-                      className="rounded-fieldops border border-border bg-white p-3 text-sm"
+                      className="rounded-fieldops border border-border bg-surface p-3 text-sm"
                     >
                       <p>
                         <span className="font-semibold">Valor:</span>{' '}

@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { persistEvidenceFile } from './persistEvidenceFile';
-
 /** Result returned after a successful pick or capture. */
 export interface CapturedImage {
   /** Local URI of the image (persisted on native, temporary on web). */
@@ -18,11 +16,28 @@ export interface CapturedImage {
 
 /**
  * Persist image to a stable location in the app's document directory.
- * Delegates to the shared {@link persistEvidenceFile} helper so the inline
- * camera screen and this hook store evidences the exact same way (PBI-044).
+ * On web, expo-file-system is not supported, so we just return the temp URI.
+ * On native, we copy to documentDirectory/evidences/.
  */
 async function persistImage(tempUri: string): Promise<string> {
-  return persistEvidenceFile(tempUri);
+  if (Platform.OS === 'web') {
+    return tempUri;
+  }
+
+  try {
+    const { Paths, Directory, File } = await import('expo-file-system');
+    const dir = new Directory(Paths.document, 'evidences');
+    if (!dir.exists) {
+      dir.create();
+    }
+    const filename = `evidence_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const source = new File(tempUri);
+    const destination = new File(dir, filename);
+    source.copy(destination);
+    return destination.uri;
+  } catch {
+    return tempUri;
+  }
 }
 
 /** Prompt the user to open settings when permission is denied. */
@@ -52,12 +67,8 @@ const SHARED_OPTIONS: Partial<ImagePicker.ImagePickerOptions> = {
  */
 export function useImagePicker(onPendingResult?: (image: CapturedImage) => void) {
   const pendingCallbackRef = useRef(onPendingResult);
+  pendingCallbackRef.current = onPendingResult;
   const [recovering, setRecovering] = useState(false);
-
-  // Keep the latest callback in a ref without writing during render.
-  useEffect(() => {
-    pendingCallbackRef.current = onPendingResult;
-  }, [onPendingResult]);
 
   // On Android, if the activity was destroyed while the camera was open,
   // getPendingResultAsync() returns the result when the app restarts.
