@@ -11,12 +11,13 @@ function renderPage(failContent = false) {
       ? new Response(JSON.stringify(review), { headers: { 'Content-Type': 'application/json' } })
       : failContent
         ? new Response(JSON.stringify({ status: 404, code: 'NOT_FOUND', message: 'Arquivo ausente' }), { status: 404, headers: { 'Content-Type': 'application/json' } })
-        : new Response(new Blob(['real-image'], { type: 'image/jpeg' })),
+        : new Response('real-image', { headers: { 'Content-Type': 'image/jpeg' } }),
   )))
-  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:real-image'), revokeObjectURL: vi.fn() })
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:real-image')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   return render(<MemoryRouter initialEntries={['/app/inspections/1/review']}><Routes><Route path="/app/inspections/:id/review" element={<InspectionReviewPage />} /></Routes></MemoryRouter>)
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 describe('InspectionReviewPage evidence lightbox', () => {
   it('renders multiple real evidences and opens, navigates and closes the lightbox', async () => {
     renderPage(); const open = await screen.findAllByRole('button', { name: /Abrir foto/ }); expect(open).toHaveLength(4)
