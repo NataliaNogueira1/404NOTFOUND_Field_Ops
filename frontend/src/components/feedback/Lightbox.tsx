@@ -5,12 +5,15 @@ import { createPortal } from 'react-dom'
 export interface LightboxPhoto {
   /** URL or filename of the photo */
   src: string
+  contentUrl?: string
   /** Label shown as the linked item (e.g. question text) */
   item: string
   /** ISO date string when the photo was captured */
   capturedAt?: string
   /** Human-readable coordinates or location name */
   location?: string
+  description?: string
+  loadError?: boolean
 }
 
 interface LightboxProps {
@@ -66,7 +69,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
 
   const photo = photos[Math.min(index, photos.length - 1)]
   if (!photo) return null
-  const isUrl = photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data')
+  const isUrl = !photo.loadError && (photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data'))
 
   return createPortal(
     <div
@@ -135,7 +138,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <div className="rounded-full bg-primary/20 p-6">
                 <ZoomIn size={48} className="text-primary-light" />
               </div>
-              <p className="max-w-xs break-all text-center text-sm text-white/60">Evidencia indisponivel</p>
+              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.loadError ? 'Nao foi possivel carregar a evidencia.' : 'Evidencia indisponivel'}</p>
             </div>
           )}
         </div>
@@ -165,12 +168,8 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <span>{formatDate(photo.capturedAt)}</span>
             </span>
           )}
-          {photo.location && (
-            <span className="flex items-center gap-1.5">
-              <MapPin size={14} className="shrink-0 text-primary-light" />
-              <span>{photo.location}</span>
-            </span>
-          )}
+          <span className="flex items-center gap-1.5"><MapPin size={14} className="shrink-0 text-primary-light" /><span>{photo.location ?? 'Localizacao nao informada'}</span></span>
+          {photo.description && <span className="flex items-center gap-1.5"><span className="font-medium text-white/80">Descricao:</span><span>{photo.description}</span></span>}
         </div>
       </div>
 
@@ -189,7 +188,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
                   : 'border-transparent opacity-50 hover:opacity-80'
               }`}
             >
-              {thumbnail.src.startsWith('http') || thumbnail.src.startsWith('blob') || thumbnail.src.startsWith('data') ? (
+              {!thumbnail.loadError && (thumbnail.src.startsWith('http') || thumbnail.src.startsWith('blob') || thumbnail.src.startsWith('data')) ? (
                 <img src={thumbnail.src} alt={thumbnail.item} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">Indisponivel</div>
@@ -221,10 +220,10 @@ export function PhotoThumbnails({
           onClick={() => onOpen(index)}
           className="group relative h-16 w-16 overflow-hidden rounded-md border border-border bg-app-bg transition hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          {photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data') ? (
+          {!photo.loadError && (photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data')) ? (
             <img src={photo.src} alt={photo.item} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-app-bg text-xs text-muted">Indisponivel</div>
+            <div className="flex h-full w-full items-center justify-center bg-app-bg text-xs text-muted">Carregar</div>
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
             <ZoomIn size={16} className="text-white opacity-0 transition group-hover:opacity-100" />
