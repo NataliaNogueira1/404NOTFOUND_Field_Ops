@@ -126,7 +126,6 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               onClick={() => setZoomed(z => !z)}
             />
           ) : (
-            // Placeholder for mock/filename-only evidences
             <div
               className={`flex flex-col items-center justify-center gap-4 rounded-lg border border-white/10 bg-white/5 p-12 transition-transform duration-200 ${
                 zoomed ? 'scale-150' : ''
@@ -136,7 +135,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <div className="rounded-full bg-primary/20 p-6">
                 <ZoomIn size={48} className="text-primary-light" />
               </div>
-              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.src}</p>
+              <p className="max-w-xs break-all text-center text-sm text-white/60">Evidencia indisponivel</p>
             </div>
           )}
         </div>
@@ -193,9 +192,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               {thumbnail.src.startsWith('http') || thumbnail.src.startsWith('blob') || thumbnail.src.startsWith('data') ? (
                 <img src={thumbnail.src} alt={thumbnail.item} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">
-                  <ZoomIn size={16} />
-                </div>
+                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">Indisponivel</div>
               )}
             </button>
           ))}
@@ -222,14 +219,12 @@ export function PhotoThumbnails({
           key={index}
           aria-label={`Abrir foto ${index + 1}: ${photo.item}`}
           onClick={() => onOpen(index)}
-          className="group relative h-16 w-16 overflow-hidden rounded-md border border-border bg-slate-100 transition hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group relative h-16 w-16 overflow-hidden rounded-md border border-border bg-app-bg transition hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data') ? (
             <img src={photo.src} alt={photo.item} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-light/40 to-slate-100 text-primary">
-              <ZoomIn size={20} />
-            </div>
+            <div className="flex h-full w-full items-center justify-center bg-app-bg text-xs text-muted">Indisponivel</div>
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
             <ZoomIn size={16} className="text-white opacity-0 transition group-hover:opacity-100" />

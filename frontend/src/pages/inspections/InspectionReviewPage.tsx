@@ -1,340 +1,49 @@
-﻿import { ArrowLeft, CheckCircle2, FileText, XCircle } from 'lucide-react'
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { AlertCircle, ArrowLeft, CheckCircle2, FileText, Loader2, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { SeverityBadge } from '@/components/badges/Badge'
+import { inspectionReviewApi, type InspectionReview, type ReviewEvidence } from '@/api/inspectionReview'
+import { ApiError } from '@/api/client'
+import { SeverityBadge, StatusBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Lightbox, PhotoThumbnails, type LightboxPhoto } from '@/components/feedback/Lightbox'
 import { Toast } from '@/components/feedback/Toast'
 import { Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/utils/cn'
-import { byId, clients, equipment, nonConformities, reviewAnswers, sites, users } from '@/mocks/domain'
-import { inspectionStore } from '@/state/mockStores'
-import { InspectionStatus } from '@/types/domain'
 import { AnswerHistoryTab } from './AnswerHistoryTab'
 
-type ReviewTab = 'review' | 'answer-history'
+type State = { type: 'loading' } | { type: 'ready'; review: InspectionReview } | { type: 'not-found' } | { type: 'error' }
 
 export function InspectionReviewPage() {
-  const { id = 'ins-compressor' } = useParams()
-  const navigate = useNavigate()
-  const inspections = useSyncExternalStore(inspectionStore.subscribe, inspectionStore.adminSnapshot, inspectionStore.adminSnapshot)
-  const inspection = byId(inspections, id) ?? inspections[0]
-  // The answer-history tab reads from the real API, so it must use the inspection id from the
-  // route (e.g. "1"), not the mock's id. The rest of this page still renders mock data until the
-  // review screen is fully wired to the API (separate PBI).
-  const answerHistoryInspectionId = id
-  const client = byId(clients, inspection.clientId)
-  const site = byId(sites, inspection.siteId)
-  const item = byId(equipment, inspection.equipmentId)
-  const tech = byId(users, inspection.technicianId)
-
-  const [approve, setApprove] = useState(false)
-  const [reject, setReject] = useState(false)
-  const [reason, setReason] = useState('')
-  const [toast, setToast] = useState(false)
-  const [activeTab, setActiveTab] = useState<ReviewTab>('review')
-
-  // Lightbox state — null means closed, otherwise holds the list and starting index
-  const [lightboxPhotos, setLightboxPhotos] = useState<LightboxPhoto[]>([])
-  const [lightboxIndex, setLightboxIndex] = useState(-1)
-
-  const canceled = inspection.status === InspectionStatus.CANCELED
-
-  // All photos from the inspection (one per answer that has evidence)
-  const allPhotos = useMemo<LightboxPhoto[]>(() => reviewAnswers
-    .filter(answer => Boolean(answer.evidence))
-    .map(answer => ({
-      src: answer.evidence!,
-      item: answer.question,
-      capturedAt: answer.evidenceCapturedAt,
-      location: answer.evidenceLocation,
-    })),
-  [])
-
-  const grouped = useMemo(() =>
-    Object.entries(
-      reviewAnswers.reduce<Record<string, typeof reviewAnswers>>((acc, answer) => {
-        acc[answer.section] = [...(acc[answer.section] ?? []), answer]
-        return acc
-      }, {}),
-    ),
-  [])
-
-  function openLightbox(photos: LightboxPhoto[], startIndex: number) {
-    setLightboxPhotos(photos)
-    setLightboxIndex(startIndex)
-  }
-
-  function closeLightbox() {
-    setLightboxIndex(-1)
-  }
-
-  function done(message: string) {
-    setApprove(false)
-    setReject(false)
-    setToast(true)
-    setTimeout(() => setToast(false), 1800)
-    console.info(message)
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/inspections">
-            <ArrowLeft size={16} />Inspecoes
-          </Link>
-          <h1 className="text-2xl font-semibold">Revisao da inspecao</h1>
-          <p className="text-sm text-muted">{inspection.title} - {item?.name}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}>
-            <FileText size={17} />Relatorio PDF
-          </Button>
-          {canceled
-            ? <Button disabled>Inspecao cancelada</Button>
-            : <>
-                <Button onClick={() => setApprove(true)}><CheckCircle2 size={17} />Aprovar</Button>
-                <Button variant="danger" onClick={() => setReject(true)}><XCircle size={17} />Reprovar</Button>
-              </>
-          }
-        </div>
-      </div>
-
-      {canceled && (
-        <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark">
-          Esta inspecao foi cancelada e nao esta disponivel para revisao.
-        </Card>
-      )}
-
-      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Secoes da inspecao">
-        <TabButton active={activeTab === 'review'} onClick={() => setActiveTab('review')}>
-          Revisao
-        </TabButton>
-        <TabButton active={activeTab === 'answer-history'} onClick={() => setActiveTab('answer-history')}>
-          Historico de respostas
-        </TabButton>
-      </div>
-
-      {activeTab === 'answer-history' && <AnswerHistoryTab inspectionId={answerHistoryInspectionId} />}
-
-      {activeTab === 'review' && (
-      <>
-      <section className="grid gap-4 md:grid-cols-5">
-        <Summary label="Tecnico" value={tech?.name} />
-        <Summary label="Cliente" value={client?.name} />
-        <Summary label="Local" value={site?.name} />
-        <Summary label="Duracao" value="50 min" />
-        <Summary label="Resultado" value={canceled ? 'Cancelada' : '8 conformes / 4 nao conformes'} />
-      </section>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]">
-        {/* Checklist sections */}
-        <div className="space-y-4">
-          {grouped.map(([section, answers]) => {
-            // Build a photo list scoped to this section for "open all" navigation
-            const sectionPhotos: LightboxPhoto[] = answers
-              .filter(answer => Boolean(answer.evidence))
-              .map(answer => ({
-                src: answer.evidence!,
-                item: answer.question,
-                capturedAt: answer.evidenceCapturedAt,
-                location: answer.evidenceLocation,
-              }))
-
-            return (
-              <Card key={section} className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-base font-semibold">{section}</h2>
-                  <span className="text-sm text-muted">
-                    {answers.filter(a => !a.nonConformityId).length}/{answers.length}
-                  </span>
-                </div>
-
-                <div className="space-y-4">
-                  {answers.map((answer, index) => {
-                    // Photo for this single item
-                    const itemPhoto: LightboxPhoto | null = answer.evidence
-                      ? {
-                          src: answer.evidence,
-                          item: answer.question,
-                          capturedAt: answer.evidenceCapturedAt,
-                          location: answer.evidenceLocation,
-                        }
-                      : null
-
-                    // Index of this item's photo within sectionPhotos (for navigation)
-                    const photoIndexInSection = sectionPhotos.findIndex(p => p.src === answer.evidence)
-
-                    return (
-                      <div key={answer.id} className="rounded-fieldops border border-border bg-slate-50 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium">{index + 1}. {answer.question}</p>
-                            <p className={answer.nonConformityId ? 'mt-2 text-sm font-semibold text-danger' : 'mt-2 text-sm font-semibold text-success-dark'}>
-                              {answer.result}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Thumbnail(s) for this item */}
-                        {itemPhoto && (
-                          <PhotoThumbnails
-                            photos={[itemPhoto]}
-                            onOpen={() => openLightbox(sectionPhotos, photoIndexInSection >= 0 ? photoIndexInSection : 0)}
-                          />
-                        )}
-
-                        <p className="mt-3 text-sm text-muted">Observacao: {answer.observation}</p>
-
-                        {answer.nonConformityId && (
-                          <div className="mt-3 rounded-fieldops border border-warning/40 bg-amber-50 p-3 text-sm">
-                            <p className="font-semibold text-warning-dark">Nao conformidade vinculada</p>
-                            <p className="text-muted">{byId(nonConformities, answer.nonConformityId)?.title}</p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Open all photos of this section */}
-                {sectionPhotos.length > 1 && (
-                  <div className="mt-4 flex justify-end">
-                    <Button variant="ghost" className="h-8 text-sm" onClick={() => openLightbox(sectionPhotos, 0)}>
-                      Ver todas as fotos da secao ({sectionPhotos.length})
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Non-conformities sidebar */}
-        <Card className="h-fit p-5">
-          <h2 className="text-base font-semibold">Nao conformidades</h2>
-          <p className="mb-4 text-sm text-muted">4 registros encontrados nesta inspecao</p>
-          <div className="space-y-3">
-            {nonConformities.map(nc => (
-              <div key={nc.id} className="rounded-fieldops border border-border p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium">{nc.title}</p>
-                  <SeverityBadge severity={nc.severity} />
-                </div>
-                <p className="mt-1 text-xs text-muted">{nc.item}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick access: open all inspection photos */}
-          {allPhotos.length > 0 && (
-            <div className="mt-5 border-t border-border pt-4">
-              <p className="mb-3 text-sm font-medium">Fotografias da inspecao</p>
-              <PhotoThumbnails
-                photos={allPhotos.slice(0, 6)}
-                onOpen={index => openLightbox(allPhotos, index)}
-              />
-              {allPhotos.length > 6 && (
-                <button
-                  className="mt-2 text-xs font-semibold text-primary hover:underline"
-                  onClick={() => openLightbox(allPhotos, 0)}
-                >
-                  +{allPhotos.length - 6} mais fotos
-                </button>
-              )}
-            </div>
-          )}
-        </Card>
-      </div>
-      </>
-      )}
-
-      {/* Lightbox */}
-      <Lightbox
-        photos={lightboxPhotos}
-        initialIndex={lightboxIndex}
-        onClose={closeLightbox}
-      />
-
-      <ConfirmDialog
-        open={approve}
-        title="Aprovar inspecao?"
-        description="Esta aprovacao e simulada e altera apenas o estado visual do prototipo."
-        confirmLabel="Aprovar inspecao"
-        onCancel={() => setApprove(false)}
-        onConfirm={() => done('approved')}
-      />
-
-      <Modal
-        open={reject}
-        title="Reprovar inspecao"
-        onClose={() => setReject(false)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setReject(false)}>Cancelar</Button>
-            <Button variant="danger" disabled={reason.length < 10} onClick={() => done('rejected')}>
-              Confirmar Reprovacao
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Textarea label="Motivo da reprovacao" id="reject-reason" value={reason} onChange={e => setReason(e.target.value)} />
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Itens para correcao</p>
-            {reviewAnswers.slice(0, 6).map(answer => (
-              <label key={answer.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" defaultChecked={Boolean(answer.nonConformityId)} />
-                {answer.question}
-              </label>
-            ))}
-          </div>
-          {reason.length > 0 && reason.length < 10 && (
-            <p className="text-xs text-danger">Informe pelo menos 10 caracteres.</p>
-          )}
-        </div>
-      </Modal>
-
-      <Toast show={toast} message="Decisao registrada no prototipo" />
-    </div>
-  )
+  const { id = '' } = useParams(); const navigate = useNavigate()
+  const [state, setState] = useState<State>({ type: 'loading' }); const [tab, setTab] = useState<'review' | 'history'>('review')
+  const [approveOpen, setApproveOpen] = useState(false); const [rejectOpen, setRejectOpen] = useState(false); const [reason, setReason] = useState(''); const [pending, setPending] = useState(false); const [toast, setToast] = useState('')
+  const [photos, setPhotos] = useState<LightboxPhoto[]>([]); const [index, setIndex] = useState(-1)
+  const load = useCallback(async () => { setState({ type: 'loading' }); try { setState({ type: 'ready', review: await inspectionReviewApi.get(id) }) } catch (error) { setState(error instanceof ApiError && error.status === 404 ? { type: 'not-found' } : { type: 'error' }) } }, [id])
+  useEffect(() => { const pendingLoad = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(pendingLoad) }, [load])
+  if (state.type === 'loading') return <Card role="status" className="flex min-h-48 items-center justify-center gap-2 p-6 text-muted"><Loader2 className="animate-spin" size={18} />Carregando revisao...</Card>
+  if (state.type === 'not-found') return <EmptyState icon={AlertCircle} title="Inspecao nao encontrada" description="A inspecao solicitada nao existe ou foi removida." />
+  if (state.type === 'error') return <Card className="flex min-h-48 flex-col items-center justify-center gap-3 p-6"><p role="alert" className="text-danger">Nao foi possivel carregar a revisao.</p><Button variant="secondary" onClick={() => void load()}>Tentar novamente</Button></Card>
+  const { review } = state; const allowed = review.status === 'UNDER_REVIEW'
+  async function decide(action: 'approve' | 'reject') { if (pending) return; setPending(true); try { if (action === 'approve') await inspectionReviewApi.approve(id); else await inspectionReviewApi.reject(id, reason); setApproveOpen(false); setRejectOpen(false); setReason(''); setToast(action === 'approve' ? 'Inspecao aprovada.' : 'Inspecao reprovada.'); await load() } catch (error) { setToast(error instanceof ApiError ? error.message : 'Nao foi possivel registrar a decisao.') } finally { setPending(false) } }
+  return <div className="space-y-6"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/inspections"><ArrowLeft size={16} />Inspecoes</Link><h1 className="text-2xl font-semibold">Revisao da inspecao</h1><p className="text-sm text-muted">{review.title}{review.equipmentName ? ` - ${review.equipmentName}` : ''}</p></div><div className="flex gap-2"><Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}><FileText size={17} />Relatorio PDF</Button><Button disabled={!allowed || pending} onClick={() => setApproveOpen(true)}><CheckCircle2 size={17} />Aprovar</Button><Button variant="danger" disabled={!allowed || pending} onClick={() => setRejectOpen(true)}><XCircle size={17} />Reprovar</Button></div></div>{!allowed && <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">Esta inspecao esta em {review.status} e nao pode receber uma nova decisao de revisao.</Card>}<div className="flex gap-1 border-b border-border" role="tablist"><Tab active={tab === 'review'} onClick={() => setTab('review')}>Revisao</Tab><Tab active={tab === 'history'} onClick={() => setTab('history')}>Historico de respostas</Tab></div>{tab === 'history' ? <AnswerHistoryTab inspectionId={id} /> : <Content review={review} onOpen={(list, selected) => { setPhotos(list); setIndex(selected) }} />}<Lightbox photos={photos} initialIndex={index} onClose={() => setIndex(-1)} /><ConfirmDialog open={approveOpen} title="Aprovar inspecao?" description="A decisao sera registrada e a inspecao passara para aprovada." confirmLabel={pending ? 'Aprovando...' : 'Aprovar inspecao'} confirmDisabled={pending} onCancel={() => setApproveOpen(false)} onConfirm={() => void decide('approve')} /><Modal open={rejectOpen} title="Reprovar inspecao" onClose={() => setRejectOpen(false)} footer={<><Button variant="secondary" disabled={pending} onClick={() => setRejectOpen(false)}>Cancelar</Button><Button variant="danger" disabled={pending || reason.trim().length < 10} onClick={() => void decide('reject')}>{pending ? 'Enviando...' : 'Confirmar reprovacao'}</Button></>}><Textarea label="Motivo da reprovacao" id="reject-reason" value={reason} error={reason.length > 0 && reason.trim().length < 10 ? 'Informe pelo menos 10 caracteres.' : undefined} onChange={event => setReason(event.target.value)} /></Modal><Toast show={Boolean(toast)} message={toast} /></div>
 }
 
-function Summary({ label, value }: { label: string; value?: string }) {
-  return (
-    <Card className="p-4">
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
-    </Card>
-  )
+function Content({ review, onOpen }: { review: InspectionReview; onOpen: (photos: LightboxPhoto[], index: number) => void }) {
+  const counts = useMemo(() => review.sections.flatMap(section => section.items).reduce((value, item) => ({ total: value.total + 1, answered: value.answered + Number(item.answer !== null) }), { total: 0, answered: 0 }), [review]); const allPhotos = review.sections.flatMap(section => section.items.flatMap(item => item.evidences.map(evidence => photo(evidence, item.title))))
+  return <>
+    <section className="grid gap-4 md:grid-cols-5"><Summary label="Tecnico" value={review.technicianName} /><Summary label="Cliente" value={review.clientName} /><Summary label="Local" value={review.siteName} /><Summary label="Prazo" value={review.dueDate} /><Summary label="Respostas" value={`${counts.answered}/${counts.total}`} /></section>
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]"><div className="space-y-4">
+      {review.sections.map(section => <Card key={`${section.order}-${section.title}`} className="p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-semibold">{section.title}</h2><span className="text-sm text-muted">{section.items.filter(item => item.answer !== null).length}/{section.items.length}</span></div>
+        {section.items.length === 0 ? <p className="text-sm text-muted">Esta secao nao possui itens.</p> : <div className="space-y-4">{section.items.map((item, itemIndex) => {
+          const itemPhotos = item.evidences.map(evidence => photo(evidence, item.title))
+          return <div key={item.snapshotId} className="rounded-fieldops border border-border bg-app-bg/60 p-4"><p className="font-medium">{itemIndex + 1}. {item.title}</p><p className="mt-1 text-xs text-muted">Tipo: {item.responseType}</p>{item.answer === null ? <p className="mt-2 text-sm font-semibold text-warning-dark">Nao respondido</p> : <p className="mt-2 text-sm font-semibold text-success-dark">Resposta: {item.answer}</p>}{item.observation && <p className="mt-3 text-sm text-muted">Observacao: {item.observation}</p>}{item.answeredBy && <p className="mt-1 text-xs text-muted">Respondido por {item.answeredBy}</p>}{itemPhotos.length ? <PhotoThumbnails photos={itemPhotos} onOpen={selected => onOpen(itemPhotos, selected)} /> : <p className="mt-3 text-xs text-muted">Sem evidencias associadas a este item.</p>}{item.nonConformities.map(nc => <div key={nc.id} className="mt-3 rounded-fieldops border border-warning/40 bg-warning/10 p-3 text-sm"><div className="flex justify-between gap-2"><p className="font-semibold text-warning-dark">Nao conformidade: {nc.title}</p><SeverityBadge severity={nc.severity} /></div><p className="mt-1 text-muted">{nc.description}</p></div>)}</div>
+        })}</div>}</Card>)}
+    </div><Card className="h-fit p-5"><div className="flex items-center justify-between"><h2 className="text-base font-semibold">Nao conformidades</h2><StatusBadge status={review.status} /></div><p className="mb-4 text-sm text-muted">{review.nonConformities.length} registros encontrados</p>{review.nonConformities.length === 0 ? <p className="text-sm text-muted">Nenhuma nao conformidade relacionada.</p> : <div className="space-y-3">{review.nonConformities.map(nc => <div key={nc.id} className="rounded-fieldops border border-border p-3"><div className="flex justify-between gap-2"><p className="font-medium">{nc.title}</p><SeverityBadge severity={nc.severity} /></div><p className="mt-1 text-sm text-muted">{nc.description}</p></div>)}</div>}{allPhotos.length > 0 && <div className="mt-5 border-t border-border pt-4"><p className="mb-3 text-sm font-medium">Fotografias da inspecao</p><PhotoThumbnails photos={allPhotos.slice(0, 6)} onOpen={selected => onOpen(allPhotos, selected)} /></div>}</Card></div>
+  </>
 }
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={cn(
-        'focus-ring -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors',
-        active
-          ? 'border-primary text-primary'
-          : 'border-transparent text-muted hover:text-text',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
+function photo(value: ReviewEvidence, item: string): LightboxPhoto { return { src: value.reference, item, capturedAt: value.capturedAt, location: value.description ?? undefined } }
+function Summary({ label, value }: { label: string; value: string }) { return <Card className="p-4"><p className="text-xs font-medium text-muted">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></Card> }
+function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={cn('focus-ring -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors', active ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text')}>{children}</button> }

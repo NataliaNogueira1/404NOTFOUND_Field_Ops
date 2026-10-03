@@ -1,61 +1,17 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { InspectionReviewPage } from '@/pages/inspections/InspectionReviewPage'
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
-
-const history = [
-  {
-    itemId: '10',
-    section: 'Seguranca',
-    sectionOrder: 1,
-    itemTitle: 'Botao de emergencia',
-    itemOrder: 1,
-    responseType: 'CONFORMITY',
-    value: 'CONFORMING',
-    observation: 'Ok',
-    answeredAt: '2026-09-22T14:32:00Z',
-    answeredBy: 'Carlos',
-    answeredById: 3,
-  },
-]
-
-describe('InspectionReviewPage - answer history tab', () => {
-  afterEach(cleanup)
-
-  it('shows the "Historico de respostas" tab and loads it on click', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(jsonResponse(history)))
-    vi.stubGlobal('fetch', fetchMock)
-
-    render(
-      <MemoryRouter initialEntries={['/app/inspections/ins-compressor/review']}>
-        <InspectionReviewPage />
-      </MemoryRouter>,
-    )
-
-    // The tab is present.
-    const tab = screen.getByRole('tab', { name: /historico de respostas/i })
-    expect(tab).not.toBeNull()
-
-    // Switching to the tab triggers the history load.
-    await userEvent.click(tab)
-    expect(await screen.findByText('Seguranca')).not.toBeNull()
-    expect(screen.getByText('Botao de emergencia')).not.toBeNull()
-    expect(screen.getByText('CONFORMING')).not.toBeNull()
-    expect(screen.getByText(/Carlos/)).not.toBeNull()
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/v1\/inspections\/ins-compressor\/answers\/history$/),
-        expect.anything(),
-      )
-    })
+const review = { id: 1, title: 'Inspecao', status: 'UNDER_REVIEW', priority: 'MEDIUM', clientName: 'Cliente', siteName: 'Local', equipmentName: null, technicianName: 'Ana', dueDate: '2026-10-02', progress: 0, sections: [{ title: 'Secao sem resposta', order: 1, items: [{ snapshotId: 1, code: null, title: 'Item nao respondido', description: null, responseType: 'TEXT', required: true, answer: null, observation: null, answeredAt: null, answeredBy: null, evidences: [], nonConformities: [] }] }], nonConformities: [] }
+const history = [{ itemId: '1', section: 'Secao sem resposta', sectionOrder: 1, itemTitle: 'Item nao respondido', itemOrder: 1, responseType: 'TEXT', value: 'versao antiga', observation: null, answeredAt: '2026-10-01T10:00:00Z', answeredBy: 'Ana', answeredById: 3 }]
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+describe('InspectionReviewPage review data', () => {
+  it('renders an unanswered item and loads separate history on demand', async () => {
+    const fetchMock = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith('/history') ? history : review), { headers: { 'Content-Type': 'application/json' } }))); vi.stubGlobal('fetch', fetchMock)
+    render(<MemoryRouter initialEntries={['/app/inspections/1/review']}><Routes><Route path="/app/inspections/:id/review" element={<InspectionReviewPage />} /></Routes></MemoryRouter>)
+    expect(await screen.findByText(/Item nao respondido/)).toBeInTheDocument(); expect(screen.getByText('Sem evidencias associadas a este item.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /historico/i })); expect(await screen.findByText('versao antiga')).toBeInTheDocument()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/api\/v1\/inspections\/1\/answers\/history$/), expect.anything()))
   })
 })
