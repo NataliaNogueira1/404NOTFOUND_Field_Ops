@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/config/theme';
+import { useThemeColors } from '@/features/theme';
 
 interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   label?: string;
@@ -24,21 +25,25 @@ export function TextInput({
   ...props
 }: TextInputProps) {
   const [focused, setFocused] = useState(false);
+  const c = useThemeColors();
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text style={styles.label} accessibilityRole="text">
+        <Text style={[styles.label, { color: c.textSecondary }]} accessibilityRole="text">
           {label}
         </Text>
       )}
       <RNTextInput
         style={[
           styles.input,
-          focused && styles.inputFocused,
-          !!error && styles.inputError,
+          {
+            backgroundColor: c.surface,
+            borderColor: focused ? Colors.primary : error ? Colors.danger : c.border,
+            color: c.text,
+          },
         ]}
-        placeholderTextColor={Colors.gray400}
+        placeholderTextColor={c.textSecondary}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         accessibilityLabel={label}
@@ -46,47 +51,24 @@ export function TextInput({
         {...props}
       />
       {error ? (
-        <Text style={styles.errorText} accessibilityRole="alert">
-          {error}
-        </Text>
+        <Text style={styles.errorText} accessibilityRole="alert">{error}</Text>
       ) : hint ? (
-        <Text style={styles.hintText}>{hint}</Text>
+        <Text style={[styles.hintText, { color: c.textSecondary }]}>{hint}</Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.xs,
-  },
-  label: {
-    fontSize: FontSize.sm,
-    fontWeight: '500',
-    color: Colors.gray700,
-  },
+  container: { gap: Spacing.xs },
+  label: { fontSize: FontSize.sm, fontWeight: '500' },
   input: {
     height: 44,
-    backgroundColor: Colors.white,
     borderWidth: 1.5,
-    borderColor: Colors.gray300,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     fontSize: FontSize.md,
-    color: Colors.gray900,
   },
-  inputFocused: {
-    borderColor: Colors.primary,
-  },
-  inputError: {
-    borderColor: Colors.danger,
-  },
-  errorText: {
-    fontSize: FontSize.xs,
-    color: Colors.danger,
-  },
-  hintText: {
-    fontSize: FontSize.xs,
-    color: Colors.gray500,
-  },
+  errorText: { fontSize: FontSize.xs, color: Colors.danger },
+  hintText: { fontSize: FontSize.xs },
 });

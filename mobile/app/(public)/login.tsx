@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, TextInput } from '@/design-system';
 import { useAuth } from '@/features/auth';
+import { useThemeColors } from '@/features/theme';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -11,6 +12,7 @@ const MIN_PASSWORD_LENGTH = 6;
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
+  const c = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,33 +26,26 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     setError('');
-
     const validationError = validate();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
+    if (validationError) { setError(validationError); return; }
     try {
       await signIn(email.trim(), password);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
-      if (message.includes('401')) {
-        setError('E-mail ou senha incorretos.');
-      } else if (message.includes('Network') || message.includes('fetch')) {
-        setError('Sem conexão com o servidor. Verifique sua rede.');
-      } else {
-        setError('Erro ao realizar login. Tente novamente.');
-      }
+      if (message.includes('401')) setError('E-mail ou senha incorretos.');
+      else if (message.includes('Network') || message.includes('fetch')) setError('Sem conexão com o servidor. Verifique sua rede.');
+      else setError('Erro ao realizar login. Tente novamente.');
     }
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-        <View style={styles.brandMark}><Text style={styles.brandMarkText}>F</Text></View>
-        <Text style={styles.title}>FieldOps</Text>
-        <Text style={styles.subtitle}>Plataforma de Inspeção</Text>
+        <View style={styles.brandMark}>
+          <Text style={styles.brandMarkText}>F</Text>
+        </View>
+        <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
+        <Text style={[styles.subtitle, { color: c.textSecondary }]}>Plataforma de Inspeção</Text>
         <Card style={styles.form} shadow="md">
           <TextInput
             label="E-mail"
@@ -73,21 +68,21 @@ export default function LoginScreen() {
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
           <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
         </Card>
-        <Text style={styles.version}>Versão 1.0.0</Text>
+        <Text style={[styles.version, { color: c.textSecondary }]}>Versão 1.0.0</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
   brandMark: { width: 64, height: 64, borderRadius: 18, backgroundColor: Colors.primary, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
   brandMarkText: { color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold },
-  title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, color: Colors.text, textAlign: 'center' },
-  subtitle: { marginTop: Spacing.xs, fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl },
+  title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, textAlign: 'center' },
+  subtitle: { marginTop: Spacing.xs, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.xl },
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
-  version: { color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
+  version: { textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
 });
