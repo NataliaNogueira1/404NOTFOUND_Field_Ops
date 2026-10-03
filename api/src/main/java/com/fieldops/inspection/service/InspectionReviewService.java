@@ -91,7 +91,9 @@ public class InspectionReviewService {
     }
 
     private InspectionReviewResponse.Evidence evidence(InspectionEvidence value) {
-        return new InspectionReviewResponse.Evidence(value.getId(), value.getReference(), value.getDescription(), value.getCapturedAt(), value.getUploadedBy().getName());
+        return new InspectionReviewResponse.Evidence(value.getId(), value.getReference(),
+                "/api/v1/inspection-evidences/" + value.getId() + "/content", value.getDescription(), value.getLocation(),
+                value.getCapturedAt(), value.getUploadedBy().getName(), value.getItemSnapshot() == null ? null : value.getItemSnapshot().getId());
     }
 
     private InspectionReviewResponse.NonConformity nonConformity(NonConformity value) {

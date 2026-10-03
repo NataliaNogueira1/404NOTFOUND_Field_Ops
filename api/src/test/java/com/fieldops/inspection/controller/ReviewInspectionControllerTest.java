@@ -33,6 +33,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -40,6 +42,8 @@ import jakarta.persistence.EntityManager;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,6 +59,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ReviewInspectionControllerTest {
+
+    private static final Path EVIDENCE_ROOT = createEvidenceRoot();
+
+    @DynamicPropertySource
+    static void evidenceStorage(DynamicPropertyRegistry registry) {
+        registry.add("fieldops.storage.evidence-dir", () -> EVIDENCE_ROOT.toString());
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -251,7 +262,7 @@ class ReviewInspectionControllerTest {
                 ResponseType.CONFORMITY, "NON_CONFORMING", "Old observation", technician.getId(), Instant.parse("2026-01-01T10:00:00Z"));
         answerHistoryService.record(inspectionA.getId(), itemA.getId(), "Safety", 1, "Guard installed", 1,
                 ResponseType.CONFORMITY, "CONFORMING", "Latest observation", technician.getId(), Instant.parse("2026-01-01T11:00:00Z"));
-        evidenceRepository.save(InspectionEvidence.create(inspectionA, snapshotA, "https://storage/a.jpg", "checksum-a", "Evidence A", Instant.now(), technician));
+        evidenceRepository.save(InspectionEvidence.create(inspectionA, snapshotA, "review/a.jpg", "checksum-a", "Evidence A", "Linha 1", Instant.parse("2026-01-01T12:00:00Z"), technician));
         evidenceRepository.save(InspectionEvidence.create(inspectionA, snapshotB, "https://storage/b.jpg", "checksum-b", "Evidence B", Instant.now(), technician));
         evidenceRepository.save(InspectionEvidence.create(inspectionB, snapshotOtherInspection, "https://storage/other.jpg", "checksum-other", "Other inspection", Instant.now(), technician));
         persistNonConformity(inspectionA.getId(), snapshotA.getId(), "NC A");
@@ -266,14 +277,60 @@ class ReviewInspectionControllerTest {
                 .andExpect(jsonPath("$.sections[0].items[0].title").value("Guard installed"))
                 .andExpect(jsonPath("$.sections[0].items[0].answer").value("CONFORMING"))
                 .andExpect(jsonPath("$.sections[0].items[0].observation").value("Latest observation"))
-                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].reference").value("https://storage/a.jpg"))
+                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].reference").value("review/a.jpg"))
+                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].contentUrl").value(org.hamcrest.Matchers.endsWith("/content")))
+                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].capturedAt").value("2026-01-01T12:00:00Z"))
+                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].location").value("Linha 1"))
+                .andExpect(jsonPath("$.sections[0].items[0].evidences[0].itemSnapshotId").value(snapshotA.getId().toString()))
                 .andExpect(jsonPath("$.sections[0].items[0].evidences[1]").doesNotExist())
                 .andExpect(jsonPath("$.sections[0].items[0].nonConformities[0].title").value("NC A"))
                 .andExpect(jsonPath("$.sections[1].items[0].evidences[0].reference").value("https://storage/b.jpg"))
+                .andExpect(jsonPath("$.sections[1].items[0].evidences[0].location").isEmpty())
                 .andExpect(jsonPath("$.sections[1].items[0].nonConformities[0].title").value("NC B"))
                 .andExpect(jsonPath("$.nonConformities.length()").value(2))
                 .andExpect(jsonPath("$.sections..evidences..reference").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("https://storage/other.jpg"))))
                 .andExpect(jsonPath("$.nonConformities..title").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("NC other inspection"))));
+    }
+
+    @Test
+    void servesProtectedEvidenceContentAndDoesNotSubstituteAnotherInspectionFile() throws Exception {
+        Inspection inspectionA = saveInspection(InspectionStatus.UNDER_REVIEW);
+        Inspection inspectionB = saveInspection(InspectionStatus.UNDER_REVIEW);
+        TemplateSection section = persistSection("Evidence", 1);
+        TemplateItem item = persistItem(section, "Photograph", 1);
+        InspectionItemSnapshot snapshotA = saveSnapshot(inspectionA, section, item);
+        InspectionItemSnapshot snapshotB = saveSnapshot(inspectionB, section, item);
+        Files.createDirectories(EVIDENCE_ROOT.resolve("inspection-a"));
+        Files.write(EVIDENCE_ROOT.resolve("inspection-a/photo.jpg"), new byte[] {1, 2, 3, 4});
+        InspectionEvidence evidenceA = evidenceRepository.save(InspectionEvidence.create(inspectionA, snapshotA,
+                "inspection-a/photo.jpg", "checksum-a", "Photo", "Area externa", Instant.parse("2026-02-01T10:00:00Z"), technician));
+        InspectionEvidence missing = evidenceRepository.save(InspectionEvidence.create(inspectionA, snapshotA,
+                "inspection-a/missing.jpg", "checksum-missing", "Missing", null, Instant.now(), technician));
+        InspectionEvidence evidenceB = evidenceRepository.save(InspectionEvidence.create(inspectionB, snapshotB,
+                "inspection-b/other.jpg", "checksum-b", "Other", null, Instant.now(), technician));
+
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/content", evidenceA.getId()))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/content", evidenceA.getId())
+                        .header("Authorization", "Bearer " + obtainTechnicianToken()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/content", evidenceA.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType(MediaType.IMAGE_JPEG))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(new byte[] {1, 2, 3, 4}));
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/content", Long.MAX_VALUE)
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/content", missing.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isNotFound());
+        assertThat(evidenceA.getInspection().getId()).isNotEqualTo(evidenceB.getInspection().getId());
+    }
+
+    private static Path createEvidenceRoot() {
+        try { return Files.createTempDirectory("fieldops-evidence-"); }
+        catch (java.io.IOException exception) { throw new IllegalStateException(exception); }
     }
 
     // --- fixtures ---

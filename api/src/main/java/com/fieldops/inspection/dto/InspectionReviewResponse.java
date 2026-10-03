@@ -14,7 +14,8 @@ public record InspectionReviewResponse(Long id, String title, InspectionStatus s
     public record Item(Long snapshotId, String code, String title, String description, String responseType,
             boolean required, String answer, String observation, Instant answeredAt, String answeredBy,
             List<Evidence> evidences, List<NonConformity> nonConformities) {}
-    public record Evidence(Long id, String reference, String description, Instant capturedAt, String uploadedBy) {}
+    public record Evidence(Long id, String reference, String contentUrl, String description, String location,
+            Instant capturedAt, String uploadedBy, Long itemSnapshotId) {}
     public record NonConformity(Long id, Long snapshotId, String title, String description, String severity,
             String status, Instant createdAt) {}
 }
