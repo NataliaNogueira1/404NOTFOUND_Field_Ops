@@ -26,11 +26,13 @@ import com.fieldops.inspection.dto.InspectionTemplateResponse;
 import com.fieldops.inspection.dto.InspectionTemplateVersionResponse;
 import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.audit.service.InspectionAnswerHistoryService;
+import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
+import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.inspection.service.InspectionTemplateService;
 import com.fieldops.inspection.service.InspectionTemplateVersionService;
@@ -59,7 +61,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DemoSeedRunnerTest {
 
     private static final String CLIENT_DOCUMENT = "12.345.678/0001-90";
-    private static final int EXPECTED_INSPECTIONS = 6;
+    private static final int EXPECTED_INSPECTIONS = 7;
 
     @Mock private UserRepository userRepository;
     @Mock private ClientRepository clientRepository;
@@ -72,18 +74,22 @@ class DemoSeedRunnerTest {
     @Mock private TemplateItemService itemService;
     @Mock private InspectionTemplateVersionService versionService;
     @Mock private InspectionService inspectionService;
+    @Mock private InspectionRepository inspectionRepository;
     @Mock private InspectionItemSnapshotRepository snapshotRepository;
     @Mock private InspectionAnswerHistoryService answerHistoryService;
 
     @InjectMocks private DemoSeedRunner runner;
 
     @Test
-    void seedsSixInspectionsWithVariedPrioritiesAndCancelsOne() {
+    void seedsSevenInspectionsWithVariedPrioritiesCancelsOneAndRejectsOne() {
         enableSeed();
         when(clientRepository.existsByDocument(CLIENT_DOCUMENT)).thenReturn(false);
         stubUsers();
         stubCatalog();
-        AtomicLong sequence = stubInspectionCreation();
+        List<Long> createdIds = stubInspectionCreation();
+        // The rejected inspection is reloaded to advance it to UNDER_REVIEW before rejecting it.
+        when(inspectionRepository.findById(anyLong()))
+                .thenAnswer(invocation -> Optional.of(new Inspection()));
         // No snapshots seeded here → answer-history seeding is a no-op (returns early).
         when(snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(anyLong()))
                 .thenReturn(List.<InspectionItemSnapshot>of());
@@ -102,8 +108,14 @@ class DemoSeedRunnerTest {
             assertThat(request.dueDate()).isNotNull();
         });
 
-        // The last inspection is canceled through the real cancel flow to show a terminal state.
-        verify(inspectionService).cancel(eq(sequence.get()), anyString(), eq(10L));
+        Long canceledId = createdIds.get(createdIds.size() - 2);
+        Long rejectedId = createdIds.get(createdIds.size() - 1);
+
+        // The penultimate inspection is canceled through the real cancel flow (terminal state).
+        verify(inspectionService).cancel(eq(canceledId), anyString(), eq(10L));
+        // The last inspection is rejected through the real reject flow so the technician can
+        // receive a rejected inspection for correction (PBI-062 / #80).
+        verify(inspectionService).reject(eq(rejectedId), anyString(), eq(10L));
     }
 
     @Test
@@ -147,16 +159,17 @@ class DemoSeedRunnerTest {
         when(versionService.publish(4L, 10L)).thenReturn(versionResponse(5L));
     }
 
-    /** Returns increasing inspection IDs and records the last one (the canceled candidate). */
-    private AtomicLong stubInspectionCreation() {
-        AtomicLong lastId = new AtomicLong();
+    /** Returns increasing inspection IDs, recording every created ID in creation order. */
+    private List<Long> stubInspectionCreation() {
+        List<Long> createdIds = new java.util.ArrayList<>();
+        AtomicLong lastId = new AtomicLong(100L);
         when(inspectionService.createInspection(any(CreateInspectionRequest.class), eq(10L)))
                 .thenAnswer(invocation -> {
-                    long id = lastId.incrementAndGet() + 100L;
-                    lastId.set(id);
+                    long id = lastId.incrementAndGet();
+                    createdIds.add(id);
                     return inspectionResponse(id);
                 });
-        return lastId;
+        return createdIds;
     }
 
     private static User user(Long id, Role role, String email) {

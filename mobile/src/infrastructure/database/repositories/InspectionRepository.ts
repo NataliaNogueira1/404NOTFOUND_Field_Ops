@@ -113,16 +113,27 @@ export class InspectionRepository {
     // the technician's local work (and captured photos) on every pull. An UPSERT
     // keeps the same row, so child records and their files survive (RN-047/RN-066).
     //
-    // We also DO NOT overwrite locally-owned execution fields (status, progress,
-    // started_at, sync_status, pending_sync_count) here so a re-pull cannot revert
-    // an in-progress inspection. Those transition to the server via the outbox.
+    // We generally DO NOT overwrite locally-owned execution fields (status, progress,
+    // started_at, sync_status, pending_sync_count) here so a re-pull cannot revert an
+    // in-progress inspection. Those transition to the server via the outbox.
+    //
+    // EXCEPTION — supervisor review decisions (PBI-062 / #80): when the server sends a
+    // terminal review state (REJECTED/APPROVED), the server is the authority, not the
+    // device. In that case we DO apply the incoming status and the rejection fields so
+    // a rejected inspection actually shows up as "Reprovada" (with its reason) for the
+    // technician to correct. The CASE guards keep every other state (ASSIGNED/IN_PROGRESS/
+    // SUBMITTED) owned by the device, preserving the "never revert in-progress work" rule.
+    const isReviewDecision =
+      inspection.status === 'REJECTED' || inspection.status === 'APPROVED';
+
     await this.db.runAsync(
       `INSERT INTO inspections (
         id, title, template_id, client_id, client_name, site_id, site_name,
         equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
-        progress, supervisor_instructions, sync_status, pending_sync_count, server_version, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        progress, supervisor_instructions, rejection_reason, rejected_by, rejected_at,
+        sync_status, pending_sync_count, server_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -139,6 +150,12 @@ export class InspectionRepository {
         due_date = excluded.due_date,
         due_time = excluded.due_time,
         supervisor_instructions = excluded.supervisor_instructions,
+        -- Only a server review decision (REJECTED/APPROVED) may change the local
+        -- status and rejection fields; otherwise keep whatever the device holds.
+        status = CASE WHEN ? THEN excluded.status ELSE inspections.status END,
+        rejection_reason = CASE WHEN ? THEN excluded.rejection_reason ELSE inspections.rejection_reason END,
+        rejected_by = CASE WHEN ? THEN excluded.rejected_by ELSE inspections.rejected_by END,
+        rejected_at = CASE WHEN ? THEN excluded.rejected_at ELSE inspections.rejected_at END,
         server_version = excluded.server_version,
         updated_at = datetime('now')`,
       inspection.id,
@@ -162,9 +179,17 @@ export class InspectionRepository {
       null, // completed_at
       inspection.progress,
       inspection.supervisorInstructions ?? null,
+      inspection.rejectionReason ?? null,
+      inspection.rejectedBy ?? null,
+      inspection.rejectedAt ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
       inspection.serverVersion ?? 0,
+      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0).
+      isReviewDecision ? 1 : 0,
+      isReviewDecision ? 1 : 0,
+      isReviewDecision ? 1 : 0,
+      isReviewDecision ? 1 : 0,
     );
   }
 
