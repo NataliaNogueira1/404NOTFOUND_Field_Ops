@@ -121,6 +121,46 @@ import { Colors } from '@/config/theme';
 
 ---
 
+## Build Android (APK) para demonstração
+
+O APK de demonstração é gerado com o **EAS Build**, conforme a [documentação oficial do Expo](https://docs.expo.dev/build-reference/apk/). Os perfis ficam em `eas.json`:
+
+| Perfil | Formato | Uso |
+|--------|---------|-----|
+| `development` | APK (dev client) | Desenvolvimento com dev client |
+| `preview` | APK (`buildType: apk`) | **Demonstração / instalação direta** no emulador ou dispositivo |
+| `production` | AAB (`app-bundle`) | Publicação na Google Play |
+
+### Pré-requisitos
+
+- **EAS CLI**: use via `npx eas-cli` (não precisa instalar global).
+- Conta **Expo** (`npx eas-cli login`) para builds na nuvem.
+- Para build **local**, é preciso ter o toolchain Android (JDK 17 + Android SDK).
+
+### Gerar o APK (nuvem)
+
+```sh
+npm run build:apk        # eas build --platform android --profile preview
+```
+
+Ao final, o EAS fornece um link para baixar o `.apk`. Envie o link ao dispositivo ou instale via `adb install caminho/do/arquivo.apk`.
+
+### Gerar o APK localmente (sem nuvem)
+
+```sh
+npm run build:apk:local  # eas build ... --profile preview --local
+```
+
+### Instalar a última build no emulador/dispositivo
+
+```sh
+npm run build:install    # eas build:run --platform android --latest
+```
+
+> O Application ID do Android é `com.fieldops.mobile` (definido em `app.json` → `android.package`).
+
+---
+
 ## Convenções
 
 ### Commits

@@ -29,6 +29,9 @@ public record MobileInspectionResponse(
         String startedAt,
         Integer progress,
         String supervisorInstructions,
+        String rejectionReason,
+        String rejectedBy,
+        String rejectedAt,
         Long version,
         TemplateDto template
 ) {

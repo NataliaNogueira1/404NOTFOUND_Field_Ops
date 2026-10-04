@@ -19,8 +19,11 @@ import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.audit.service.InspectionAnswerHistoryService;
+import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
+import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.inspection.service.InspectionTemplateService;
 import com.fieldops.inspection.service.InspectionTemplateVersionService;
@@ -80,6 +83,7 @@ public class DemoSeedRunner implements ApplicationRunner {
     private final TemplateItemService itemService;
     private final InspectionTemplateVersionService versionService;
     private final InspectionService inspectionService;
+    private final InspectionRepository inspectionRepository;
     private final InspectionItemSnapshotRepository snapshotRepository;
     private final InspectionAnswerHistoryService answerHistoryService;
 
@@ -89,6 +93,7 @@ public class DemoSeedRunner implements ApplicationRunner {
             EquipmentService equipmentService, InspectionTemplateService templateService,
             TemplateSectionService sectionService, TemplateItemService itemService,
             InspectionTemplateVersionService versionService, InspectionService inspectionService,
+            InspectionRepository inspectionRepository,
             InspectionItemSnapshotRepository snapshotRepository,
             InspectionAnswerHistoryService answerHistoryService) {
         this.properties = properties;
@@ -103,6 +108,7 @@ public class DemoSeedRunner implements ApplicationRunner {
         this.itemService = itemService;
         this.versionService = versionService;
         this.inspectionService = inspectionService;
+        this.inspectionRepository = inspectionRepository;
         this.snapshotRepository = snapshotRepository;
         this.answerHistoryService = answerHistoryService;
     }
@@ -211,9 +217,11 @@ public class DemoSeedRunner implements ApplicationRunner {
     }
 
     /**
-     * Seeds a coherent set of six demonstration inspections for the technician, varying priority
+     * Seeds a coherent set of seven demonstration inspections for the technician, varying priority
      * and due date so the mobile and admin lists show a realistic mix. One of them is canceled
-     * through the real {@link InspectionService#cancel} flow to also exhibit a terminal state.
+     * through the real {@link InspectionService#cancel} flow to exhibit a terminal state, and one
+     * is driven all the way to REJECTED (PBI-062 / #80) so the technician can exercise the
+     * "receive a rejected inspection for correction" flow out of the box.
      *
      * @return the number of inspections created
      */
@@ -240,10 +248,17 @@ public class DemoSeedRunner implements ApplicationRunner {
                         "Confirmar parametros de operacao apos troca de filtro."),
                 new SeedInspection("Inspecao Cancelada - Compressor de Ar XPTO 500",
                         Priority.LOW, 10,
-                        "Agendamento duplicado; sera cancelado para demonstracao."));
+                        "Agendamento duplicado; sera cancelado para demonstracao."),
+                new SeedInspection("Inspecao Reprovada - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 5,
+                        "Enviada com evidencia insuficiente; sera reprovada para correcao."));
 
-        Long canceledId = null;
+        int canceledIndex = plan.size() - 2;
+        int rejectedIndex = plan.size() - 1;
+
         Long firstInspectionId = null;
+        Long canceledId = null;
+        Long rejectedId = null;
         for (int index = 0; index < plan.size(); index++) {
             SeedInspection seed = plan.get(index);
             Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
@@ -253,18 +268,49 @@ public class DemoSeedRunner implements ApplicationRunner {
             if (index == 0) {
                 firstInspectionId = inspectionId;
             }
-            // Cancel the last one to showcase a terminal state in the admin listing.
-            if (index == plan.size() - 1) {
+            if (index == canceledIndex) {
                 canceledId = inspectionId;
+            }
+            if (index == rejectedIndex) {
+                rejectedId = inspectionId;
             }
         }
 
+        // Cancel one to showcase a terminal state in the admin listing.
         if (canceledId != null) {
             inspectionService.cancel(canceledId,
                     "Agendamento duplicado identificado durante o planejamento.", supervisorId);
         }
 
+        // Reject one so the technician has a rejected inspection to correct (PBI-062 / #80).
+        if (rejectedId != null) {
+            rejectInspection(rejectedId, supervisorId);
+        }
+
         return new SeededInspections(plan.size(), firstInspectionId);
+    }
+
+    /**
+     * Drives a freshly created ASSIGNED inspection all the way to REJECTED so the demo dataset
+     * includes a rejected inspection the technician can correct (PBI-062 / #80).
+     *
+     * <p>The approve/reject domain flow only accepts an inspection that is already
+     * {@code UNDER_REVIEW} ({@link InspectionService#reject}), and no domain method currently
+     * moves an inspection from {@code SUBMITTED} to {@code UNDER_REVIEW} (that transition is
+     * tracked as a separate backend task). To keep this limited to the demo seed and still honour
+     * the real rejection logic (reason, reviewer and audit event), the status is advanced to
+     * {@code UNDER_REVIEW} directly on the persisted entity here, then rejected through the
+     * service so {@code rejectionReason}/{@code reviewedBy}/{@code reviewedAt} and the audit
+     * trail are populated exactly as in production.
+     */
+    private void rejectInspection(Long inspectionId, Long supervisorId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId).orElseThrow();
+        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
+        inspectionRepository.save(inspection);
+
+        inspectionService.reject(inspectionId,
+                "Evidencia fotografica do item de carcaca esta ilegivel; refazer a foto e reenviar.",
+                supervisorId);
     }
 
     /** Builds a small but coherent compressor checklist as a draft and publishes it. */
