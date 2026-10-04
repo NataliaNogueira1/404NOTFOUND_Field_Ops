@@ -179,6 +179,8 @@ export class InspectionRepository {
       null, // completed_at
       inspection.progress,
       inspection.supervisorInstructions ?? null,
+      // PBI-062: persist the rejection metadata pulled from the server so the
+      // RejectionBanner and the "Corrigir" action have the reason offline.
       inspection.rejectionReason ?? null,
       inspection.rejectedBy ?? null,
       inspection.rejectedAt ?? null,

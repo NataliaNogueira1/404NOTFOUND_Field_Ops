@@ -44,8 +44,11 @@ interface ApiInspection {
   startedAt?: string;
   progress: number;
   supervisorInstructions?: string;
+  /** Reason the supervisor rejected the inspection (PBI-061 → PBI-062). */
   rejectionReason?: string;
+  /** Who rejected the inspection (supervisor name). */
   rejectedBy?: string;
+  /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
   version: number;
   template: ApiTemplate;
@@ -190,6 +193,8 @@ export class InspectionSyncService {
       startedAt: apiInsp.startedAt,
       progress: apiInsp.progress,
       supervisorInstructions: apiInsp.supervisorInstructions ?? '',
+      // PBI-062: bring the rejection state/reason down from the server so the
+      // technician sees why the inspection was rejected and can correct it.
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
