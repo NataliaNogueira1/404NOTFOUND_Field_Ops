@@ -44,6 +44,9 @@ interface ApiInspection {
   startedAt?: string;
   progress: number;
   supervisorInstructions?: string;
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
   version: number;
   template: ApiTemplate;
 }
@@ -187,6 +190,9 @@ export class InspectionSyncService {
       startedAt: apiInsp.startedAt,
       progress: apiInsp.progress,
       supervisorInstructions: apiInsp.supervisorInstructions ?? '',
+      rejectionReason: apiInsp.rejectionReason,
+      rejectedBy: apiInsp.rejectedBy,
+      rejectedAt: apiInsp.rejectedAt,
       serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,
