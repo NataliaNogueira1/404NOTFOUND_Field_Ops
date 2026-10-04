@@ -7,23 +7,19 @@ import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useAuth } from '@/features/auth';
 import { useFieldOps } from '@/features/fieldops';
-import { ThemeSelector } from '@/features/theme';
+import { ThemeSelector, useThemeColors } from '@/features/theme';
 import { useBiometricAuth } from '@/hooks';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join('');
+  return name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
 }
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { inspections, syncNow } = useFieldOps();
   const router = useRouter();
+  const c = useThemeColors();
   const [confirm, setConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -73,29 +69,25 @@ export default function ProfileScreen() {
 
   async function logout() {
     setLoggingOut(true);
-    try {
-      await signOut();
-      router.replace('/(public)/login');
-    } finally {
-      setLoggingOut(false);
-    }
+    try { await signOut(); router.replace('/(public)/login'); }
+    finally { setLoggingOut(false); }
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
 
         {/* Avatar */}
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.name}>{user?.name ?? 'Usuário'}</Text>
-        <Text style={styles.role}>{user?.role ?? '—'}</Text>
-        <Text style={styles.email}>{user?.email ?? '—'}</Text>
+        <Text style={[styles.name, { color: c.text }]}>{user?.name ?? 'Usuário'}</Text>
+        <Text style={[styles.role, { color: c.primary }]}>{user?.role ?? '—'}</Text>
+        <Text style={[styles.email, { color: c.textSecondary }]}>{user?.email ?? '—'}</Text>
 
         {/* App info */}
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Aparência</Text>
+          <Text style={[styles.cardTitle, { color: c.text }]}>Aparência</Text>
           <ThemeSelector />
         </Card>
 
@@ -106,7 +98,7 @@ export default function ProfileScreen() {
 
         {/* Security settings */}
         <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>Segurança</Text>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Segurança</Text>
 
           <View
             style={[styles.biometricRow, !biometricAvailable && styles.biometricRowDisabled]}
@@ -115,14 +107,14 @@ export default function ProfileScreen() {
           >
             <View style={styles.biometricText}>
               <Text
-                style={[styles.biometricLabel, !biometricAvailable && styles.textMuted]}
+                style={[styles.biometricLabel, { color: biometricAvailable ? c.text : c.textSecondary }]}
               >
                 {biometricLabel}
               </Text>
               {biometricUnavailableHint ? (
-                <Text style={styles.biometricHint}>{biometricUnavailableHint}</Text>
+                <Text style={[styles.biometricHint, { color: c.textSecondary }]}>{biometricUnavailableHint}</Text>
               ) : (
-                <Text style={styles.biometricHint}>
+                <Text style={[styles.biometricHint, { color: c.textSecondary }]}>
                   {biometricEnabled
                     ? 'Ativado — o app pedirá biometria ao ser reaberto.'
                     : 'Desativado — use sua senha ao reabrir o app.'}
@@ -134,8 +126,8 @@ export default function ProfileScreen() {
               value={biometricEnabled}
               onValueChange={(v) => void handleBiometricToggle(v)}
               disabled={!biometricAvailable || isTogglingBiometric}
-              trackColor={{ false: Colors.gray200, true: Colors.primaryLight }}
-              thumbColor={biometricEnabled ? Colors.primary : Colors.gray400}
+              trackColor={{ false: c.gray200, true: Colors.primaryLight }}
+              thumbColor={biometricEnabled ? Colors.primary : c.gray400}
               accessibilityLabel={biometricLabel}
               accessibilityRole="switch"
               accessibilityState={{
@@ -161,8 +153,8 @@ export default function ProfileScreen() {
       <Modal visible={confirm} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <Card style={styles.modal}>
-            <Text style={styles.modalTitle}>Operações pendentes</Text>
-            <Text style={styles.modalDesc}>
+            <Text style={[styles.modalTitle, { color: c.text }]}>Operações pendentes</Text>
+            <Text style={[styles.modalDesc, { color: c.textSecondary }]}>
               Existem {pending} operações aguardando sincronização. Se sair agora, elas serão enviadas no próximo login.
             </Text>
             <Button label="Sair mesmo assim" onPress={logout} variant="danger" fullWidth loading={loggingOut} />
@@ -175,46 +167,46 @@ export default function ProfileScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const c = useThemeColors();
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+    <View style={[styles.row, { borderBottomColor: c.border }]}>
+      <Text style={[styles.rowLabel, { color: c.textSecondary }]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: c.text }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { padding: Spacing.md, alignItems: 'center', gap: Spacing.md, paddingBottom: 100 },
 
   // Avatar / user info
   avatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
   avatarText: { color: Colors.white, fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
-  name: { fontSize: FontSize.xl, color: Colors.text, fontWeight: FontWeight.bold, textAlign: 'center' },
-  role: { color: Colors.primary, fontWeight: FontWeight.semibold },
-  email: { color: Colors.textSecondary, fontSize: FontSize.sm },
+  name: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, textAlign: 'center' },
+  role: { fontWeight: FontWeight.semibold },
+  email: { fontSize: FontSize.sm },
 
   // Cards
   card: { width: '100%', gap: Spacing.sm },
-  cardTitle: { color: Colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  cardTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
 
   // App info rows
-  row: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.sm },
-  rowLabel: { color: Colors.textSecondary, fontSize: FontSize.sm },
-  rowValue: { color: Colors.text, fontWeight: FontWeight.semibold },
+  row: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, paddingVertical: Spacing.sm },
+  rowLabel: { fontSize: FontSize.sm },
+  rowValue: { fontWeight: FontWeight.semibold },
 
   // Security section
-  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   biometricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
   biometricRowDisabled: { opacity: 0.5 },
   biometricText: { flex: 1, gap: 2 },
-  biometricLabel: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.medium },
-  biometricHint: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 16 },
-  textMuted: { color: Colors.textSecondary },
+  biometricLabel: { fontSize: FontSize.md, fontWeight: FontWeight.medium },
+  biometricHint: { fontSize: FontSize.xs, lineHeight: 16 },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.30)', alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
   modal: { width: '100%', gap: Spacing.md },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.text },
-  modalDesc: { color: Colors.textSecondary, fontSize: FontSize.sm },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  modalDesc: { fontSize: FontSize.sm },
 });
