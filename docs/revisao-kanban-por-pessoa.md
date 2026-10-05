@@ -42,7 +42,7 @@
 | #84 | Estados de carregamento, vazio, erro e offline | 🟡 Parcial | Loading/vazio/erro reais nas telas integradas (Users/Clients/Sites/Equipment/Inspections/ReviewQueue, `AnswerHistoryTab`); falta tratamento de **offline** no web. |
 | #149 | Relatório PDF (web) | ❌ Não feito (apesar de a issue estar fechada) | `InspectionReportPage` ainda gera PDF via jsPDF com dados de `@/mocks/domain`; não consome o endpoint `GET /api/v1/inspections/{id}/report.pdf` (que **já existe** no backend, `ReportController`). A issue #149 foi fechada no GitHub, mas o front não foi migrado para o endpoint real. |
 | #155 | Notificações push de nova atribuição | ✅ Concluído | Backend (`/devices/register` + envio Expo na atribuição) e mobile (`pushNotifications.ts`: permissão + Expo token + register; abre inspeção ao toque). Commits 650134d/81555ef, PR #201. |
-| #172 | Tema escuro — telas de autenticação (web) | ✅ Concluído | `LoginPage`/`AuthLayout` usam os tokens semânticos do tema (`bg-surface`, `text-text`, `bg-app-bg`), que o `.dark` redefine em `index.css`, então adaptam ao modo escuro automaticamente. Ressalva menor: resíduo `bg-slate-50` na caixa de dica do rodapé não acompanha o tema. |
+| #172 | Tema escuro — telas de autenticação (web) | ✅ Concluído | `LoginPage`/`AuthLayout`/`NotFoundPage` usam tokens semânticos do tema (`bg-surface`, `text-text`, `bg-app-bg`, `border-border`), redefinidos sob `.dark` em `index.css`, adaptando ao modo escuro automaticamente. PR #212 (merge `6c1a3fa`): corrigiu o resíduo `bg-slate-50` da caixa de dica (agora `bg-app-bg` + `border-border`) e adicionou o `ThemeToggle` no `AuthLayout` (alternar tema antes de autenticar); 8 testes em `LoginPage.test.tsx`. |
 | #171 | Tema escuro — padrão base das telas dark | ✅ Concluído | `ThemeProvider` + `ThemeToggle` + persistência em `localStorage` + testes, plugado no `App.tsx`. Base pronta (falta aplicar nas telas). |
 
 ## Felipe
@@ -112,7 +112,8 @@
 - #74 Tela de sync, #150 Histórico, #167 Testes do lightbox, #64 Foto pendente, #179 Dark login/abas mobile (Rodrigo)
 - #77 Revisão por seção/item, #168 Evidências reais na revisão, #174 Dark mode cadastros, #176 Dark mode inspeções (Júlia) — PR #208 mergeado
 - #88 Build APK, #80 Reprovação propagada no pull (Felipe)
-- #67 Evidências/NCs reais no admin (Marcela), #172 Tema escuro autenticação web (Carol) — via PR #208 / tokens de tema
+- #67 Evidências/NCs reais no admin (Marcela) — via PR #208 / tokens de tema
+- #172 Tema escuro autenticação web (Carol) — PR #212 mergeado (merge `6c1a3fa`): `bg-slate-50` corrigido, `ThemeToggle` no `AuthLayout`, 8 testes
 
 **🟡 Parciais:** #84 (estados, falta offline no web), #89 (build web — CI+configs
 prontos, sem deploy ativo; issue fechada), #65 (GPS: capturado só no início, não na
