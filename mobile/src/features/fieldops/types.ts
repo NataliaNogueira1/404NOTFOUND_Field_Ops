@@ -51,6 +51,10 @@ export interface Inspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** PBI-086: encoded stroke data of the technician's drawn signature. */
+  signatureBase64?: string;
+  /** PBI-086: when true, a non-empty signature is required to conclude. */
+  signatureRequired?: boolean;
 }
 export interface Evidence {
   id: string;
