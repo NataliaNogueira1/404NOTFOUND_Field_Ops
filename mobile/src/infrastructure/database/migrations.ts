@@ -180,6 +180,19 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 5,
+    description: 'PBI-086: store drawn signature (base64 PNG) and signature requirement flag',
+    sql: `
+      -- Signature captured by the technician at conclusion (PBI-086).
+      -- Stored as a base64-encoded PNG string. NULL means not yet signed.
+      ALTER TABLE inspections ADD COLUMN signature_base64 TEXT;
+
+      -- When 1, the inspection cannot be concluded without a signature.
+      -- Defaults to 0 so existing inspections keep working without changes.
+      ALTER TABLE inspections ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /**
