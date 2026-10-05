@@ -13,6 +13,7 @@ import { DataTable, type Column } from '@/components/tables/DataTable'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 import { byId, clients as seedClients, equipment as seedEquipment, sites as seedSites } from '@/mocks/domain'
 import type { Client, Equipment, Site } from '@/types/domain'
@@ -165,14 +166,7 @@ export function ClientsPage() {
           <option value={ClientStatus.INACTIVE}>Inativo</option>
         </Select>
       </Card>
-      {error && (
-        <div
-          role="alert"
-          className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark"
-        >
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} onRetry={() => void loadClients()} />}
       <DataTable
         columns={columns}
         rows={rows}

@@ -11,6 +11,7 @@ import { DataTable, type Column } from '@/components/tables/DataTable'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 import { UserRole, UserStatus } from '@/types/domain'
 
@@ -160,14 +161,7 @@ export function UsersPage() {
           <option value={UserStatus.BLOCKED}>Bloqueado</option>
         </Select>
       </Card>
-      {error && (
-        <div
-          role="alert"
-          className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark"
-        >
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} onRetry={() => void loadUsers()} />}
       <DataTable
         columns={columns}
         rows={rows}
