@@ -1,20 +1,86 @@
 ﻿import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
 import { useAuth } from '@/features/auth';
 import { useThemeColors } from '@/features/theme';
-import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
+
+// ─── Password field with visibility toggle ────────────────────────────────────
+
+/**
+ * Renders a labelled password input whose border colour matches the design
+ * system TextInput and has an Ionicons eye/eye-off toggle aligned to the
+ * vertical centre of the input box.
+ */
+function PasswordInput({
+  value,
+  onChangeText,
+  showPassword,
+  onToggle,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  showPassword: boolean;
+  onToggle: () => void;
+}) {
+  const c = useThemeColors();
+  const [focused, setFocused] = useState(false);
+  const iconColor = focused ? c.primary : c.textSecondary;
+
+  return (
+    <View style={styles.passwordWrapper}>
+      <Text style={[styles.passwordLabel, { color: c.text }]}>Senha</Text>
+      {/* Row: native TextInput fills the space, icon sits at the right */}
+      <View
+        style={[
+          styles.passwordRow,
+          { backgroundColor: c.surface, borderColor: focused ? c.primary : c.border },
+        ]}
+      >
+        <RNTextInput
+          style={[styles.passwordInput, { color: c.text }]}
+          placeholder="Senha"
+          placeholderTextColor={c.textSecondary}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!showPassword}
+          autoComplete="password"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel="Senha"
+        />
+        <Pressable
+          style={styles.eyeButton}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+            size={20}
+            color={iconColor}
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
   const c = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   function validate(): string | null {
@@ -56,13 +122,11 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoComplete="email"
           />
-          <TextInput
-            label="Senha"
-            placeholder="Senha"
+          <PasswordInput
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
+            showPassword={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
           />
           {!!error && <Text style={styles.error}>{error}</Text>}
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
@@ -85,4 +149,27 @@ const styles = StyleSheet.create({
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
   version: { textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
+  // ─── PasswordInput ─────────────────────────────────────────────────────────
+  // Layout only. Theme-dependent colours (border/background/text) are applied
+  // inline via useThemeColors so the field follows dark mode like the rest of
+  // the login screen.
+  passwordWrapper: { gap: Spacing.xs },
+  passwordLabel: { fontSize: FontSize.sm, fontWeight: '500' },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',          // vertically centres input text and icon
+    height: 44,
+    borderWidth: 1.5,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+  },
+  passwordInput: {
+    flex: 1,                        // fills available width, leaving room for icon
+    height: '100%',
+    fontSize: FontSize.md,
+    paddingRight: Spacing.sm,      // keeps text from running under the icon
+  },
+  eyeButton: {
+    padding: 4,                    // tap-friendly without pushing the icon off-centre
+  },
 });

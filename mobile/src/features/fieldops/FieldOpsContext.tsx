@@ -40,11 +40,11 @@ interface FieldOpsContextValue {
     },
   ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
-  reopenForCorrection: (inspectionId: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
+  reopenForCorrection: (inspectionId: string) => void;
   syncNow: () => void;
   resetSession: () => void;
   isSyncing: boolean;
@@ -264,10 +264,9 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => {
-    // Resolve the target inspection explicitly when the caller knows it (checklist
-    // screen passes the route id). Falling back to "the IN_PROGRESS one" is fragile
-    // during correction of a REJECTED inspection, where the fallback could write to
-    // the wrong inspection (PBI-062).
+    // Prefer the explicit inspection id passed by the checklist screen; fall back
+    // to the active (IN_PROGRESS) inspection, then the first one, for callers that
+    // don't provide it.
     const resolveTargetId = () =>
       inspectionId
       ?? inspectionsRef.current.find((i) => i.status === InspectionStatus.IN_PROGRESS)?.id
@@ -333,31 +332,6 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         }
         return [...current, nc];
       });
-    }
-  }, [getRepos, getSyncService]);
-
-  // PBI-062: when a technician reopens a REJECTED inspection to fix it, move it
-  // back to IN_PROGRESS so answers become editable again (RN-043). The rejection
-  // reason stays on the record so the banner keeps guiding the correction, and
-  // the transition is queued in the outbox to be pushed to the server.
-  const reopenForCorrection = useCallback((inspectionId: string) => {
-    setInspections((current) =>
-      current.map((insp) =>
-        insp.id === inspectionId && insp.status === InspectionStatus.REJECTED
-          ? {
-              ...insp,
-              status: InspectionStatus.IN_PROGRESS,
-              syncStatus: 'pending' as const,
-              pendingSyncCount: Math.max(insp.pendingSyncCount, 1),
-            }
-          : insp,
-      ),
-    );
-    const repos = getRepos();
-    const sync = getSyncService();
-    if (repos && sync) {
-      repos.inspection.updateStatus(inspectionId, 'IN_PROGRESS').catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
     }
   }, [getRepos, getSyncService]);
 
@@ -446,6 +420,30 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
+  // Reopen a REJECTED inspection so the technician can correct it (PBI-062).
+  // Moves it back to IN_PROGRESS, making answers writable again, and queues the
+  // transition so the server learns the inspection is being reworked.
+  const reopenForCorrection = useCallback((inspectionId: string) => {
+    setInspections((current) =>
+      current.map((insp) =>
+        insp.id === inspectionId
+          ? {
+              ...insp,
+              status: InspectionStatus.IN_PROGRESS,
+              syncStatus: 'pending' as const,
+              pendingSyncCount: Math.max(insp.pendingSyncCount, 1),
+            }
+          : insp,
+      ),
+    );
+    const repos = getRepos();
+    const sync = getSyncService();
+    if (repos && sync) {
+      repos.inspection.updateStatus(inspectionId, 'IN_PROGRESS').catch(console.warn);
+      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
+    }
+  }, [getRepos, getSyncService]);
+
   const syncNow = useCallback(async () => {
     const sync = getSyncService();
     if (!sync || !token) {
@@ -520,11 +518,11 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       syncOperations,
       startInspection,
       answerItem,
-      reopenForCorrection,
       addEvidence,
       retryEvidenceUpload,
       addNonConformity,
       concludeInspection,
+      reopenForCorrection,
       syncNow,
       resetSession,
       isSyncing,
@@ -532,8 +530,8 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, syncOperations,
-      startInspection, answerItem, reopenForCorrection, addEvidence, retryEvidenceUpload, addNonConformity,
-      concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
+      startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
+      concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );
 
