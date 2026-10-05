@@ -139,6 +139,9 @@ public class MobileInspectionService {
                 inspection.getStartedAt() != null ? inspection.getStartedAt().toString() : null,
                 inspection.getProgress(),
                 inspection.getSupervisorInstructions(),
+                inspection.getRejectionReason(),
+                inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
+                inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
                 inspection.getVersion(),
                 templateDto
         );

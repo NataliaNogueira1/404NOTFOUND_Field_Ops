@@ -10,8 +10,9 @@ import {
   RejectionBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
-import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
+import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { InspectionStatus, useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { useDatabase } from '@/infrastructure/database/DatabaseProvider';
 import { InspectionRepository } from '@/infrastructure/database/repositories';
 
@@ -19,7 +20,8 @@ export default function InspectionDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const db = useDatabase();
-  const { inspections, answers, evidences, nonConformities } = useFieldOps();
+  const c = useThemeColors();
+  const { inspections, answers, evidences, nonConformities, reopenForCorrection } = useFieldOps();
 
   // Detail screen must resolve the exact inspection from the route param.
   const inspection = inspections.find((item) => item.id === id);
@@ -54,9 +56,9 @@ export default function InspectionDetailsScreen() {
 
   if (!inspection) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
         <View style={styles.centered}>
-          <Text style={styles.empty}>Inspeção não encontrada.</Text>
+          <Text style={[styles.empty, { color: c.textSecondary }]}>Inspeção não encontrada.</Text>
           <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
         </View>
       </SafeAreaView>
@@ -82,9 +84,9 @@ export default function InspectionDetailsScreen() {
       : `${inspection.progress}% concluído`;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{inspection.title}</Text>
+        <Text style={[styles.title, { color: c.text }]}>{inspection.title}</Text>
         <View style={styles.badges}>
           <PriorityBadge priority={inspection.priority} />
           <InspectionStatusBadge status={inspection.status} />
@@ -100,7 +102,7 @@ export default function InspectionDetailsScreen() {
         ) : null}
 
         <Card style={styles.card}>
-          <Text style={styles.section}>📋 Informações</Text>
+          <Text style={[styles.section, { color: c.text }]}>📋 Informações</Text>
           <Row label="Cliente" value={clientName} />
           <Row label="Local" value={siteName} />
           <Row label="Equipamento" value={equipmentName} />
@@ -115,14 +117,14 @@ export default function InspectionDetailsScreen() {
 
         {inspection.supervisorInstructions ? (
           <Card style={styles.card}>
-            <Text style={styles.section}>📝 Instruções do supervisor</Text>
-            <Text style={styles.body}>{inspection.supervisorInstructions}</Text>
+            <Text style={[styles.section, { color: c.text }]}>📝 Instruções do supervisor</Text>
+            <Text style={[styles.body, { color: c.textSecondary }]}>{inspection.supervisorInstructions}</Text>
           </Card>
         ) : null}
 
         {isStarted ? (
           <Card style={styles.card}>
-            <Text style={styles.section}>📊 Progresso</Text>
+            <Text style={[styles.section, { color: c.text }]}>📊 Progresso</Text>
             <ProgressBar
               value={
                 totalItems && totalItems > 0
@@ -130,7 +132,7 @@ export default function InspectionDetailsScreen() {
                   : inspection.progress
               }
             />
-            <Text style={styles.body}>{progressLabel}</Text>
+            <Text style={[styles.body, { color: c.textSecondary }]}>{progressLabel}</Text>
             <Row label="⚠️ Não conformidades" value={String(inspectionNCs.length)} />
             <Row label="📷 Evidências" value={String(inspectionEvidences.length)} />
           </Card>
@@ -138,20 +140,24 @@ export default function InspectionDetailsScreen() {
 
         {hasLocation ? (
           <Card style={styles.card}>
-            <Text style={styles.section}>📍 Localização de início</Text>
-            <Text style={styles.body}>
+            <Text style={[styles.section, { color: c.text }]}>📍 Localização de início</Text>
+            <Text style={[styles.body, { color: c.textSecondary }]}>
               {inspection.startLatitude?.toFixed(4)}, {inspection.startLongitude?.toFixed(4)}
               {inspection.startAccuracy !== undefined
                 ? ` (±${inspection.startAccuracy.toFixed(1)}m)`
                 : ''}
             </Text>
             {inspection.startedAt ? (
-              <Text style={styles.bodyMuted}>{inspection.startedAt}</Text>
+              <Text style={[styles.bodyMuted, { color: c.gray400 }]}>{inspection.startedAt}</Text>
             ) : null}
           </Card>
         ) : null}
 
-        <ActionButtons inspection={inspection} router={router} />
+        <ActionButtons
+          inspection={inspection}
+          router={router}
+          onCorrect={reopenForCorrection}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -160,9 +166,11 @@ export default function InspectionDetailsScreen() {
 function ActionButtons({
   inspection,
   router,
+  onCorrect,
 }: {
   inspection: ReturnType<typeof useFieldOps>['inspections'][number];
   router: ReturnType<typeof useRouter>;
+  onCorrect: (inspectionId: string) => void;
 }) {
   switch (inspection.status) {
     case InspectionStatus.ASSIGNED:
@@ -187,7 +195,12 @@ function ActionButtons({
       return (
         <Button
           label="🔧 Corrigir"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/checklist`)}
+          onPress={() => {
+            // Reopen the rejected inspection (→ IN_PROGRESS) before editing so
+            // answers become writable again, then go straight to the checklist.
+            onCorrect(inspection.id);
+            router.push(`/(protected)/inspections/${inspection.id}/checklist`);
+          }}
           variant="danger"
           fullWidth
           size="lg"
@@ -222,33 +235,33 @@ function priorityText(priority: string): string {
 }
 
 function Row({ label, value }: { label: string; value?: string }) {
+  const c = useThemeColors();
   return (
-    <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value ?? '-'}</Text>
+    <View style={[styles.row, { borderBottomColor: c.border }]}>
+      <Text style={[styles.label, { color: c.textSecondary }]}>{label}</Text>
+      <Text style={[styles.value, { color: c.text }]}>{value ?? '-'}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
-  empty: { color: Colors.textSecondary, fontSize: FontSize.md },
+  empty: { fontSize: FontSize.md },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   badges: { flexDirection: 'row', gap: Spacing.sm },
   card: { gap: Spacing.sm },
-  section: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
-  body: { color: Colors.textSecondary, lineHeight: 21 },
-  bodyMuted: { color: Colors.gray400, fontSize: FontSize.sm },
+  section: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
+  body: { lineHeight: 21 },
+  bodyMuted: { fontSize: FontSize.sm },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.md,
     paddingVertical: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
-  label: { color: Colors.textSecondary, flex: 1 },
-  value: { color: Colors.text, fontWeight: FontWeight.semibold, flex: 1, textAlign: 'right' },
+  label: { flex: 1 },
+  value: { fontWeight: FontWeight.semibold, flex: 1, textAlign: 'right' },
 });

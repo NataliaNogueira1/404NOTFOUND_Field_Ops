@@ -7,18 +7,21 @@ import { ChecklistItemCard, ProgressBar, SectionHeader } from '@/components/fiel
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 export default function ChecklistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { inspections, answers, evidences, answerItem } = useFieldOps();
+  const c = useThemeColors();
+  const { inspections, answers, evidences, answerItem, retryEvidenceUpload } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
   const scrollRef = useRef<ScrollView>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
 
   const allItems = useMemo(() => (template ? template.sections.flatMap((section) => section.items) : []), [template]);
+  const hasChecklist = Boolean(template && allItems.length > 0);
   const total = allItems.length;
   const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
   const pending = total - answered;
@@ -41,29 +44,47 @@ export default function ChecklistScreen() {
     scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
   }, [allItems, answers, template]);
 
-  if (templateLoading || !template) {
+  if (templateLoading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.muted}>Carregando checklist...</Text>
+          <Text style={{ color: c.textSecondary }}>Carregando checklist...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Loading is done but there is no snapshot in SQLite (e.g. the inspection was
+  // never synced from the server). Show an actionable empty state instead of
+  // freezing forever on the spinner.
+  if (!template || !hasChecklist) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+        <View style={styles.centered}>
+          <Text style={[styles.title, { color: c.text }]}>Checklist indisponível</Text>
+          <Text style={{ color: c.textSecondary, textAlign: 'center' }}>
+            Esta inspeção ainda não tem o checklist baixado. Sincronize na aba Sync e tente
+            novamente.
+          </Text>
+          <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{template.title}</Text>
-        <Text style={styles.muted}>
+        <Text style={[styles.title, { color: c.text }]}>{template.title}</Text>
+        <Text style={{ color: c.textSecondary }}>
           {template.sections.length} seções / {total} itens
         </Text>
 
         <Card style={styles.card}>
-          <ProgressBar value={inspection.progress} />
+          <ProgressBar value={inspection?.progress ?? 0} />
           <View style={styles.progressRow}>
-            <Text style={styles.muted}>
+            <Text style={{ color: c.textSecondary }}>
               {answered} de {total} itens respondidos
             </Text>
             {pending > 0 ? (
@@ -82,9 +103,11 @@ export default function ChecklistScreen() {
                 key={item.id}
                 item={item}
                 index={allItems.findIndex((candidate) => candidate.id === item.id) + 1}
+                inspectionId={inspection?.id ?? id}
                 answer={answers[item.id]}
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
-                onAnswer={(value, observation) => answerItem(item.id, value, observation)}
+                onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
+                onRetryEvidence={retryEvidenceUpload}
               />
             ))}
           </View>
@@ -92,13 +115,13 @@ export default function ChecklistScreen() {
 
         <Button
           label="Ver resumo"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/summary`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
           fullWidth
           size="lg"
         />
         <Button
           label="Não conformidades"
-          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/non-conformities`)}
+          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
           variant="secondary"
           fullWidth
         />
@@ -108,11 +131,10 @@ export default function ChecklistScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
-  muted: { color: Colors.textSecondary },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   card: { gap: Spacing.sm },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pendingLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
