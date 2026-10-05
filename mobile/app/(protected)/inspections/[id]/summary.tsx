@@ -4,13 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Button, Card } from '@/design-system';
-import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
+import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const c = useThemeColors();
   const { answers, evidences, nonConformities, concludeInspection } = useFieldOps();
   const { template } = useInspectionTemplate(id);
   const [confirm, setConfirm] = useState(false);
@@ -68,9 +70,9 @@ export default function SummaryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Resumo</Text>
+        <Text style={[styles.title, { color: c.text }]}>Resumo</Text>
 
         <Card style={styles.card}>
           <Row label="Total de itens" value={String(total)} />
@@ -93,8 +95,8 @@ export default function SummaryScreen() {
       <Modal visible={confirm} transparent animationType="fade">
         <View style={styles.backdrop}>
           <Card style={styles.modal}>
-            <Text style={styles.modalTitle}>Concluir inspeção?</Text>
-            <Text style={styles.muted}>A inspeção será marcada como enviada e ficará pendente de sincronização.</Text>
+            <Text style={[styles.modalTitle, { color: c.text }]}>Concluir inspeção?</Text>
+            <Text style={{ color: c.textSecondary }}>A inspeção será marcada como enviada e ficará pendente de sincronização.</Text>
             <Button label="Concluir inspeção" onPress={conclude} fullWidth />
             <Button label="Cancelar" onPress={() => setConfirm(false)} variant="ghost" fullWidth />
           </Card>
@@ -104,14 +106,14 @@ export default function SummaryScreen() {
       <Modal visible={showPending} transparent animationType="fade">
         <View style={styles.backdrop}>
           <Card style={styles.modal}>
-            <Text style={styles.modalTitle}>
+            <Text style={[styles.modalTitle, { color: c.text }]}>
               {pendings.length ? 'Não é possível concluir' : 'Sem pendências'}
             </Text>
             {pendings.length
               ? pendings.map((item, index) => (
-                  <Text key={`${item}-${index}`} style={styles.muted}>{index + 1}. {item}</Text>
+                  <Text key={`${item}-${index}`} style={{ color: c.textSecondary }}>{index + 1}. {item}</Text>
                 ))
-              : <Text style={styles.muted}>Nenhuma pendência obrigatória no momento.</Text>}
+              : <Text style={{ color: c.textSecondary }}>Nenhuma pendência obrigatória no momento.</Text>}
             <Button
               label="Ir para pendências"
               onPress={() => { setShowPending(false); router.push(`/(protected)/inspections/${id}/checklist`); }}
@@ -126,35 +128,35 @@ export default function SummaryScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const c = useThemeColors();
   return (
-    <View style={styles.row}>
-      <Text style={styles.muted}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+    <View style={[styles.row, { borderBottomColor: c.border }]}>
+      <Text style={{ color: c.textSecondary }}>{label}</Text>
+      <Text style={{ color: c.text, fontWeight: FontWeight.semibold }}>{value}</Text>
     </View>
   );
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
+  const c = useThemeColors();
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.muted}>{label}</Text>
+    <View style={[styles.metric, { backgroundColor: c.mutedSurface }]}>
+      <Text style={[styles.metricValue, { color: c.primary }]}>{value}</Text>
+      <Text style={{ color: c.textSecondary }}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   card: { gap: Spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  metric: { width: '47%', padding: Spacing.sm, borderRadius: 10, backgroundColor: Colors.mutedSurface },
-  metricValue: { fontSize: FontSize.xxl, color: Colors.primary, fontWeight: FontWeight.bold },
-  row: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.sm },
-  muted: { color: Colors.textSecondary },
-  value: { color: Colors.text, fontWeight: FontWeight.semibold },
+  metric: { width: '47%', padding: Spacing.sm, borderRadius: 10 },
+  metricValue: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
+  row: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, paddingVertical: Spacing.sm },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.30)', justifyContent: 'center', padding: Spacing.lg },
   modal: { gap: Spacing.md },
-  modalTitle: { color: Colors.text, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
 });

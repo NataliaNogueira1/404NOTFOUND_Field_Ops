@@ -5,6 +5,7 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
 import { useAuth } from '@/features/auth';
+import { useThemeColors } from '@/features/theme';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,18 +29,24 @@ function PasswordInput({
   showPassword: boolean;
   onToggle: () => void;
 }) {
+  const c = useThemeColors();
   const [focused, setFocused] = useState(false);
-  const iconColor = focused ? Colors.primary : Colors.gray300;
+  const iconColor = focused ? c.primary : c.textSecondary;
 
   return (
     <View style={styles.passwordWrapper}>
-      <Text style={styles.passwordLabel}>Senha</Text>
+      <Text style={[styles.passwordLabel, { color: c.text }]}>Senha</Text>
       {/* Row: native TextInput fills the space, icon sits at the right */}
-      <View style={[styles.passwordRow, focused && styles.passwordRowFocused]}>
+      <View
+        style={[
+          styles.passwordRow,
+          { backgroundColor: c.surface, borderColor: focused ? c.primary : c.border },
+        ]}
+      >
         <RNTextInput
-          style={styles.passwordInput}
+          style={[styles.passwordInput, { color: c.text }]}
           placeholder="Senha"
-          placeholderTextColor={Colors.gray400}
+          placeholderTextColor={c.textSecondary}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={!showPassword}
@@ -70,6 +77,7 @@ function PasswordInput({
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
+  const c = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -86,27 +94,24 @@ export default function LoginScreen() {
     setError('');
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
-
     try {
       await signIn(email.trim(), password);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
-      if (message.includes('401')) {
-        setError('E-mail ou senha incorretos.');
-      } else if (message.includes('Network') || message.includes('fetch')) {
-        setError('Sem conexão com o servidor. Verifique sua rede.');
-      } else {
-        setError('Erro ao realizar login. Tente novamente.');
-      }
+      if (message.includes('401')) setError('E-mail ou senha incorretos.');
+      else if (message.includes('Network') || message.includes('fetch')) setError('Sem conexão com o servidor. Verifique sua rede.');
+      else setError('Erro ao realizar login. Tente novamente.');
     }
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-        <View style={styles.brandMark}><Text style={styles.brandMarkText}>F</Text></View>
-        <Text style={styles.title}>FieldOps</Text>
-        <Text style={styles.subtitle}>Plataforma de Inspeção</Text>
+        <View style={styles.brandMark}>
+          <Text style={styles.brandMarkText}>F</Text>
+        </View>
+        <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
+        <Text style={[styles.subtitle, { color: c.textSecondary }]}>Plataforma de Inspeção</Text>
         <Card style={styles.form} shadow="md">
           <TextInput
             label="E-mail"
@@ -127,42 +132,41 @@ export default function LoginScreen() {
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
           <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
         </Card>
-        <Text style={styles.version}>Versão 1.0.0</Text>
+        <Text style={[styles.version, { color: c.textSecondary }]}>Versão 1.0.0</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
   brandMark: { width: 64, height: 64, borderRadius: 18, backgroundColor: Colors.primary, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
   brandMarkText: { color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold },
-  title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, color: Colors.text, textAlign: 'center' },
-  subtitle: { marginTop: Spacing.xs, fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl },
+  title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, textAlign: 'center' },
+  subtitle: { marginTop: Spacing.xs, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.xl },
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
-  version: { color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
+  version: { textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
   // ─── PasswordInput ─────────────────────────────────────────────────────────
+  // Layout only. Theme-dependent colours (border/background/text) are applied
+  // inline via useThemeColors so the field follows dark mode like the rest of
+  // the login screen.
   passwordWrapper: { gap: Spacing.xs },
-  passwordLabel: { fontSize: FontSize.sm, fontWeight: '500', color: Colors.gray700 },
+  passwordLabel: { fontSize: FontSize.sm, fontWeight: '500' },
   passwordRow: {
     flexDirection: 'row',
     alignItems: 'center',          // vertically centres input text and icon
     height: 44,
-    backgroundColor: Colors.white,
     borderWidth: 1.5,
-    borderColor: Colors.gray300,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
   },
-  passwordRowFocused: { borderColor: Colors.primary },
   passwordInput: {
     flex: 1,                        // fills available width, leaving room for icon
     height: '100%',
     fontSize: FontSize.md,
-    color: Colors.gray900,
     paddingRight: Spacing.sm,      // keeps text from running under the icon
   },
   eyeButton: {
