@@ -49,6 +49,10 @@ interface FieldOpsContextValue {
   resetSession: () => void;
   isSyncing: boolean;
   lastSyncError: string | null;
+  /** PBI-086: persist the drawn signature locally and enqueue for sync. */
+  saveSignature: (inspectionId: string, signatureData: string | null) => void;
+  /** PBI-086: load the stored signature for an inspection from SQLite. */
+  loadSignature: (inspectionId: string) => Promise<string | null>;
 }
 
 // Downloads the technician's inspections from the API into SQLite. Failures are
@@ -444,6 +448,39 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
+  // PBI-086: persist drawn signature locally and enqueue for sync
+  const saveSignature = useCallback((inspectionId: string, signatureData: string | null) => {
+    // Update in-memory inspection state
+    setInspections((current) =>
+      current.map((insp) =>
+        insp.id === inspectionId
+          ? {
+              ...insp,
+              signatureBase64: signatureData ?? undefined,
+              syncStatus: 'pending' as const,
+              pendingSyncCount: Math.max(insp.pendingSyncCount, 1),
+            }
+          : insp,
+      ),
+    );
+    // Persist to SQLite and enqueue for sync
+    const repos = getRepos();
+    const sync = getSyncService();
+    if (repos) {
+      repos.inspection.saveSignature(inspectionId, signatureData).catch(console.warn);
+    }
+    if (sync && signatureData) {
+      sync.enqueueSignature(inspectionId, signatureData).catch(console.warn);
+    }
+  }, [getRepos, getSyncService]);
+
+  // PBI-086: read the stored signature from SQLite (used to restore state on mount)
+  const loadSignature = useCallback(async (inspectionId: string): Promise<string | null> => {
+    const repos = getRepos();
+    if (!repos) return null;
+    return repos.inspection.getSignature(inspectionId);
+  }, [getRepos]);
+
   const syncNow = useCallback(async () => {
     const sync = getSyncService();
     if (!sync || !token) {
@@ -527,11 +564,14 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       resetSession,
       isSyncing,
       lastSyncError,
+      saveSignature,
+      loadSignature,
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
       concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
+      saveSignature, loadSignature,
     ],
   );
 
