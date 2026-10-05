@@ -90,6 +90,24 @@ appears at `GET /api/v1/mobile/inspections`.
 The seed is idempotent (guarded by the client document) and safe to re-run. Disable it with
 `FIELDOPS_DEMO_SEED_ENABLED=false`.
 
+## Public demonstration deployment (Render)
+
+The repository root contains [`render.yaml`](../render.yaml), which creates a Render web service
+and a private PostgreSQL database. The service builds `api/Dockerfile`, migrates the database via
+Flyway, runs the `demo` profile seed, and uses `/actuator/health` as its health check.
+
+1. In Render, create a Blueprint from this repository and provide `CORS_ALLOWED_ORIGINS` when
+   prompted. Use the exact public web origins that need browser access; native APK traffic does
+   not require a browser CORS origin.
+2. Wait for the health check at `https://<render-service>.onrender.com/actuator/health` and verify
+   Swagger at `/swagger-ui`.
+3. Use that HTTPS base URL when configuring the mobile preview build as described in
+   [`mobile/README.md`](../mobile/README.md#public-demo-apk).
+
+The Blueprint generates `JWT_SECRET` and references the database connection internally. It never
+commits credentials. Its container entrypoint converts Render's `DATABASE_URL` to the JDBC URL
+used by Spring and honours Render's dynamic `PORT`.
+
 ## Commands
 
 ```sh

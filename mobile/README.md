@@ -68,6 +68,23 @@ npm run lint       # ESLint (flat config, TypeScript + react-hooks)
 npm run lint:fix   # ESLint corrigindo o que for automático
 ```
 
+### Public demo APK
+
+The `preview` EAS profile is bound to the EAS `preview` environment. After the API Blueprint in
+[`render.yaml`](../render.yaml) is live, set its HTTPS base URL in EAS before building the APK:
+
+```sh
+npx eas env:set --name EXPO_PUBLIC_API_URL \
+  --value https://<render-service>.onrender.com \
+  --environment preview --visibility plaintext
+npx eas env:list --environment preview
+npx eas build --platform android --profile preview
+```
+
+`EXPO_PUBLIC_API_URL` is intentionally a public build-time setting, not a secret. Changing it
+requires a new preview build. Verify `/actuator/health`, Swagger, and mobile login/inspection pull
+against the public URL before distributing the APK.
+
 ---
 
 ## Estrutura do projeto
