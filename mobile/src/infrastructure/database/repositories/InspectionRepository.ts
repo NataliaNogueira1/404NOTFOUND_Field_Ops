@@ -48,6 +48,10 @@ interface InspectionRow {
   rejected_by: string | null;
   rejected_at: string | null;
   server_version: number;
+  /** PBI-086: drawn signature stored as encoded stroke data (base64-like JSON). */
+  signature_base64: string | null;
+  /** PBI-086: whether a signature is required to conclude this inspection. */
+  signature_required: number;
 }
 
 interface SectionRow {
@@ -270,6 +274,30 @@ export class InspectionRepository {
     );
   }
 
+  /**
+   * PBI-086: persist the drawn signature for an inspection.
+   * @param id          Inspection id
+   * @param signatureData  Encoded stroke data (JSON string). Pass null to clear.
+   */
+  async saveSignature(id: string, signatureData: string | null): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET signature_base64 = ?, sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
+      signatureData,
+      id,
+    );
+  }
+
+  /**
+   * PBI-086: get the stored signature for an inspection, or null if not yet signed.
+   */
+  async getSignature(id: string): Promise<string | null> {
+    const row = await this.db.getFirstAsync<{ signature_base64: string | null }>(
+      'SELECT signature_base64 FROM inspections WHERE id = ?',
+      id,
+    );
+    return row?.signature_base64 ?? null;
+  }
+
   // ─── Sections & Items (template snapshot) ──────────────────────────────────
 
   async saveTemplate(inspectionId: string, template: InspectionTemplate): Promise<void> {
@@ -412,6 +440,8 @@ export class InspectionRepository {
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
     serverVersion: row.server_version,
+    signatureBase64: row.signature_base64 ?? undefined,
+    signatureRequired: row.signature_required === 1,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({
