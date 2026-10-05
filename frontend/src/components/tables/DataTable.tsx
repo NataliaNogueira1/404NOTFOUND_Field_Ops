@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, ChevronLeft, ChevronRight } from 'l
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { LoadingState } from '@/components/ui/LoadingState'
 
 export interface Column<T> {
   header: string
@@ -92,8 +93,8 @@ export function DataTable<T>({
         </table>
       </div>
       {loading && (
-        <div role="status" className="p-8 text-center text-sm text-muted">
-          {loadingLabel}
+        <div className="p-4">
+          <LoadingState label={loadingLabel} />
         </div>
       )}
       {!loading && rows.length === 0 && <div className="p-8 text-center text-sm text-muted">{empty}</div>}
