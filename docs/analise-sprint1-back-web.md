@@ -9,6 +9,8 @@
 > **Revisão após PR #142 (`fix/backend-pbi-feedback`):** **PBI-022 (prévia do checklist)** passou a ✅ — foi adicionado o endpoint `GET /api/v1/inspection-templates/{id}/preview`, deixando o **backend da Sprint 1 em 23/23 (100%)**. O agendamento (**PBI-025**) passou a reforçar versão publicada, cliente ativo e equipamento ativo.
 >
 > **Revisão de outubro (código atual):** nova verificação de toda a coluna Veredicto contra o código. Correções factuais no backend: enum `ResponseType` é `TEXT_SHORT/TEXT_LONG/...` (não `TEXT`); migrações Flyway vão até **V26** (não há V22); o `NonConformity` do dashboard é a **V26** (não V20); `DemoSeedRunner` é `@Profile({"dev","demo"})`; o resultado do batch de sync inclui também `CONFLICT`. **Frontend Web** subiu bastante: os CRUDs de catálogo, construtor de modelos, seleção encadeada, cancelamento e listagem **já consomem a API real** (Sprint 1 Web → 16/16); o refresh token single-flight **já está plugado** na sessão ativa; na Sprint 2, **PBI-056** e **PBI-088** estão integrados, e **PBI-083**/**PBI-091** saíram de "sem código" para parciais. **Mobile Sprint 2** teve várias correções: **PBI-040/044/054/055/085/090** passaram a ✅ e **PBI-065/091** a 🟡, elevando a Sprint 2 Mobile para **12/22 (~55%)**.
+>
+> **Revisão de 05/10/2026 (após PR #208 e re-verificação do código):** a tela de revisão web deixou de ser protótipo. Sprint 2 **Frontend Web**: **PBI-047/057/058** passaram a ✅ (revisão por seção/item, evidências/NCs e lightbox agora consomem o backend real; aprovar/reprovar via `inspectionReviewApi`), e **PBI-091 (web)** foi concluído (`ThemeToggle` exposto no `Header` + telas de cadastros/inspeções adaptadas), elevando a Sprint 2 Web para **6/13 (~46%)**. Sprint 2 **Mobile**: **PBI-062** (pull propaga a reprovação do servidor), **PBI-068** (build de APK via `eas.json`) e **PBI-091 (mobile)** (telas migradas para `useThemeColors()`) passaram a ✅, elevando a Sprint 2 Mobile para **15/22 (~68%)**. Ressalva: **PBI-087** (PDF web) e **PBI-069** (deploy) foram fechados no GitHub, mas no código seguem incompletos — o PDF ainda usa jsPDF/mocks (não consome `report.pdf`) e não há deploy ativo.
 
 ---
 
@@ -120,7 +122,7 @@ Já estão integrados de forma real:
 
 > ✅ **Renovação automática (PBI-010 no cliente web) — atualizado:** o backend está completo (endpoint de refresh + entidade + migration) e o frontend **já tem o refresh single-flight plugado na via ativa de sessão**. Os antigos `src/services/api/httpClient.ts` e `src/services/auth/tokenStorage.ts` hoje são apenas re-exports de `@/api/client`; o interceptor real vive em `src/api/client.ts` (`renewAccessToken`/`refreshInFlight`): ao receber 401 (com token, não sendo retry nem rota de login/refresh), chama `POST /api/v1/auth/refresh`, salva o novo `accessToken` e **repete a request original**, só fazendo logout se o refresh falhar. O login (`src/auth/session.ts`) grava `accessToken` **e** `refreshToken`. Única ressalva: não há rotação do refresh token no cliente (o `/auth/refresh` devolve apenas `accessToken` + `expiresIn`).
 
-Além da autenticação, os CRUDs de catálogo, o construtor de modelos, a seleção encadeada, o cancelamento e a listagem/acompanhamento de inspeções já consomem a API real. Os módulos que **ainda dependem de mocks/stores locais** são principalmente os de **revisão** (respostas por seção, lightbox de evidências), **relatório PDF** e boa parte do **dashboard** — enquanto os endpoints correspondentes não são totalmente consumidos.
+Além da autenticação, os CRUDs de catálogo, o construtor de modelos, a seleção encadeada, o cancelamento, a listagem/acompanhamento de inspeções e, após o PR #208, a **tela de revisão** (respostas por seção/item, lightbox de evidências reais, aprovar/reprovar) já consomem a API real. Os módulos que **ainda dependem de mocks/stores locais** são principalmente o **relatório PDF** e boa parte do **dashboard** — enquanto os endpoints correspondentes não são totalmente consumidos.
 
 ### Estrutura Web atual
 
@@ -251,9 +253,9 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 ### Pequenos ajustes pendentes identificados no código
 
-- `scanner.tsx` ainda é simulado (botão "Simular leitura" com equipamento fixo), sem leitura real de QR por `expo-camera` (PBI-041);
-- o pull (`pullInspections`/`saveInspectionLocally`) não mapeia os campos de reprovação vindos do servidor (`rejectionReason`/estado), então o motivo não é propagado do backend ao dispositivo (PBI-062);
-- as telas ainda usam a paleta `Colors` estática em vez do `ThemeContext`, deixando o tema escuro só na infraestrutura (PBI-091).
+- `scanner.tsx` ainda é simulado (botão "Simular leitura" com equipamento fixo), sem leitura real de QR por `expo-camera` (PBI-041).
+
+> Observação: os dois itens antes listados aqui — o pull não propagar o estado de reprovação (PBI-062) e as telas usarem `Colors` estático (PBI-091) — **não procedem mais**. O pull agora mapeia `rejectionReason`/`rejectedBy`/`rejectedAt` do servidor, e as telas foram migradas para `useThemeColors()`.
 
 > Observação: o item antes listado aqui sobre o `sync.tsx` exibir métricas fixas de demonstração **não procede mais** — a tela consome dados reais do outbox via `useSyncStatus()` (ver PBI-054).
 ---
@@ -303,31 +305,31 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 
 | PBI | Título | Issue | Veredicto |
 |-----|--------|-------|-----------|
-| PBI-047 | Visualizar evidências e NCs no admin | [#67](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/67) | 🟡 Parcial — `InspectionReviewPage` mostra NCs e modal de evidência, mas com dados mockados (protótipo) |
+| PBI-047 | Visualizar evidências e NCs no admin | [#67](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/67) | ✅ Concluído — `InspectionReviewPage` mostra NCs e o lightbox de evidências com **dados reais do backend** (download autenticado via Blob URL), não mais mocks (PR #208) |
 | PBI-056 | Lista de inspeções aguardando revisão | [#76](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/76) | ✅ Concluído — `ReviewQueuePage` consome `listInspections({ review: true })` (`GET /api/v1/inspections?review=true`) com paginação/busca reais; badge via `useReviewCount` também real |
-| PBI-057 | Revisão de respostas por seção e item | [#77](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/77) | 🟡 Parcial — `InspectionReviewPage` agrupa respostas por seção/item, porém em mocks |
-| PBI-058 | Lightbox de fotografias na revisão | [#78](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/78) | 🟡 Parcial — há modal de evidência fotográfica; usa dados simulados |
-| PBI-059 | Iniciar revisão formalmente | [#79](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/79) | ❌ Não feito — não há ação/estado de "iniciar revisão" formal; aprovar/reprovar em `InspectionReviewPage` são simulados (toast "protótipo"), sem endpoint |
+| PBI-057 | Revisão de respostas por seção e item | [#77](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/77) | ✅ Concluído — `InspectionReviewPage` consome o backend real: seções/itens do snapshot, pergunta/resposta/observação, destaque de não conformidade e navegação por seção (PR #208) |
+| PBI-058 | Lightbox de fotografias na revisão | [#78](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/78) | ✅ Concluído — lightbox exibe a fotografia real vinda de `GET /api/v1/inspection-evidences/{id}/content` (download autenticado) com data, localização e item vinculado (PR #208). Observação: seed demo não traz evidências, então validado por testes |
+| PBI-059 | Iniciar revisão formalmente | [#79](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/79) | 🟡 Parcial — aprovar/reprovar em `InspectionReviewPage` agora são **reais** (`inspectionReviewApi.approve`/`reject`, habilitados só em `UNDER_REVIEW`); porém ainda **não** há ação/estado formal de "iniciar revisão" (transição dedicada) |
 | PBI-064 | Estados de carregamento, vazio, erro e offline | [#84](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/84) | 🟡 Parcial — páginas integradas (Users/Clients/Sites/Equipment/Inspections/ReviewQueue) e `AnswerHistoryTab` têm estados reais de loading/vazio/erro (com retry); falta tratamento específico de **offline** no web |
 | PBI-069 | Build e publicação do painel web admin | [#89](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/89) | 🟡 Parcial — CI existe (`.github/workflows/frontend-ci.yml`); publicação ainda não configurada |
 | PBI-083 | *P1:* Dashboard com indicadores (telas) | [#146](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/146) | 🟡 Parcial — `DashboardPage` existe e está roteado (`/app/dashboard`) com KPIs/gráficos (Recharts); dados ainda majoritariamente de `@/mocks/domain`, exceto "Revisões pendentes" (`useReviewCount`, API real). Não consome o `GET /api/v1/dashboard/summary` |
 | PBI-087 | *P1:* Relatório PDF básico (visualização/download) | [#149](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/149) | 🟡 Parcial — `InspectionReportPage` com prévia e download via jsPDF/`jspdf-autotable`; dados mockados e **não** consome o endpoint `report.pdf` do backend |
 | PBI-088 | *P1:* Histórico detalhado de respostas (telas) | [#150](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/150) | ✅ Concluído — `AnswerHistoryTab` (aba em `InspectionReviewPage`) consome `GET /api/v1/inspections/{id}/answers/history` com agrupamento por seção/item e estados loading/ready/not-found/error; tem testes |
 | PBI-089 | *P1:* Comentários de revisão por item (telas) | [#151](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/151) | ❌ Não feito (sem código no frontend) — issue no backlog |
-| PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | 🟡 Parcial — `ThemeProvider` (claro/escuro/sistema, classe `dark` no `<html>`, persistência em `localStorage`, segue `prefers-color-scheme`) plugado em `App.tsx`, com `ThemeToggle` acessível e testes; falta expor o toggle em algum layout visível |
+| PBI-091 | *P1:* Tema escuro | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ✅ Concluído (web) — `ThemeProvider` (claro/escuro/sistema, classe `dark` no `<html>`, persistência em `localStorage`, segue `prefers-color-scheme`) plugado em `App.tsx`, `ThemeToggle` acessível **exposto no `Header`** e telas de cadastros/inspeções adaptadas aos tokens (PRs #208 e dark mode). Mobile é tratado no PBI-091 (mobile) |
 | PBI-092 | *P1:* Exportação CSV (botão e download) | [#154](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/154) | ❌ Não feito (sem código no frontend) — issue no backlog |
 
 ### Resumo Sprint 2 Frontend Web (13 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 2 |
-| 🟡 Parcial | 8 |
-| ❌ Não feito | 3 |
+| ✅ Concluído | 6 |
+| 🟡 Parcial | 5 |
+| ❌ Não feito | 2 |
 
-**Porcentagem: ~15%** concluído (2/13). Concluídos: PBI-056 (fila de revisão integrada) e PBI-088 (histórico de respostas integrado). Parciais: PBI-047, 057, 058, 064, 069, 083, 087 e 091. Não feitos: PBI-059, 089 e 092.
+**Porcentagem: ~46%** concluído (6/13). Concluídos: PBI-056 (fila de revisão), PBI-088 (histórico de respostas), PBI-047 (evidências/NCs reais), PBI-057 (revisão por seção/item real), PBI-058 (lightbox com foto real) e PBI-091 (tema escuro web). Parciais: PBI-059, 064, 069, 083 e 087. Não feitos: PBI-089 e 092.
 
-> Revisão de outubro: a fila de revisão (PBI-056) e o histórico de respostas (PBI-088) **já estão integrados à API real**. A tela de revisão em si (aprovar/reprovar, respostas por seção, lightbox) continua como protótipo sobre mocks e, embora os endpoints de aprovação/reprovação (**PBI-060/061**) já existam no backend, ela ainda não os consome. O dashboard (PBI-083) e o tema escuro (PBI-091) saíram de "sem código" para parciais.
+> Revisão de outubro (atualizada após PR #208): a tela de revisão (`InspectionReviewPage`) deixou de ser protótipo — agora consome o backend real (respostas por seção/item, lightbox com fotografia real via `inspection-evidences/{id}/content`, aprovar/reprovar via `inspectionReviewApi`). Com isso, PBI-047/057/058 passaram a ✅ e o tema escuro web (PBI-091) foi concluído com o `ThemeToggle` exposto no `Header` e as telas adaptadas. Seguem pendentes: PBI-059 (não há "iniciar revisão" formal, só aprovar/reprovar), PBI-087 (PDF ainda via jsPDF/mocks, não consome o endpoint real), PBI-083 (dashboard ainda majoritariamente mock), PBI-064 (falta offline no web), PBI-069 (deploy não configurado), PBI-089 e PBI-092 (sem código no front).
 
 ---
 
@@ -347,28 +349,28 @@ Também já existem no código, embora pertençam a PBIs de sprints seguintes:
 | PBI-053 | Pull de alterações com cursor de sincronização | [#73](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/73) | ❌ Não feito — `pullInspections` baixa tudo; `sync_metadata`/`SyncMetadataRepository` guarda só `last_successful_sync` (timestamp), não é usado como cursor incremental |
 | PBI-054 | Tela de status de sincronização | [#74](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/74) | ✅ Concluído — `(tabs)/sync.tsx` consome `useSyncStatus()` com **dados reais** do outbox (`SyncQueueRepository.getAll/countPending`) e `SyncMetadataRepository.getLastSuccessfulSync`, conectividade via `useConnectivity` e `syncStatusMapping` (synced/pending/error/waiting/conflict); coberto por `__tests__/pbi054.test.ts` |
 | PBI-055 | Detecção de conflito de versão | [#75](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/75) | ✅ Concluído — migration v4 adiciona `server_version` em `inspections`; `enqueueTransition`/`enqueueStatusChange` enviam `baseVersion`; `pushInspectionStatus` lança `VersionConflictError` em resultado `CONFLICT`, `pushPendingOperations` chama `markConflict` e `sync.tsx` exibe banner "Conflito de versão"; coberto por `pbi054.test.ts` |
-| PBI-062 | Técnico recebe inspeção reprovada para correção | [#80](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/80) | 🟡 Parcial — há `RejectionBanner` e colunas `rejection_reason`/`rejected_by`/`rejected_at` + ação "Corrigir"; o backend de reprovação já existe (**PBI-061**), mas o `pullInspections` ainda não propaga o motivo/estado de reprovação do servidor para o dispositivo |
+| PBI-062 | Técnico recebe inspeção reprovada para correção | [#80](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/80) | ✅ Concluído — `RejectionBanner` + colunas `rejection_reason`/`rejected_by`/`rejected_at` + ação "Corrigir"; o `pullInspections`/`saveInspectionLocally` agora **propaga** `rejectionReason`/`rejectedBy`/`rejectedAt` do servidor para o dispositivo |
 | PBI-065 | Testes automatizados dos fluxos críticos | [#85](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/85) | 🟡 Parcial — `package.json` tem `jest`/`jest-expo`/`ts-jest`, script `"test": "jest"`, `jest.config.js` e suítes reais da camada de sync (`pbi044.test.ts`, `pbi054.test.ts`) rodando migrations/repos em SQLite in-memory; ainda **não** há React Testing Library para componentes nem cobertura ampla dos fluxos de UI |
 | PBI-067 | READMEs com instruções de execução | [#87](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/87) | ✅ Concluído — `api/README.md`, `frontend/README.md` e `mobile/README.md` existem, com pré-requisitos, comandos de execução, estrutura e convenções de commit/PR |
-| PBI-068 | Build Android (APK) para demonstração | [#88](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/88) | ❌ Não feito — sem configuração de build de APK |
+| PBI-068 | Build Android (APK) para demonstração | [#88](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/88) | ✅ Concluído — `mobile/eas.json` com perfis `development`/`preview` em `buildType: apk` (demo) e `production` em `app-bundle`; `mobile/README.md` documenta o build de APK e scripts (`build:apk`, `build:apk:local`, `build:install`) |
 | PBI-072 | Demonstração ponta a ponta | [#92](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/92) | ❌ Não feito — não há roteiro/fluxo de demo integrando ponta a ponta; o sync ainda só transmite status (sem escrita de respostas/evidências/NCs no servidor) |
 | PBI-084 | *P1:* Notificações locais de prazo | [#147](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/147) | ❌ Não feito — não há `scheduleNotificationAsync`/notificação local de prazo; só push remoto |
 | PBI-085 | *P1:* Notificações push de nova atribuição | [#155](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/155) | ✅ Concluído — `infrastructure/notifications/pushNotifications.ts` (expo-notifications) solicita permissão, obtém Expo push token e faz `POST /api/v1/devices/register` (chamado no `AuthContext` após login); `subscribeToNotificationTaps`/`useNotificationNavigation` abrem a inspeção pelo `inspectionId` ao toque |
 | PBI-086 | *P1:* Assinatura desenhada no dispositivo | [#148](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/148) | ❌ Não feito (sem código) — issue criada no backlog |
 | PBI-090 | *P1:* Biometria para reabertura de sessão local | [#152](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/152) | ✅ Concluído — `hooks/useBiometricAuth.ts` (expo-local-authentication) + `BiometricLockScreen`, toggle em `profile.tsx` (`biometricStorage`) e lock por AppState no `_layout.tsx` via `AuthContext.lockSession/unlockSession` |
-| PBI-091 | *P1:* Tema escuro (mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | 🟡 Parcial — infra pronta: `features/theme/ThemeContext.tsx` (claro/escuro/sistema + persistência `themeStorage`), `ThemeSelector`, `ThemeProvider` no `_layout.tsx` e paletas em `config/themes.ts`; falta migrar as telas (ainda usam `Colors` estático) |
+| PBI-091 | *P1:* Tema escuro (mobile) | [#153](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/153) | ✅ Concluído — infra (`features/theme/ThemeContext.tsx`, `ThemeSelector`, `ThemeProvider` no `_layout.tsx`, paletas em `config/themes.ts`) + telas migradas para `useThemeColors()`: login, abas (sync/profile/inspections) e telas de inspeção (start/checklist/index/summary/non-conformities/evidence/scanner). Restam poucos resquícios de `Colors` estático (cores de marca fixas) |
 
 ### Resumo Sprint 2 Mobile (22 itens)
 
 | Categoria | Qtd |
 |-----------|-----|
-| ✅ Concluído | 12 |
-| 🟡 Parcial | 5 |
-| ❌ Não feito | 5 |
+| ✅ Concluído | 15 |
+| 🟡 Parcial | 3 |
+| ❌ Não feito | 4 |
 
-**Porcentagem: ~55%** concluído (12/22).
+**Porcentagem: ~68%** concluído (15/22).
 
-> Revisão de outubro (código atual): além dos já concluídos **PBI-042 (foto+prévia)**, **PBI-043 (associar foto ao item)**, **PBI-046 (NC com criticidade)**, **PBI-049 (persistência de respostas)**, **PBI-050 (outbox)** e **PBI-067 (READMEs)**, subiram para ✅: **PBI-040** (validação de obrigatórios na conclusão, em `summary.tsx`), **PBI-044** (foto pendente/retry com testes), **PBI-054** (tela de sync com dados reais), **PBI-055** (conflito de versão via `server_version`/`VersionConflictError`), **PBI-085** (push: registra token + abre inspeção ao toque) e **PBI-090** (biometria). Parciais: **PBI-041** (scanner simulado), **PBI-045** (GPS no início, mas não na conclusão nem enviado ao servidor), **PBI-062** (banner/colunas de reprovação existem, mas o pull não propaga o estado do servidor), **PBI-065** (há Jest + testes de sync, falta testar UI) e **PBI-091** (tema escuro: infra pronta, telas ainda em `Colors`). Não feitos: cursor de sync (053), APK (068), demo ponta a ponta (072), notificações locais (084) e assinatura (086).
+> Revisão de outubro (atualizada): além dos já concluídos **PBI-040/042/043/044/046/049/050/054/055/067/085/090**, subiram para ✅ nesta verificação: **PBI-062** (o pull agora propaga `rejectionReason`/`rejectedBy`/`rejectedAt` do servidor), **PBI-068** (build de APK via `eas.json` + README) e **PBI-091 mobile** (telas migradas para `useThemeColors()`: login, abas e telas de inspeção). Parciais: **PBI-041** (scanner simulado), **PBI-045** (GPS no início, mas não na conclusão nem enviado ao servidor) e **PBI-065** (há Jest + testes de sync, falta testar UI). Não feitos: cursor de sync (053), demo ponta a ponta (072), notificações locais (084) e assinatura (086).
 
 ---
 
