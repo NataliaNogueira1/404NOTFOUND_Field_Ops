@@ -531,6 +531,19 @@ export class InspectionSyncService {
   }
 
   /**
+   * PBI-086: Enqueue a signature to be sent to the server later.
+   * The signature is stored as encoded stroke data alongside the inspection,
+   * so it is available offline and sent during the next sync cycle.
+   */
+  async enqueueSignature(inspectionId: string, signatureData: string): Promise<void> {
+    const id = `signature-${inspectionId}`;
+    await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
+      signatureData,
+      type: 'SIGNATURE',
+    });
+  }
+
+  /**
    * Enqueue a status change to be synced later.
    */
   async enqueueStatusChange(inspectionId: string, status: string): Promise<void> {
