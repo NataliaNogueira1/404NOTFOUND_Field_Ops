@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { authSession } from '@/auth/session'
 import { MobileMenuButton } from '@/components/layout/Sidebar'
+import { ThemeToggle } from '@/theme/ThemeToggle'
 
 const titles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -43,6 +44,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <button
           className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
           aria-label="Notificacoes"
