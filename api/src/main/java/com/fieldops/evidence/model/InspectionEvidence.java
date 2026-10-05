@@ -41,6 +41,9 @@ public class InspectionEvidence {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(columnDefinition = "TEXT")
+    private String location;
+
     @Column(name = "captured_at", nullable = false, updatable = false)
     private Instant capturedAt;
 
@@ -56,12 +59,18 @@ public class InspectionEvidence {
 
     public static InspectionEvidence create(Inspection inspection, InspectionItemSnapshot itemSnapshot,
             String reference, String checksum, String description, Instant capturedAt, User uploadedBy) {
+        return create(inspection, itemSnapshot, reference, checksum, description, null, capturedAt, uploadedBy);
+    }
+
+    public static InspectionEvidence create(Inspection inspection, InspectionItemSnapshot itemSnapshot,
+            String reference, String checksum, String description, String location, Instant capturedAt, User uploadedBy) {
         InspectionEvidence evidence = new InspectionEvidence();
         evidence.inspection = inspection;
         evidence.itemSnapshot = itemSnapshot;
         evidence.reference = reference;
         evidence.checksum = checksum;
         evidence.description = description;
+        evidence.location = location;
         evidence.capturedAt = capturedAt;
         evidence.uploadedBy = uploadedBy;
         return evidence;
@@ -81,6 +90,7 @@ public class InspectionEvidence {
     public String getReference() { return reference; }
     public String getChecksum() { return checksum; }
     public String getDescription() { return description; }
+    public String getLocation() { return location; }
     public Instant getCapturedAt() { return capturedAt; }
     public User getUploadedBy() { return uploadedBy; }
     public Instant getCreatedAt() { return createdAt; }
