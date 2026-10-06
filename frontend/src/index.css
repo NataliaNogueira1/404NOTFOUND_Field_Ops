@@ -24,6 +24,8 @@
   --color-text: #0f172a;
   --color-muted: #64748b;
   --color-border: #c1cddd;
+  /* Subtle surface used for placeholders and progress tracks (was bg-slate-50/100). */
+  --color-muted-surface: #f1f5f9;
   --radius-fieldops: 10px;
   --radius-card: 12px;
   --shadow-soft: 0 8px 24px rgb(15 23 42 / 0.06);
@@ -42,6 +44,7 @@
   --color-text: #e2e8f0;
   --color-muted: #94a3b8;
   --color-border: #2a3852;
+  --color-muted-surface: #0f1626;
   --color-success: #22c55e;
   --color-success-dark: #4ade80;
   --color-success-light: #14532d;
