@@ -1,8 +1,9 @@
 ﻿import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -107,13 +108,21 @@ export default function StartInspectionScreen() {
         </Card>
 
         <Button label="✅ Confirmar início" onPress={confirm} loading={confirming} fullWidth size="lg" />
-        <Button
-          label="🔍 Confirmar QR do equipamento"
+
+        {/* QR Code button — blue circle with Ionicons qr-code icon */}
+        <Pressable
+          style={({ pressed }) => [styles.qrButton, pressed && styles.qrButtonPressed]}
           onPress={() => router.push(`/(protected)/scanner?inspectionId=${inspection.id}`)}
-          variant="secondary"
           disabled={confirming}
-          fullWidth
-        />
+          accessibilityRole="button"
+          accessibilityLabel="Confirmar QR Code do equipamento"
+        >
+          <View style={styles.qrCircle}>
+            <Ionicons name="qr-code" size={28} color={Colors.white} />
+          </View>
+          <Text style={[styles.qrLabel, { color: c.text }]}>Confirmar QR do equipamento</Text>
+        </Pressable>
+
         <Button label="Cancelar" onPress={() => router.back()} variant="ghost" disabled={confirming} fullWidth />
       </ScrollView>
     </SafeAreaView>
@@ -159,5 +168,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderTopWidth: 1,
     paddingTop: Spacing.sm,
+  },
+  // QR Code button
+  qrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  qrButtonPressed: { opacity: 0.7 },
+  qrCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrLabel: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
   },
 });
