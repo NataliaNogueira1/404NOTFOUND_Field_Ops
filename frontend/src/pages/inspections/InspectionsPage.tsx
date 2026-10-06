@@ -150,11 +150,17 @@ export function InspectionsPage() {
     setExporting(true)
     setExportError('')
     try {
+      // Resolve clientName → clientId: the backend export endpoint accepts clientId
+      // (numeric), not clientName. Look up in the locally-available clients list.
+      const matchedClient = clientName
+        ? clients.find((c) => c.name === clientName)
+        : undefined
+
       await adminCatalogApi.exportCsv({
         status,
         from: dueDate,   // "Período" field maps to the from filter
         to: '',
-        clientName,
+        clientId: matchedClient?.id ? Number(matchedClient.id) : undefined,
       })
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Erro ao exportar CSV.')
