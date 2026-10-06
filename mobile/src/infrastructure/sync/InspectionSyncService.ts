@@ -131,10 +131,21 @@ export class InspectionSyncService {
   /**
    * Fetch inspections assigned to the current technician and store locally.
    * This is the main "download" operation.
+   *
+   * @param token        - Bearer access token.
+   * @param onAfterPull  - Optional async callback called with the downloaded
+   *                       inspections after they are persisted. Used to
+   *                       reschedule local deadline reminders (PBI-084) without
+   *                       coupling this service to the notifications module
+   *                       (keeps existing tests unaffected).
    */
-  async pullInspections(token: string): Promise<{ downloaded: number; errors: string[] }> {
+  async pullInspections(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{ downloaded: number; errors: string[] }> {
     const errors: string[] = [];
     let downloaded = 0;
+    const downloaded_inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }> = [];
 
     try {
       const apiInspections = await apiClient.get<ApiInspection[]>(
@@ -146,6 +157,13 @@ export class InspectionSyncService {
         try {
           await this.saveInspectionLocally(apiInsp);
           downloaded++;
+          downloaded_inspections.push({
+            id: apiInsp.id,
+            title: apiInsp.title,
+            dueDate: apiInsp.dueDate,
+            dueTime: apiInsp.dueTime,
+            status: apiInsp.status,
+          });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           errors.push(`[${apiInsp.id}] ${msg}`);
@@ -154,6 +172,16 @@ export class InspectionSyncService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
       errors.push(msg);
+    }
+
+    // Reschedule local deadline reminders after pull. Errors here must never
+    // break the sync result or surface to the user as sync failures (RN-041).
+    if (onAfterPull && downloaded_inspections.length > 0) {
+      try {
+        await onAfterPull(downloaded_inspections);
+      } catch {
+        // Notification scheduling failure is silently swallowed.
+      }
     }
 
     return { downloaded, errors };
@@ -404,8 +432,14 @@ export class InspectionSyncService {
 
   /**
    * Perform a full sync cycle: push pending operations, then pull latest data.
+   *
+   * @param onAfterPull  - Optional callback forwarded to {@link pullInspections}
+   *                       for rescheduling local deadline reminders (PBI-084).
    */
-  async fullSync(token: string): Promise<{
+  async fullSync(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{
     pulled: number;
     pushed: number;
     errors: string[];
@@ -416,8 +450,8 @@ export class InspectionSyncService {
     const pushResult = await this.pushPendingOperations(token);
     errors.push(...pushResult.errors);
 
-    // Then pull (to get server-side updates)
-    const pullResult = await this.pullInspections(token);
+    // Then pull (to get server-side updates), forwarding the reminders callback.
+    const pullResult = await this.pullInspections(token, onAfterPull);
     errors.push(...pullResult.errors);
 
     // Record the timestamp of the last *successful* sync only when the whole
