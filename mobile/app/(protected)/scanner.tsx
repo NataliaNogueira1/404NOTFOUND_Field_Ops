@@ -183,38 +183,35 @@ export default function ScannerScreen() {
   // ─── Camera viewfinder ──────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
-      <Text style={[styles.title, styles.titlePadded, { color: c.text }]}>
-        Confirmar equipamento
-      </Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {/* Camera fills the entire screen */}
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+        onBarcodeScanned={handleBarcode}
+      />
 
-      {equipmentName ? (
-        <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          Aponte para o QR Code de{' '}
-          <Text style={{ fontWeight: FontWeight.semibold }}>{equipmentName}</Text>
-        </Text>
-      ) : (
-        <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          Aponte para o QR Code do equipamento
-        </Text>
-      )}
-
-      {/* Dark viewfinder — intentionally stays dark in both themes so the
-          viewfinder frame is always visible regardless of the background. */}
-      <View style={styles.cameraContainer}>
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={handleBarcode}
-        />
-        {/* Overlay corners that frame the target area */}
-        <View style={styles.overlay}>
-          <View style={styles.corner} />
-          <Text style={styles.scanHint}>Posicione o QR Code dentro da moldura</Text>
-        </View>
+      {/* Semi-transparent top bar with title + subtitle */}
+      <View style={styles.topBar}>
+        <Text style={styles.title}>Confirmar equipamento</Text>
+        {equipmentName ? (
+          <Text style={styles.subtitle}>
+            Aponte para o QR Code de{' '}
+            <Text style={{ fontWeight: FontWeight.semibold }}>{equipmentName}</Text>
+          </Text>
+        ) : (
+          <Text style={styles.subtitle}>Aponte para o QR Code do equipamento</Text>
+        )}
       </View>
 
+      {/* Corner frame — centred in the remaining space between top bar and footer */}
+      <View style={styles.frameArea}>
+        <View style={styles.corner} />
+        <Text style={styles.scanHint}>Posicione o QR Code dentro da moldura</Text>
+      </View>
+
+      {/* Footer with cancel button */}
       <View style={styles.footer}>
         <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
       </View>
@@ -231,24 +228,28 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     padding: Spacing.xl,
   },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
-  titlePadded: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  subtitle: { fontSize: FontSize.md, paddingHorizontal: Spacing.md, marginBottom: Spacing.sm },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.white },
+  subtitle: { fontSize: FontSize.md, color: Colors.white, opacity: 0.9 },
   muted: { fontSize: FontSize.md, textAlign: 'center' },
-  // Camera
-  cameraContainer: {
-    flex: 1,
-    overflow: 'hidden',
+  // ─── Camera viewfinder ─────────────────────────────────────────────────
+  // Top bar: semi-transparent strip that sits above the frame area
+  topBar: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    gap: Spacing.xs,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
+  // frameArea: flex:1 so it takes all space between topBar and footer,
+  // then centres the corner frame both horizontally and vertically
+  frameArea: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.md,
+    gap: Spacing.lg,
   },
   corner: {
-    width: 200,
-    height: 200,
+    width: 220,
+    height: 220,
     borderWidth: 3,
     borderColor: Colors.primaryLight,
     borderRadius: 20,
@@ -257,13 +258,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: FontWeight.semibold,
     fontSize: FontSize.sm,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.50)',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: 8,
+    textAlign: 'center',
   },
-  footer: { padding: Spacing.md },
-  // Result card
+  // Footer: semi-transparent strip with cancel button
+  footer: {
+    padding: Spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },  // Result card
   resultContainer: {
     flex: 1,
     padding: Spacing.md,
