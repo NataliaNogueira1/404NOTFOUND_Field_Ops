@@ -196,6 +196,7 @@ public class InspectionService {
         inspection.setClientName(client.getName());
         inspection.setSiteName(site.getName());
         inspection.setEquipmentName(equipment == null ? null : equipment.getName());
+        inspection.setEquipmentQrCode(equipment == null ? null : equipment.getQrCode());
         inspection.setTechnician(technician);
         inspection.setSupervisor(supervisor);
         inspection.setStatus(InspectionStatus.ASSIGNED);

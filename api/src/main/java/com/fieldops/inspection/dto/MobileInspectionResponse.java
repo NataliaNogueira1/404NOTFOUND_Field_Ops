@@ -18,6 +18,8 @@ public record MobileInspectionResponse(
         String siteName,
         String equipmentId,
         String equipmentName,
+        /** QR Code of the equipment snapshot — used by the mobile app for offline confirmation (PBI-041). */
+        String equipmentQrCode,
         String technicianId,
         String supervisorId,
         String supervisorName,
