@@ -4,10 +4,11 @@ import { cn } from '@/utils/cn'
 
 type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
 const tones: Record<BadgeTone, string> = {
-  neutral: 'bg-muted-surface text-muted',
+  // Light tone kept exactly as before; dark override only fixes contrast on dark.
+  neutral: 'bg-slate-100 text-muted dark:bg-muted-surface',
   primary: 'bg-primary-light/55 text-primary-dark',
   success: 'bg-success-light/35 text-success-dark',
-  warning: 'bg-warning-light/60 text-warning-dark',
+  warning: 'bg-amber-100 text-warning-dark dark:bg-warning-light/60',
   danger: 'bg-danger-light/25 text-danger-dark',
 }
 export function Badge({

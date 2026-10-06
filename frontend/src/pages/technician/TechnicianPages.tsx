@@ -849,7 +849,7 @@ function EvidenceModal({ item, onClose }: { item: TemplateItem | null; onClose: 
       {item && (
         <div className="space-y-4">
           <p className="font-medium">{item.question}</p>
-          <div className="grid h-48 place-items-center rounded-card border border-dashed border-border bg-muted-surface text-muted">
+          <div className="grid h-48 place-items-center rounded-card border border-dashed border-border bg-slate-50 text-muted dark:bg-muted-surface">
             <Camera size={40} />
           </div>
           <Textarea label="Descricao" id="evidence-desc" placeholder="Descricao da evidencia simulada" />
@@ -902,7 +902,7 @@ function TechStat({
   const toneClass = {
     primary: 'text-primary-dark bg-primary-light/45',
     danger: 'text-danger-dark bg-danger-light/20',
-    warning: 'text-warning-dark bg-warning-light/60',
+    warning: 'text-warning-dark bg-amber-100 dark:bg-warning-light/60',
     success: 'text-success-dark bg-success-light/30',
   }[tone]
   return (
@@ -942,7 +942,7 @@ function Info({ label, value }: { label: string; value?: string }) {
 function Progress({ value }: { value: number }) {
   return (
     <div>
-      <div className="h-2 rounded-full bg-muted-surface">
+      <div className="h-2 rounded-full bg-slate-100 dark:bg-muted-surface">
         <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, value)}%` }} />
       </div>
       <p className="mt-1 text-xs text-muted">{value}% concluido</p>
