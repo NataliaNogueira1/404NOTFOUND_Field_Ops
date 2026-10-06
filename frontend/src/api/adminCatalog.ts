@@ -299,21 +299,25 @@ export const adminCatalogApi = {
    * via an invisible anchor element — no page navigation occurs.
    *
    * Only ADMINISTRATOR accounts may call this endpoint (403 for SUPERVISOR).
+   *
+   * Note: the backend export endpoint accepts `clientId` (numeric), not `clientName`.
+   * The caller is responsible for resolving clientName → clientId before calling this.
    */
   async exportCsv(filters: {
     status: InspectionStatus | ''
     from: string
     to: string
-    clientName: string
+    clientId?: number
   }): Promise<void> {
     const params = new URLSearchParams()
     if (filters.status) params.set('status', filters.status)
     if (filters.from) params.set('from', filters.from)
     if (filters.to) params.set('to', filters.to)
-    if (filters.clientName.trim()) params.set('clientName', filters.clientName.trim())
+    if (filters.clientId) params.set('clientId', String(filters.clientId))
 
     const query = params.toString()
-    const url = `/api/v1/inspections/export.csv${query ? `?${query}` : ''}`
+    const apiUrl = import.meta.env.VITE_API_URL ?? ''
+    const url = `${apiUrl}/api/v1/inspections/export.csv${query ? `?${query}` : ''}`
 
     // Use fetch directly — apiRequest always JSON.parses the body
     const token = (await import('@/api/client')).tokenStorage.get()
@@ -335,7 +339,7 @@ export const adminCatalogApi = {
     // Derive filename from Content-Disposition header when available
     const disposition = response.headers.get('Content-Disposition') ?? ''
     const match = /filename="?([^";\n]+)"?/.exec(disposition)
-    const filename = match?.[1] ?? `inspections-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = match?.[1] ?? `inspecoes-${new Date().toISOString().slice(0, 10)}.csv`
 
     const anchor = document.createElement('a')
     anchor.href = objectUrl
