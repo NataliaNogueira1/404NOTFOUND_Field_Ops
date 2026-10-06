@@ -107,6 +107,13 @@ export default function StartInspectionScreen() {
         </Card>
 
         <Button label="✅ Confirmar início" onPress={confirm} loading={confirming} fullWidth size="lg" />
+        <Button
+          label="🔍 Confirmar QR do equipamento"
+          onPress={() => router.push(`/(protected)/scanner?inspectionId=${inspection.id}`)}
+          variant="secondary"
+          disabled={confirming}
+          fullWidth
+        />
         <Button label="Cancelar" onPress={() => router.back()} variant="ghost" disabled={confirming} fullWidth />
       </ScrollView>
     </SafeAreaView>
