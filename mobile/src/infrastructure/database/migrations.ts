@@ -180,6 +180,13 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 5,
+    description: 'PBI-041: store equipment QR code on inspection snapshot for offline confirmation',
+    sql: `
+      ALTER TABLE inspections ADD COLUMN equipment_qr_code TEXT;
+    `,
+  },
 ];
 
 /**

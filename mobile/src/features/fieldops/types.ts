@@ -23,6 +23,8 @@ export interface Inspection {
   siteName: string;
   equipmentId: string;
   equipmentName: string;
+  /** QR Code of the equipment at time of assignment — used for offline confirmation (PBI-041). */
+  equipmentQrCode?: string;
   technicianId: string;
   supervisorId: string;
   supervisorName: string;
