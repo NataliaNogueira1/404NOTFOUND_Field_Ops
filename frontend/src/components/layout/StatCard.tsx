@@ -8,7 +8,8 @@ interface StatCardProps {
 }
 const tones = {
   blue: 'bg-primary-light/55 text-primary-dark',
-  amber: 'bg-amber-100 text-warning-dark',
+  // Light tone unchanged; dark override keeps contrast on dark backgrounds.
+  amber: 'bg-amber-100 text-warning-dark dark:bg-warning-light/60',
   red: 'bg-danger-light/25 text-danger-dark',
   green: 'bg-success-light/35 text-success-dark',
 }
