@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
 import { useReviewCount } from '@/hooks/useReviewCount'
+import { useTheme } from '@/theme'
 import {
   dashboardStats,
   inspections,
@@ -28,9 +29,21 @@ import {
   equipment,
 } from '@/mocks/domain'
 
+/**
+ * Recharts renders SVG and cannot use Tailwind classes, so chart colors are
+ * passed explicitly. We resolve them from the active theme (PBI-091 #173) so
+ * axes, grid, tooltip and bars stay legible on both light and dark backgrounds.
+ */
+const CHART_COLORS = {
+  light: { grid: '#C1CDDD', tick: '#64748B', cursor: '#F2F7FF', tooltipBg: '#FFFFFF', tooltipBorder: '#C1CDDD', bar: '#2563EB' },
+  dark: { grid: '#2A3852', tick: '#94A3B8', cursor: '#1E293B', tooltipBg: '#111A2E', tooltipBorder: '#2A3852', bar: '#3B82F6' },
+} as const
+
 export function DashboardPage() {
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const reviewCount = useReviewCount()
+  const { effectiveTheme } = useTheme()
+  const chart = CHART_COLORS[effectiveTheme]
 
   const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
   const pendingLabel =
@@ -69,16 +82,24 @@ export function DashboardPage() {
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={inspectionsByStatus} margin={{ left: -20, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C1CDDD" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: chart.tick, fontSize: 12 }} />
                 <YAxis
                   allowDecimals={false}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 12 }}
+                  tick={{ fill: chart.tick, fontSize: 12 }}
                 />
-                <Tooltip cursor={{ fill: '#F2F7FF' }} contentStyle={{ borderRadius: 10, borderColor: '#C1CDDD' }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} />
+                <Tooltip
+                  cursor={{ fill: chart.cursor }}
+                  contentStyle={{
+                    borderRadius: 10,
+                    borderColor: chart.tooltipBorder,
+                    backgroundColor: chart.tooltipBg,
+                    color: chart.tick,
+                  }}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} fill={chart.bar} />
               </BarChart>
             </ResponsiveContainer>
           </div>
