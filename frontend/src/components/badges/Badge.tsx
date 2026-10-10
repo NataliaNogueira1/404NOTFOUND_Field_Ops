@@ -6,7 +6,9 @@ type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
 const tones: Record<BadgeTone, string> = {
   // Light tone kept exactly as before; dark override only fixes contrast on dark.
   neutral: 'bg-slate-100 text-muted dark:bg-muted-surface',
-  primary: 'bg-primary-light/55 text-primary-dark',
+  // Light keeps the soft blue chip; primary-light is not remapped on dark, so
+  // override only the primary tone there to avoid a washed-out light chip.
+  primary: 'bg-primary-light/55 text-primary-dark dark:bg-primary/25 dark:text-primary-light',
   success: 'bg-success-light/35 text-success-dark',
   warning: 'bg-amber-100 text-warning-dark dark:bg-warning-light/60',
   danger: 'bg-danger-light/25 text-danger-dark',
