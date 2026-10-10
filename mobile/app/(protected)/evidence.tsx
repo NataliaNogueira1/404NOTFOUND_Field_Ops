@@ -1,5 +1,5 @@
 ﻿import { useCallback, useRef, useState } from 'react';
-import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -7,17 +7,19 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
-import { useImagePicker, type CapturedImage } from '@/infrastructure/media';
+import { useImagePicker, persistEvidenceFile, type CapturedImage } from '@/infrastructure/media';
 
 type ScreenMode = 'idle' | 'camera' | 'preview';
 
 export default function EvidenceScreen() {
-  const { inspectionId = 'ins-compressor', itemId = 'item-4' } = useLocalSearchParams<{
+  const { inspectionId, itemId } = useLocalSearchParams<{
     inspectionId?: string;
     itemId?: string;
   }>();
   const router = useRouter();
+  const c = useThemeColors();
   const { addEvidence } = useFieldOps();
   const { pickFromGallery } = useImagePicker();
   const { template } = useInspectionTemplate(inspectionId);
@@ -45,8 +47,11 @@ export default function EvidenceScreen() {
     if (!cameraRef.current) return;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
     if (photo) {
+      // Copy the camera capture out of the temporary cache into persistent
+      // storage so an evidence pending upload survives offline (RN-047 / PBI-044).
+      const persistedUri = await persistEvidenceFile(photo.uri);
       setCaptured({
-        uri: photo.uri,
+        uri: persistedUri,
         width: photo.width,
         height: photo.height,
       });
@@ -63,7 +68,12 @@ export default function EvidenceScreen() {
   }, [pickFromGallery]);
 
   function usePhoto() {
-    if (!captured) return;
+    // Guard against opening this route without the required context params —
+    // an evidence must always be bound to a real inspection + item (RN-045).
+    if (!captured || !inspectionId || !itemId) {
+      router.back();
+      return;
+    }
     addEvidence(inspectionId, itemId, description, captured.uri);
     router.back();
   }
@@ -72,7 +82,7 @@ export default function EvidenceScreen() {
 
   if (mode === 'camera') {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={[styles.safe, styles.cameraSafe]} edges={['top']}>
         <View style={styles.cameraContainer}>
           <CameraView
             ref={cameraRef}
@@ -96,21 +106,21 @@ export default function EvidenceScreen() {
 
   if (mode === 'preview' && captured) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>Prévia da foto</Text>
+          <Text style={[styles.title, { color: c.text }]}>Prévia da foto</Text>
 
           <Card style={styles.viewer}>
             <Image source={{ uri: captured.uri }} style={styles.preview} resizeMode="cover" />
-            <Text style={styles.item}>
+            <Text style={{ color: c.textSecondary }}>
               Item: {item?.question ?? 'Não identificado'}
             </Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Descrição (opcional)"
-              placeholderTextColor={Colors.gray400}
-              style={styles.input}
+              placeholderTextColor={c.textSecondary}
+              style={[styles.input, { borderColor: c.border, color: c.text, backgroundColor: c.surface }]}
               multiline
             />
           </Card>
@@ -127,18 +137,18 @@ export default function EvidenceScreen() {
   // ─── Idle mode: choose camera or gallery ──────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Capturar evidência</Text>
+        <Text style={[styles.title, { color: c.text }]}>Capturar evidência</Text>
 
         <Card style={styles.viewer}>
-          <View style={styles.placeholder}>
+          <View style={[styles.placeholder, { backgroundColor: c.mutedSurface, borderColor: c.border }]}>
             <Text style={styles.placeholderIcon}>📷</Text>
-            <Text style={styles.placeholderText}>
+            <Text style={[styles.placeholderText, { color: c.textSecondary }]}>
               Tire uma foto ou escolha da galeria
             </Text>
           </View>
-          <Text style={styles.item}>
+          <Text style={{ color: c.textSecondary }}>
             Item: {item?.question ?? 'Não identificado'}
           </Text>
         </Card>
@@ -152,22 +162,22 @@ export default function EvidenceScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
+  // Camera is always a dark surface, in both themes.
+  cameraSafe: { backgroundColor: Colors.gray900 },
   container: { padding: Spacing.md, gap: Spacing.md },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   viewer: { gap: Spacing.md },
   preview: {
     width: '100%',
     height: 320,
     borderRadius: 12,
-    backgroundColor: Colors.text,
+    backgroundColor: Colors.gray900,
   },
   placeholder: {
     height: 320,
     borderRadius: 12,
-    backgroundColor: Colors.mutedSurface,
     borderWidth: 2,
-    borderColor: Colors.border,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -175,23 +185,18 @@ const styles = StyleSheet.create({
   },
   placeholderIcon: { fontSize: 48 },
   placeholderText: {
-    color: Colors.textSecondary,
     fontWeight: FontWeight.semibold,
     textAlign: 'center',
     paddingHorizontal: Spacing.lg,
   },
-  item: { color: Colors.textSecondary },
   input: {
     minHeight: 88,
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 10,
     padding: Spacing.md,
-    color: Colors.text,
     textAlignVertical: 'top',
-    backgroundColor: Colors.surface,
   },
-  // Camera inline styles
+  // Camera inline styles — dark overlay in both themes.
   cameraContainer: { flex: 1 },
   camera: { flex: 1 },
   cameraControls: {
@@ -199,7 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.md,
-    backgroundColor: Colors.text,
+    backgroundColor: Colors.gray900,
   },
   shutterButton: {
     width: 72,

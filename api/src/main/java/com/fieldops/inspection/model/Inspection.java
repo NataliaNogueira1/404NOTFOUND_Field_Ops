@@ -16,6 +16,10 @@ public class Inspection {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(nullable = false, length = 300)
     private String title;
 
@@ -113,6 +117,7 @@ public class Inspection {
 
     // Getters and Setters
     public Long getId() { return id; }
+    public Long getVersion() { return version; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public InspectionTemplate getTemplate() { return template; }

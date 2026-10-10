@@ -7,10 +7,12 @@ import { SeverityBadge } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Severity, useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 export default function NonConformitiesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const c = useThemeColors();
   const { nonConformities, addNonConformity } = useFieldOps();
   const { template } = useInspectionTemplate(id);
   const [open, setOpen] = useState(false);
@@ -31,19 +33,19 @@ export default function NonConformitiesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Não conformidades</Text>
+        <Text style={[styles.title, { color: c.text }]}>Não conformidades</Text>
         {list.map((nc) => {
           const item = items.find((candidate) => candidate.id === nc.itemId);
           return (
             <Card key={nc.id} style={styles.card}>
               <View style={styles.row}>
-                <Text style={styles.ncTitle}>{nc.title}</Text>
+                <Text style={[styles.ncTitle, { color: c.text }]}>{nc.title}</Text>
                 <SeverityBadge severity={nc.severity} />
               </View>
-              <Text style={styles.muted}>Item: {item?.question ?? nc.itemId}</Text>
-              <Text style={styles.muted}>Evidências: {nc.evidenceCount}</Text>
+              <Text style={[styles.muted, { color: c.textSecondary }]}>Item: {item?.question ?? nc.itemId}</Text>
+              <Text style={[styles.muted, { color: c.textSecondary }]}>Evidências: {nc.evidenceCount}</Text>
             </Card>
           );
         })}
@@ -53,45 +55,48 @@ export default function NonConformitiesScreen() {
       <Modal visible={open} transparent animationType="slide">
         <View style={styles.backdrop}>
           <Card style={styles.modal}>
-            <Text style={styles.modalTitle}>Nova não conformidade</Text>
+            <Text style={[styles.modalTitle, { color: c.text }]}>Nova não conformidade</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Título"
-              placeholderTextColor={Colors.gray400}
-              style={styles.input}
+              placeholderTextColor={c.textSecondary}
+              style={[styles.input, { borderColor: c.border, color: c.text, backgroundColor: c.surface }]}
             />
             <TextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Descrição"
-              placeholderTextColor={Colors.gray400}
-              style={[styles.input, styles.textArea]}
+              placeholderTextColor={c.textSecondary}
+              style={[styles.input, styles.textArea, { borderColor: c.border, color: c.text, backgroundColor: c.surface }]}
               multiline
             />
-            <Text style={styles.label}>Criticidade</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Criticidade</Text>
             <View style={styles.chips}>
-              {Object.values(Severity).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setSeverity(value)}
-                  style={[styles.chip, severity === value && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, severity === value && styles.chipTextActive]}>
-                    {value === Severity.LOW ? 'Leve' : value === Severity.MEDIUM ? 'Moderada' : value === Severity.HIGH ? 'Alta' : 'Crítica'}
-                  </Text>
-                </Pressable>
-              ))}
+              {Object.values(Severity).map((value) => {
+                const active = severity === value;
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => setSeverity(value)}
+                    style={[styles.chip, { borderColor: active ? Colors.primary : c.border, backgroundColor: active ? Colors.primary : c.surface }]}
+                  >
+                    <Text style={[styles.chipText, { color: active ? Colors.white : c.textSecondary }]}>
+                      {value === Severity.LOW ? 'Leve' : value === Severity.MEDIUM ? 'Moderada' : value === Severity.HIGH ? 'Alta' : 'Crítica'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={styles.label}>Item relacionado</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Item relacionado</Text>
             <ScrollView style={styles.itemPicker}>
               {items.map((item) => (
                 <Pressable
                   key={item.id}
                   onPress={() => setItemId(item.id)}
-                  style={[styles.itemOption, itemId === item.id && styles.itemOptionActive]}
+                  style={[styles.itemOption, itemId === item.id && { backgroundColor: c.primaryLight }]}
                 >
-                  <Text style={styles.muted}>{item.question}</Text>
+                  <Text style={{ color: c.textSecondary }}>{item.question}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -105,25 +110,22 @@ export default function NonConformitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   card: { gap: Spacing.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm },
-  ncTitle: { flex: 1, color: Colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
-  muted: { color: Colors.textSecondary, fontSize: FontSize.sm },
+  ncTitle: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  muted: { fontSize: FontSize.sm },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.30)' },
   modal: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, gap: Spacing.md, maxHeight: '88%' },
-  modalTitle: { fontSize: FontSize.lg, color: Colors.text, fontWeight: FontWeight.bold },
-  input: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, color: Colors.text, backgroundColor: Colors.surface },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  input: { minHeight: 48, borderRadius: 10, borderWidth: 1, padding: Spacing.md },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
-  label: { color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  label: { fontWeight: FontWeight.semibold },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: { minHeight: 40, borderRadius: 999, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.md, justifyContent: 'center' },
-  chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  chipText: { color: Colors.textSecondary, fontWeight: FontWeight.semibold },
-  chipTextActive: { color: Colors.white },
+  chip: { minHeight: 40, borderRadius: 999, borderWidth: 1, paddingHorizontal: Spacing.md, justifyContent: 'center' },
+  chipText: { fontWeight: FontWeight.semibold },
   itemPicker: { maxHeight: 160 },
   itemOption: { padding: Spacing.sm, borderRadius: 8 },
-  itemOptionActive: { backgroundColor: Colors.primaryLight },
 });

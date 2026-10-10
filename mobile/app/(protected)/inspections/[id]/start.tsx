@@ -7,6 +7,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
+import type { ThemeColors } from '@/config/themes';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 import { useLocation } from '@/infrastructure/location';
 
@@ -15,6 +17,7 @@ type PermissionState = 'granted' | 'denied' | 'undetermined';
 export default function StartInspectionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const c = useThemeColors();
   const { inspections, startInspection } = useFieldOps();
   const { template, isLoading } = useInspectionTemplate(id);
   const location = useLocation();
@@ -34,9 +37,9 @@ export default function StartInspectionScreen() {
 
   if (!inspection) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
         <View style={styles.centered}>
-          <Text style={styles.muted}>Inspeção não encontrada.</Text>
+          <Text style={{ color: c.textSecondary }}>Inspeção não encontrada.</Text>
           <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
         </View>
       </SafeAreaView>
@@ -49,18 +52,9 @@ export default function StartInspectionScreen() {
     if (!inspection || confirming) return;
     setConfirming(true);
     try {
-      // Device timestamp — records when the activity effectively began.
       const startedAtDevice = new Date().toISOString();
-
-      // One-shot location capture, unless the technician opted out for this
-      // inspection. If denied/unavailable, continue anyway (RN-059).
       const captured = registerLocation ? await location.capture() : null;
-
-      startInspection(inspection.id, {
-        startedAtDevice,
-        location: captured,
-      });
-
+      startInspection(inspection.id, { startedAtDevice, location: captured });
       router.replace(`/(protected)/inspections/${inspection.id}/checklist`);
     } finally {
       setConfirming(false);
@@ -68,123 +62,95 @@ export default function StartInspectionScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Você está prestes a iniciar</Text>
+        <Text style={[styles.title, { color: c.text }]}>Você está prestes a iniciar</Text>
 
         <Card style={styles.card}>
-          <Text style={styles.inspection}>{inspection.title}</Text>
-          <Text style={styles.muted}>{inspection.equipmentName}</Text>
-          <Text style={styles.muted}>
+          <Text style={[styles.inspection, { color: c.text }]}>{inspection.title}</Text>
+          <Text style={{ color: c.textSecondary }}>{inspection.equipmentName}</Text>
+          <Text style={{ color: c.textSecondary }}>
             {inspection.clientName} — {inspection.siteName}
           </Text>
           {isLoading ? (
             <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
-            <Text style={styles.items}>📊 {totalItems} itens para verificar</Text>
+            <Text style={[styles.items, { color: c.text }]}>📊 {totalItems} itens para verificar</Text>
           )}
         </Card>
 
         <Card style={styles.card}>
-          <Text style={styles.section}>Permissões</Text>
-          <PermissionRow
-            icon="📍"
-            label="Localização"
-            state={location.permission}
-          />
+          <Text style={[styles.section, { color: c.text }]}>Permissões</Text>
+          <PermissionRow icon="📍" label="Localização" state={location.permission} />
           <PermissionRow icon="📷" label="Câmera" state={cameraState} />
           {location.permission === 'denied' ? (
-            <Text style={styles.warning}>
+            <Text style={[styles.warning, { color: c.warningDark }]}>
               ⚠️ Sem permissão de localização a inspeção inicia normalmente, mas o local de
               início não será registrado.
             </Text>
           ) : (
-            <View style={styles.row}>
-              <Text style={styles.muted}>📍 Registrar localização de início</Text>
+            <View style={[styles.row, { borderTopColor: c.border }]}>
+              <Text style={{ color: c.textSecondary }}>📍 Registrar localização de início</Text>
               <Switch
                 value={registerLocation}
                 onValueChange={setRegisterLocation}
                 disabled={confirming}
-                trackColor={{ true: Colors.primary, false: Colors.gray400 }}
+                trackColor={{ true: Colors.primary, false: c.gray400 }}
               />
             </View>
           )}
           {location.permission !== 'denied' && !registerLocation ? (
-            <Text style={styles.warning}>
+            <Text style={[styles.warning, { color: c.warningDark }]}>
               ⚠️ Esta inspeção será iniciada sem registrar o local de início.
             </Text>
           ) : null}
         </Card>
 
-        <Button
-          label="✅ Confirmar início"
-          onPress={confirm}
-          loading={confirming}
-          fullWidth
-          size="lg"
-        />
-        <Button
-          label="Cancelar"
-          onPress={() => router.back()}
-          variant="ghost"
-          disabled={confirming}
-          fullWidth
-        />
+        <Button label="✅ Confirmar início" onPress={confirm} loading={confirming} fullWidth size="lg" />
+        <Button label="Cancelar" onPress={() => router.back()} variant="ghost" disabled={confirming} fullWidth />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function PermissionRow({
-  icon,
-  label,
-  state,
-}: {
-  icon: string;
-  label: string;
-  state: PermissionState;
-}) {
-  const { text, style } = describePermission(state);
+function PermissionRow({ icon, label, state }: { icon: string; label: string; state: PermissionState }) {
+  const c = useThemeColors();
+  const { text, color } = describePermission(state, c);
   return (
-    <View style={styles.row}>
-      <Text style={styles.muted}>
+    <View style={[styles.row, { borderTopColor: c.border }]}>
+      <Text style={{ color: c.textSecondary }}>
         {icon} {label}
       </Text>
-      <Text style={style}>{text}</Text>
+      <Text style={{ color, fontWeight: FontWeight.semibold }}>{text}</Text>
     </View>
   );
 }
 
-function describePermission(state: PermissionState): { text: string; style: object } {
+function describePermission(state: PermissionState, c: ThemeColors): { text: string; color: string } {
   switch (state) {
     case 'granted':
-      return { text: '✅ Permissão concedida', style: styles.valueOk };
+      return { text: '✅ Permissão concedida', color: c.successDark };
     case 'denied':
-      return { text: '⚠️ Permissão negada', style: styles.valueWarn };
+      return { text: '⚠️ Permissão negada', color: c.warningDark };
     default:
-      return { text: 'Solicitada ao iniciar', style: styles.valueMuted };
+      return { text: 'Solicitada ao iniciar', color: c.textSecondary };
   }
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   card: { gap: Spacing.sm },
-  inspection: { fontSize: FontSize.lg, color: Colors.text, fontWeight: FontWeight.semibold },
-  section: { fontSize: FontSize.lg, color: Colors.text, fontWeight: FontWeight.semibold },
-  items: { color: Colors.text, fontWeight: FontWeight.semibold, marginTop: Spacing.xs },
-  muted: { color: Colors.textSecondary },
-  warning: { color: Colors.warningDark, fontSize: FontSize.sm, lineHeight: 20, marginTop: Spacing.xs },
-  valueOk: { color: Colors.successDark, fontWeight: FontWeight.semibold },
-  valueWarn: { color: Colors.warningDark, fontWeight: FontWeight.semibold },
-  valueMuted: { color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  inspection: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
+  section: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
+  items: { fontWeight: FontWeight.semibold, marginTop: Spacing.xs },
+  warning: { fontSize: FontSize.sm, lineHeight: 20, marginTop: Spacing.xs },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
     paddingTop: Spacing.sm,
   },
 });

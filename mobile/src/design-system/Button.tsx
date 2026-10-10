@@ -7,6 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
+import { useThemeColors } from '@/features/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -33,6 +34,12 @@ export function Button({
   style,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const c = useThemeColors();
+
+  // Build variant style dynamically so secondary uses the themed surface/border.
+  const variantStyle = variant === 'secondary'
+    ? { backgroundColor: c.surface, borderWidth: 1.5, borderColor: Colors.primary }
+    : staticVariants[variant];
 
   return (
     <Pressable
@@ -40,7 +47,7 @@ export function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        styles[variant],
+        variantStyle,
         styles[`size_${size}`],
         fullWidth && styles.fullWidth,
         (isDisabled || pressed) && styles.pressed,
@@ -65,6 +72,12 @@ export function Button({
   );
 }
 
+const staticVariants: Record<Exclude<ButtonVariant, 'secondary'>, object> = {
+  primary: { backgroundColor: Colors.primary },
+  danger: { backgroundColor: Colors.danger },
+  ghost: { backgroundColor: 'transparent' },
+};
+
 const styles = StyleSheet.create({
   base: {
     flexDirection: 'row',
@@ -72,59 +85,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: BorderRadius.md,
   },
-  fullWidth: {
-    width: '100%',
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-
-  // Variants
-  primary: {
-    backgroundColor: Colors.primary,
-  },
-  secondary: {
-    backgroundColor: Colors.white,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  danger: {
-    backgroundColor: Colors.danger,
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-
-  // Sizes
-  size_sm: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    minHeight: 36,
-  },
-  size_md: {
-    paddingVertical: Spacing.sm + 2,
-    paddingHorizontal: Spacing.lg,
-    minHeight: 44,
-  },
-  size_lg: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    minHeight: 52,
-  },
-
-  // Label base
-  label: {
-    fontWeight: FontWeight.semibold,
-    textAlign: 'center',
-  },
+  fullWidth: { width: '100%' },
+  pressed: { opacity: 0.8 },
+  disabled: { opacity: 0.5 },
+  size_sm: { paddingVertical: Spacing.xs, paddingHorizontal: Spacing.md, minHeight: 36 },
+  size_md: { paddingVertical: Spacing.sm + 2, paddingHorizontal: Spacing.lg, minHeight: 44 },
+  size_lg: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, minHeight: 52 },
+  label: { fontWeight: FontWeight.semibold, textAlign: 'center' },
   label_primary: { color: Colors.white },
   label_secondary: { color: Colors.primary },
   label_danger: { color: Colors.white },
   label_ghost: { color: Colors.primary },
-
   labelSize_sm: { fontSize: FontSize.sm },
   labelSize_md: { fontSize: FontSize.md },
   labelSize_lg: { fontSize: FontSize.lg },

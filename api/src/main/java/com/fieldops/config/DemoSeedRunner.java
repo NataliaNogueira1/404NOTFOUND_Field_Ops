@@ -18,6 +18,12 @@ import com.fieldops.inspection.dto.TemplateSectionRequest;
 import com.fieldops.inspection.dto.TemplateSectionResponse;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.model.ResponseType;
+import com.fieldops.audit.service.InspectionAnswerHistoryService;
+import com.fieldops.inspection.model.Inspection;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.inspection.model.InspectionStatus;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
+import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.service.InspectionService;
 import com.fieldops.inspection.service.InspectionTemplateService;
 import com.fieldops.inspection.service.InspectionTemplateVersionService;
@@ -37,7 +43,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -75,13 +83,19 @@ public class DemoSeedRunner implements ApplicationRunner {
     private final TemplateItemService itemService;
     private final InspectionTemplateVersionService versionService;
     private final InspectionService inspectionService;
+    private final InspectionRepository inspectionRepository;
+    private final InspectionItemSnapshotRepository snapshotRepository;
+    private final InspectionAnswerHistoryService answerHistoryService;
 
     public DemoSeedRunner(DemoSeedProperties properties, UserRepository userRepository,
             ClientRepository clientRepository, EquipmentRepository equipmentRepository,
             ClientService clientService, InspectionSiteService siteService,
             EquipmentService equipmentService, InspectionTemplateService templateService,
             TemplateSectionService sectionService, TemplateItemService itemService,
-            InspectionTemplateVersionService versionService, InspectionService inspectionService) {
+            InspectionTemplateVersionService versionService, InspectionService inspectionService,
+            InspectionRepository inspectionRepository,
+            InspectionItemSnapshotRepository snapshotRepository,
+            InspectionAnswerHistoryService answerHistoryService) {
         this.properties = properties;
         this.userRepository = userRepository;
         this.clientRepository = clientRepository;
@@ -94,6 +108,9 @@ public class DemoSeedRunner implements ApplicationRunner {
         this.itemService = itemService;
         this.versionService = versionService;
         this.inspectionService = inspectionService;
+        this.inspectionRepository = inspectionRepository;
+        this.snapshotRepository = snapshotRepository;
+        this.answerHistoryService = answerHistoryService;
     }
 
     @Override
@@ -131,22 +148,84 @@ public class DemoSeedRunner implements ApplicationRunner {
 
         Long templateVersionId = seedPublishedTemplate(supervisor.getId());
 
-        int created = seedInspections(templateVersionId, client.id(), site.id(),
+        SeededInspections seeded = seedInspections(templateVersionId, client.id(), site.id(),
                 equipment.id(), technician.getId(), supervisor.getId());
+
+        // Seed a detailed answer history (PBI-088) on the first inspection so the admin can see a
+        // realistic timeline, including an item answered more than once over time.
+        seedAnswerHistory(seeded.firstInspectionId(), technician.getId());
 
         log.info("Demo seed created: client={}, site={}, equipment={}, templateVersion={}, "
                 + "{} inspections for technicianId={}.",
-                client.id(), site.id(), equipment.id(), templateVersionId, created, technician.getId());
+                client.id(), site.id(), equipment.id(), templateVersionId, seeded.created(), technician.getId());
+    }
+
+    private record SeededInspections(int created, Long firstInspectionId) {
     }
 
     /**
-     * Seeds a coherent set of six demonstration inspections for the technician, varying priority
+     * Appends a coherent answer history to the given inspection (PBI-088). The first item is
+     * answered three times (Conforming -> Non-conforming -> Conforming) to demonstrate that the
+     * history keeps every version chronologically, not just the current value.
+     */
+    private void seedAnswerHistory(Long inspectionId, Long technicianId) {
+        if (inspectionId == null) {
+            return;
+        }
+        List<InspectionItemSnapshot> items = snapshotRepository
+                .findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspectionId);
+        if (items.isEmpty()) {
+            return;
+        }
+        Instant base = Instant.now().minus(2, ChronoUnit.HOURS);
+
+        InspectionItemSnapshot first = items.get(0);
+        // Same item answered three times over ~40 minutes: full change history.
+        appendAnswer(inspectionId, technicianId, first, "NON_CONFORMING",
+                "Carcaca apresentou leve corrosao na base.", base);
+        appendAnswer(inspectionId, technicianId, first, "NON_CONFORMING",
+                "Corrosao confirmada apos limpeza; requer tratamento.", base.plus(20, ChronoUnit.MINUTES));
+        appendAnswer(inspectionId, technicianId, first, "CONFORMING",
+                "Superficie tratada e liberada.", base.plus(40, ChronoUnit.MINUTES));
+
+        // Remaining items answered once each.
+        for (int index = 1; index < items.size(); index++) {
+            InspectionItemSnapshot item = items.get(index);
+            String value = demoValueFor(item.getResponseType().name());
+            String observation = index % 2 == 0 ? "Sem anomalias." : null;
+            appendAnswer(inspectionId, technicianId, item, value, observation,
+                    base.plus(45L + index * 5L, ChronoUnit.MINUTES));
+        }
+    }
+
+    private void appendAnswer(Long inspectionId, Long technicianId, InspectionItemSnapshot item,
+            String value, String observation, Instant answeredAt) {
+        answerHistoryService.record(inspectionId, item.getSourceTemplateItemId(), item.getSectionTitle(),
+                item.getSectionOrder(), item.getItemTitle(), item.getItemOrder(), item.getResponseType(),
+                value, observation, technicianId, answeredAt);
+    }
+
+    private String demoValueFor(String responseType) {
+        return switch (responseType) {
+            case "BOOLEAN" -> "true";
+            case "NUMBER" -> "7.5";
+            case "CONFORMITY" -> "CONFORMING";
+            case "SINGLE_CHOICE" -> "Funcionando";
+            case "DATE" -> LocalDate.now().toString();
+            default -> "Verificado";
+        };
+    }
+
+    /**
+     * Seeds a coherent set of seven demonstration inspections for the technician, varying priority
      * and due date so the mobile and admin lists show a realistic mix. One of them is canceled
-     * through the real {@link InspectionService#cancel} flow to also exhibit a terminal state.
+     * through the real {@link InspectionService#cancel} flow to exhibit a terminal state, and one
+     * is driven all the way to REJECTED (PBI-062 / #80) so the technician can exercise the
+     * "receive a rejected inspection for correction" flow out of the box.
      *
      * @return the number of inspections created
      */
-    private int seedInspections(Long templateVersionId, Long clientId, Long siteId,
+    private SeededInspections seedInspections(Long templateVersionId, Long clientId, Long siteId,
             Long equipmentId, Long technicianId, Long supervisorId) {
         record SeedInspection(String title, Priority priority, int dueInDays, String instructions) {
         }
@@ -169,27 +248,69 @@ public class DemoSeedRunner implements ApplicationRunner {
                         "Confirmar parametros de operacao apos troca de filtro."),
                 new SeedInspection("Inspecao Cancelada - Compressor de Ar XPTO 500",
                         Priority.LOW, 10,
-                        "Agendamento duplicado; sera cancelado para demonstracao."));
+                        "Agendamento duplicado; sera cancelado para demonstracao."),
+                new SeedInspection("Inspecao Reprovada - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 5,
+                        "Enviada com evidencia insuficiente; sera reprovada para correcao."));
 
+        int canceledIndex = plan.size() - 2;
+        int rejectedIndex = plan.size() - 1;
+
+        Long firstInspectionId = null;
         Long canceledId = null;
+        Long rejectedId = null;
         for (int index = 0; index < plan.size(); index++) {
             SeedInspection seed = plan.get(index);
             Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
                     seed.title(), templateVersionId, clientId, siteId, equipmentId, technicianId,
                     seed.priority(), LocalDate.now().plusDays(seed.dueInDays()), null,
                     seed.instructions()), supervisorId).id();
-            // Cancel the last one to showcase a terminal state in the admin listing.
-            if (index == plan.size() - 1) {
+            if (index == 0) {
+                firstInspectionId = inspectionId;
+            }
+            if (index == canceledIndex) {
                 canceledId = inspectionId;
+            }
+            if (index == rejectedIndex) {
+                rejectedId = inspectionId;
             }
         }
 
+        // Cancel one to showcase a terminal state in the admin listing.
         if (canceledId != null) {
             inspectionService.cancel(canceledId,
                     "Agendamento duplicado identificado durante o planejamento.", supervisorId);
         }
 
-        return plan.size();
+        // Reject one so the technician has a rejected inspection to correct (PBI-062 / #80).
+        if (rejectedId != null) {
+            rejectInspection(rejectedId, supervisorId);
+        }
+
+        return new SeededInspections(plan.size(), firstInspectionId);
+    }
+
+    /**
+     * Drives a freshly created ASSIGNED inspection all the way to REJECTED so the demo dataset
+     * includes a rejected inspection the technician can correct (PBI-062 / #80).
+     *
+     * <p>The approve/reject domain flow only accepts an inspection that is already
+     * {@code UNDER_REVIEW} ({@link InspectionService#reject}), and no domain method currently
+     * moves an inspection from {@code SUBMITTED} to {@code UNDER_REVIEW} (that transition is
+     * tracked as a separate backend task). To keep this limited to the demo seed and still honour
+     * the real rejection logic (reason, reviewer and audit event), the status is advanced to
+     * {@code UNDER_REVIEW} directly on the persisted entity here, then rejected through the
+     * service so {@code rejectionReason}/{@code reviewedBy}/{@code reviewedAt} and the audit
+     * trail are populated exactly as in production.
+     */
+    private void rejectInspection(Long inspectionId, Long supervisorId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId).orElseThrow();
+        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
+        inspectionRepository.save(inspection);
+
+        inspectionService.reject(inspectionId,
+                "Evidencia fotografica do item de carcaca esta ilegivel; refazer a foto e reenviar.",
+                supervisorId);
     }
 
     /** Builds a small but coherent compressor checklist as a draft and publishes it. */

@@ -4,6 +4,7 @@ import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.service.MobileInspectionService;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.sync.dto.SyncOperationRequest;
 import com.fieldops.sync.dto.SyncOperationResult;
 import com.fieldops.sync.dto.SyncPushRequest;
@@ -81,6 +82,8 @@ public class SyncBatchService {
             return switch (op.type()) {
                 case INSPECTION_STATUS -> applyInspectionStatus(op, technicianId);
             };
+        } catch (ResourceConflictException ex) {
+            return SyncOperationResult.conflict(op.operationId(), ex.getMessage());
         } catch (ResourceNotFoundException | BusinessException ex) {
             return SyncOperationResult.failed(op.operationId(), ex.getMessage());
         }
@@ -101,7 +104,8 @@ public class SyncBatchService {
                     "Unknown status: " + payload.get("status").asText());
         }
 
-        var response = mobileInspectionService.updateStatus(inspectionId, op.operationId(), status, technicianId);
+        var response = mobileInspectionService.updateStatus(
+                inspectionId, op.operationId(), status, op.baseVersion(), technicianId);
         return response.applied()
                 ? SyncOperationResult.applied(op.operationId())
                 : SyncOperationResult.alreadyApplied(op.operationId());

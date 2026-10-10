@@ -14,22 +14,33 @@ export function useInspectionTemplate(inspectionId: string | undefined) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db || !inspectionId) {
-      setIsLoading(false);
-      return;
-    }
+    let cancelled = false;
 
-    const repo = new InspectionRepository(db);
-    (async () => {
+    async function load() {
+      if (!db || !inspectionId) {
+        if (!cancelled) {
+          setTemplate(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      const repo = new InspectionRepository(db);
       try {
         const tpl = await repo.getTemplate(inspectionId);
-        setTemplate(tpl);
+        if (!cancelled) setTemplate(tpl);
       } catch (error) {
         console.warn('[useInspectionTemplate] Failed to load:', error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
-    })();
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [db, inspectionId]);
 
   return { template, isLoading };

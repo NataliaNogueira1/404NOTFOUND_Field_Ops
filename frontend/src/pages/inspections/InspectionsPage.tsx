@@ -169,7 +169,7 @@ export function InspectionsPage() {
       sortKey: 'progress',
       cell: (item) => (
         <div className="w-28">
-          <div className="h-2 rounded-full bg-slate-100">
+          <div className="h-2 rounded-full bg-app-bg">
             <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
           </div>
           <span className="text-xs text-muted">{item.progress}%</span>

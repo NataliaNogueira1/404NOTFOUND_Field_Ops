@@ -28,61 +28,53 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
 
     List<Inspection> findByTechnicianIdOrderByDueDateAsc(Long technicianId);
 
-    // ── Dashboard aggregation queries ─────────────────────────────────────────
-
-    /**
-     * Returns inspection counts grouped by status.
-     * Each element is Object[]{InspectionStatus, Long}.
-     * Supports optional date-range and clientName filters (null = ignored).
-     */
     @Query("""
         SELECT i.status, COUNT(i)
         FROM Inspection i
         WHERE (:from IS NULL OR i.dueDate >= :from)
-          AND (:to   IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.status
     """)
     List<Object[]> countByStatus(
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
-            @Param("clientName") String clientName);
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
 
-    /**
-     * Returns non-terminal inspection counts grouped by priority.
-     * Each element is Object[]{Priority, Long}.
-     */
     @Query("""
         SELECT i.priority, COUNT(i)
         FROM Inspection i
         WHERE i.status NOT IN :terminalStatuses
           AND (:from IS NULL OR i.dueDate >= :from)
-          AND (:to   IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.priority
     """)
     List<Object[]> countByPriority(
             @Param("terminalStatuses") List<InspectionStatus> terminalStatuses,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
-            @Param("clientName") String clientName);
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
 
-    /**
-     * Returns the number of overdue inspections (dueDate before today, not in a terminal state).
-     */
     @Query("""
         SELECT COUNT(i)
         FROM Inspection i
         WHERE i.dueDate < :today
           AND i.status NOT IN :terminalStatuses
           AND (:from IS NULL OR i.dueDate >= :from)
-          AND (:to   IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = LOWER(:clientName))
+          AND (:to IS NULL OR i.dueDate <= :to)
+          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
     """)
     long countOverdue(
             @Param("today") LocalDate today,
             @Param("terminalStatuses") List<InspectionStatus> terminalStatuses,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
-            @Param("clientName") String clientName);
+            @Param("clientName") String clientName,
+            @Param("technicianId") Long technicianId);
 }

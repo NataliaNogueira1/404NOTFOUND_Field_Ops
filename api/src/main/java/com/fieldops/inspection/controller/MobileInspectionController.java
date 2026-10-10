@@ -65,6 +65,6 @@ public class MobileInspectionController {
             @Valid @RequestBody MobileStatusUpdateRequest request,
             @AuthenticationPrincipal AuthenticatedUser user) {
         return ResponseEntity.ok(
-                service.updateStatus(id, request.operationId(), request.status(), user.getId()));
+                service.updateStatus(id, request.operationId(), request.status(), request.baseVersion(), user.getId()));
     }
 }

@@ -42,8 +42,14 @@ const InspectionsPage = lazy(() =>
 const NewInspectionPage = lazy(() =>
   import('@/pages/inspections/NewInspectionPage').then((module) => ({ default: module.NewInspectionPage })),
 )
+const ReviewQueuePage = lazy(() =>
+  import('@/pages/inspections/ReviewQueuePage').then((module) => ({ default: module.ReviewQueuePage })),
+)
 const InspectionReviewPage = lazy(() =>
   import('@/pages/inspections/InspectionReviewPage').then((module) => ({ default: module.InspectionReviewPage })),
+)
+const InspectionReportPage = lazy(() =>
+  import('@/pages/inspections/InspectionReportPage').then((module) => ({ default: module.InspectionReportPage })),
 )
 const NonConformitiesPage = lazy(() =>
   import('@/pages/nonConformities/NonConformitiesPage').then((module) => ({ default: module.NonConformitiesPage })),
@@ -242,10 +248,26 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="inspections/review"
+            element={
+              <LazyPage>
+                <ReviewQueuePage />
+              </LazyPage>
+            }
+          />
+          <Route
             path="inspections/:id/review"
             element={
               <LazyPage>
                 <InspectionReviewPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="inspections/:id/report"
+            element={
+              <LazyPage>
+                <InspectionReportPage />
               </LazyPage>
             }
           />

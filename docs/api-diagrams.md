@@ -34,6 +34,8 @@ erDiagram
 
     INSPECTION_TEMPLATE_VERSION ||--o{ INSPECTION : origina
     INSPECTION ||--o{ INSPECTION_ITEM_SNAPSHOT : congela
+    INSPECTION ||--o{ NON_CONFORMITY : registra
+    INSPECTION_ITEM_SNAPSHOT o|--o{ NON_CONFORMITY : contextualiza
 
     INSPECTION ||--o{ AUDIT_EVENT : registra
     INSPECTION ||--o{ PROCESSED_OPERATION : idempotencia
@@ -106,6 +108,16 @@ erDiagram
         bigint inspection_id FK
         string item_title
         string response_type
+    }
+    NON_CONFORMITY {
+        bigint id PK
+        bigint inspection_id FK
+        bigint inspection_item_snapshot_id FK
+        string title
+        string severity "LOW, MEDIUM, HIGH, CRITICAL"
+        string status "OPEN, CLOSED"
+        timestamp created_at
+        timestamp closed_at
     }
     AUDIT_EVENT {
         bigint id PK

@@ -13,7 +13,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, erro
       id={id}
       ref={ref}
       className={cn(
-        'focus-ring h-11 w-full rounded-fieldops border bg-white px-3.5 text-sm text-text placeholder:text-muted/70 focus:border-primary disabled:bg-slate-50',
+        'focus-ring h-11 w-full rounded-fieldops border bg-surface px-3.5 text-sm text-text placeholder:text-muted/70 focus:border-primary disabled:bg-app-bg',
         error ? 'border-danger' : 'border-border',
         className,
       )}

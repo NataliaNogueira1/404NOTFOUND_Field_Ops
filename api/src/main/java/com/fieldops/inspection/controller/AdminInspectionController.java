@@ -1,7 +1,9 @@
 package com.fieldops.inspection.controller;
 
+import com.fieldops.audit.dto.AnswerHistoryResponse;
 import com.fieldops.audit.dto.AuditEventResponse;
 import com.fieldops.audit.service.AuditService;
+import com.fieldops.audit.service.InspectionAnswerHistoryService;
 import com.fieldops.inspection.dto.AdminInspectionSummary;
 import com.fieldops.inspection.dto.ApproveInspectionRequest;
 import com.fieldops.inspection.dto.CancelInspectionRequest;
@@ -10,10 +12,12 @@ import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.dto.RejectInspectionRequest;
 import com.fieldops.inspection.dto.ReviewDecisionResponse;
+import com.fieldops.inspection.dto.InspectionReviewResponse;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.service.AdminCatalogListService;
 import com.fieldops.inspection.service.InspectionService;
+import com.fieldops.inspection.service.InspectionReviewService;
 import com.fieldops.shared.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -49,12 +53,16 @@ public class AdminInspectionController {
     private final AdminCatalogListService listService;
     private final InspectionService inspectionService;
     private final AuditService auditService;
+    private final InspectionAnswerHistoryService answerHistoryService;
+    private final InspectionReviewService reviewService;
 
     public AdminInspectionController(AdminCatalogListService listService, InspectionService inspectionService,
-            AuditService auditService) {
+            AuditService auditService, InspectionAnswerHistoryService answerHistoryService, InspectionReviewService reviewService) {
         this.listService = listService;
         this.inspectionService = inspectionService;
         this.auditService = auditService;
+        this.answerHistoryService = answerHistoryService;
+        this.reviewService = reviewService;
     }
 
     @Operation(summary = "Schedule an inspection from an immutable template version")
@@ -73,6 +81,23 @@ public class AdminInspectionController {
     @GetMapping("/{id}/history")
     public ResponseEntity<List<AuditEventResponse>> history(@PathVariable Long id) {
         return ResponseEntity.ok(auditService.timeline(AuditService.ENTITY_INSPECTION, id));
+    }
+
+    @Operation(summary = "Get the detailed answer history of an inspection (PBI-088)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Answer history ordered by section, item and time"),
+            @ApiResponse(responseCode = "403", description = "Forbidden — only ADMINISTRATOR or SUPERVISOR"),
+            @ApiResponse(responseCode = "404", description = "Inspection not found")
+    })
+    @GetMapping("/{id}/answers/history")
+    public ResponseEntity<List<AnswerHistoryResponse>> answersHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(answerHistoryService.timeline(id));
+    }
+
+    @Operation(summary = "Get an inspection checklist review with latest answers and real item evidence")
+    @GetMapping("/{id}/review")
+    public ResponseEntity<InspectionReviewResponse> review(@PathVariable Long id) {
+        return ResponseEntity.ok(reviewService.getReview(id));
     }
 
     @Operation(summary = "Approve an inspection under review")

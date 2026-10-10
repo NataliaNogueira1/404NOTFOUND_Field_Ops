@@ -8,6 +8,7 @@ import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.model.Equipment;
 import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
+import com.fieldops.device.service.PushNotificationService;
 import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
@@ -52,11 +53,12 @@ public class InspectionService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final PushNotificationService pushNotificationService;
 
     public InspectionService(InspectionRepository inspectionRepository,
             InspectionTemplateVersionRepository versionRepository, ClientRepository clientRepository,
             InspectionSiteRepository siteRepository, EquipmentRepository equipmentRepository,
-            UserRepository userRepository, AuditService auditService) {
+            UserRepository userRepository, AuditService auditService, PushNotificationService pushNotificationService) {
         this.inspectionRepository = inspectionRepository;
         this.versionRepository = versionRepository;
         this.clientRepository = clientRepository;
@@ -64,6 +66,7 @@ public class InspectionService {
         this.equipmentRepository = equipmentRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     /** Creates an assigned inspection and freezes every checklist item from the selected version. */
@@ -85,6 +88,7 @@ public class InspectionService {
         auditService.recordInspection(supervisorId, AuditAction.INSPECTION_CREATED, saved.getId(), null);
         auditService.recordInspection(supervisorId, AuditAction.INSPECTION_ASSIGNED, saved.getId(),
                 "technicianId=" + technician.getId());
+        pushNotificationService.notifyInspectionAssigned(technician.getId(), saved.getId(), saved.getTitle());
 
         return toResponse(saved);
     }

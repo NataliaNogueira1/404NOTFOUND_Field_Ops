@@ -9,6 +9,7 @@ import com.fieldops.inspection.model.*;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.sync.service.IdempotencyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +54,7 @@ public class MobileInspectionService {
      */
     @Transactional
     public MobileStatusUpdateResponse updateStatus(Long inspectionId, UUID operationId,
-            InspectionStatus targetStatus, Long technicianId) {
+            InspectionStatus targetStatus, Long baseVersion, Long technicianId) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
 
@@ -64,6 +65,11 @@ public class MobileInspectionService {
         // Idempotent resend: the operation was already applied, report current state.
         if (idempotencyService.findProcessed(operationId).isPresent()) {
             return MobileStatusUpdateResponse.alreadyApplied(inspection.getId(), inspection.getStatus());
+        }
+
+        if (!inspection.getVersion().equals(baseVersion)) {
+            throw new ResourceConflictException("Inspection version conflict: local=" + baseVersion
+                    + ", server=" + inspection.getVersion());
         }
 
         Set<InspectionStatus> allowed = MOBILE_TRANSITIONS.getOrDefault(inspection.getStatus(), Set.of());
@@ -133,6 +139,10 @@ public class MobileInspectionService {
                 inspection.getStartedAt() != null ? inspection.getStartedAt().toString() : null,
                 inspection.getProgress(),
                 inspection.getSupervisorInstructions(),
+                inspection.getRejectionReason(),
+                inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
+                inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
+                inspection.getVersion(),
                 templateDto
         );
     }

@@ -1,5 +1,11 @@
 ﻿@import 'tailwindcss';
 
+/* Dark mode is class-based (PBI-091): the `.dark` class is toggled on <html>
+   by the theme provider. This variant lets utilities like `dark:...` work and,
+   more importantly, we redefine the semantic color tokens under `.dark` below,
+   so existing screens using bg-surface/text-text/... adapt with no changes. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
@@ -22,6 +28,28 @@
   --radius-card: 12px;
   --shadow-soft: 0 8px 24px rgb(15 23 42 / 0.06);
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Dark theme tokens (PBI-091 — infrastructure only).
+   Mirrors the light tokens above with the same variable names, so components
+   that already use the semantic classes (bg-app-bg, bg-surface, text-text,
+   text-muted, border-border, success/warning/danger) adapt automatically.
+   The light theme keeps its exact previous values (defined in @theme). */
+.dark {
+  --color-app-bg: #0b1220;
+  --color-surface: #111a2e;
+  --color-sidebar: #0f1626;
+  --color-text: #e2e8f0;
+  --color-muted: #94a3b8;
+  --color-border: #2a3852;
+  --color-success: #22c55e;
+  --color-success-dark: #4ade80;
+  --color-success-light: #14532d;
+  --color-warning: #f59e0b;
+  --color-warning-dark: #fbbf24;
+  --color-danger: #ef4444;
+  --color-danger-dark: #f87171;
+  --color-danger-light: #7f1d1d;
 }
 
 @layer base {

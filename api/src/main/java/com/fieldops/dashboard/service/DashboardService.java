@@ -4,14 +4,14 @@ import com.fieldops.dashboard.dto.DashboardSummaryResponse;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
 import com.fieldops.inspection.repository.InspectionRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.fieldops.nonconformity.model.NonConformityStatus;
+import com.fieldops.nonconformity.repository.NonConformityRepository;
 import java.time.LocalDate;
-import java.util.EnumMap;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DashboardService {
@@ -22,76 +22,63 @@ public class DashboardService {
             InspectionStatus.REJECTED);
 
     private final InspectionRepository inspectionRepository;
+    private final NonConformityRepository nonConformityRepository;
 
-    public DashboardService(InspectionRepository inspectionRepository) {
+    public DashboardService(InspectionRepository inspectionRepository, NonConformityRepository nonConformityRepository) {
         this.inspectionRepository = inspectionRepository;
+        this.nonConformityRepository = nonConformityRepository;
     }
 
     /**
-     * Builds a dashboard summary with four aggregations in three DB queries (no N+1):
-     * <ol>
-     *   <li>Count by status — one GROUP BY query</li>
-     *   <li>Count by priority (non-terminal only) — one GROUP BY query</li>
-     *   <li>Count overdue — one COUNT query</li>
-     * </ol>
+     * Returns dashboard indicators using three aggregate queries, avoiding entity loading and N+1 queries.
      *
-     * @param from       optional start of dueDate range (inclusive)
-     * @param to         optional end of dueDate range (inclusive)
-     * @param clientName optional exact client name filter (case-insensitive)
+     * @param from optional inclusive due-date start
+     * @param to optional inclusive due-date end
+     * @param clientName optional exact client-name filter, case-insensitive
+     * @param technicianId optional technician filter
      */
     @Transactional(readOnly = true)
-    public DashboardSummaryResponse getSummary(LocalDate from, LocalDate to, String clientName) {
-
-        String normalizedClient = (clientName != null && !clientName.isBlank()) ? clientName.trim() : null;
-
-        // Query 1 — counts by status (all statuses, no restriction)
-        Map<String, Long> byStatus = toStatusMap(
-                inspectionRepository.countByStatus(from, to, normalizedClient));
-
-        // Query 2 — counts by priority (non-terminal inspections only)
-        Map<String, Long> byCriticality = toPriorityMap(
-                inspectionRepository.countByPriority(TERMINAL_STATUSES, from, to, normalizedClient));
-
-        // Query 3 — overdue count
+    public DashboardSummaryResponse getSummary(
+            LocalDate from, LocalDate to, String clientName, Long technicianId) {
+        String normalizedClientName = normalizeClientName(clientName);
+        Map<String, Long> byStatus = statusCounts(
+                inspectionRepository.countByStatus(from, to, normalizedClientName, technicianId));
+        Map<String, Long> byCriticality = priorityCounts(inspectionRepository.countByPriority(
+                TERMINAL_STATUSES, from, to, normalizedClientName, technicianId));
         long overdue = inspectionRepository.countOverdue(
-                LocalDate.now(), TERMINAL_STATUSES, from, to, normalizedClient);
-
-        // Non-conformities: not yet implemented in the backend domain.
-        // Returns 0 until the NonConformity entity and repository are created (future PBI).
-        long openNonConformities = 0L;
+                LocalDate.now(), TERMINAL_STATUSES, from, to, normalizedClientName, technicianId);
+        long openNonConformities = nonConformityRepository.countByStatusAndInspectionFilters(
+                NonConformityStatus.OPEN, from, to, normalizedClientName, technicianId);
 
         return new DashboardSummaryResponse(byStatus, byCriticality, openNonConformities, overdue);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /** Converts GROUP BY status rows into a Map pre-populated with all 8 statuses (0 if absent). */
-    private Map<String, Long> toStatusMap(List<Object[]> rows) {
-        Map<String, Long> result = new HashMap<>();
-        // Seed all statuses with 0 so the frontend always gets a complete map
-        for (InspectionStatus s : InspectionStatus.values()) {
-            result.put(s.name(), 0L);
-        }
-        for (Object[] row : rows) {
-            InspectionStatus status = (InspectionStatus) row[0];
-            Long count = ((Number) row[1]).longValue();
-            result.put(status.name(), count);
-        }
-        return result;
+    private String normalizeClientName(String clientName) {
+        // The queries compare LOWER(i.clientName) against this raw parameter, so lowercase it here.
+        // Passing LOWER(:clientName) in JPQL instead makes Postgres bind a NULL as bytea and fail
+        // (function lower(bytea) does not exist) when no client filter is provided.
+        return clientName == null || clientName.isBlank()
+                ? null
+                : clientName.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** Converts GROUP BY priority rows into a Map pre-populated with all 4 priorities (0 if absent). */
-    private Map<String, Long> toPriorityMap(List<Object[]> rows) {
-        Map<String, Long> result = new EnumMap<>(Priority.class);
-        // Seed all priorities with 0
-        for (Priority p : Priority.values()) {
-            result.put(p.name(), 0L);
+    private Map<String, Long> statusCounts(List<Object[]> rows) {
+        Map<String, Long> counts = emptyCounts(InspectionStatus.values());
+        rows.forEach(row -> counts.put(((InspectionStatus) row[0]).name(), ((Number) row[1]).longValue()));
+        return counts;
+    }
+
+    private Map<String, Long> priorityCounts(List<Object[]> rows) {
+        Map<String, Long> counts = emptyCounts(Priority.values());
+        rows.forEach(row -> counts.put(((Priority) row[0]).name(), ((Number) row[1]).longValue()));
+        return counts;
+    }
+
+    private <T extends Enum<T>> Map<String, Long> emptyCounts(T[] values) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (T value : values) {
+            counts.put(value.name(), 0L);
         }
-        for (Object[] row : rows) {
-            Priority priority = (Priority) row[0];
-            Long count = ((Number) row[1]).longValue();
-            result.put(priority.name(), count);
-        }
-        return result;
+        return counts;
     }
 }
