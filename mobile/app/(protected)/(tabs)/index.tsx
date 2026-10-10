@@ -6,10 +6,12 @@ import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button, Card } from '@/design-system';
 import { InspectionCard } from '@/components/fieldops';
 import { InspectionStatus, useFieldOps } from '@/features/fieldops';
+import { useThemeColors } from '@/features/theme';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const c = useThemeColors();
   const { inspections, syncNow, isSyncing } = useFieldOps();
   const { refreshing, onRefresh, notice, clearNotice } = usePullToRefresh(syncNow);
 
@@ -20,14 +22,11 @@ export default function HomeScreen() {
   const pendingSync = inspections.reduce((sum, item) => sum + item.pendingSyncCount, 0);
 
   const dateLabel = new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -36,12 +35,12 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.greeting}>Minhas inspeções</Text>
-          <Text style={styles.date}>{dateLabel}</Text>
+          <Text style={[styles.greeting, { color: c.text }]}>Minhas inspeções</Text>
+          <Text style={[styles.date, { color: c.textSecondary }]}>{dateLabel}</Text>
         </View>
         {notice ? (
-          <Pressable onPress={clearNotice} style={styles.notice}>
-            <Text style={styles.noticeText}>{notice}</Text>
+          <Pressable onPress={clearNotice} style={[styles.notice, { backgroundColor: c.warningLight }]}>
+            <Text style={[styles.noticeText, { color: c.warningDark }]}>{notice}</Text>
           </Pressable>
         ) : null}
 
@@ -53,7 +52,7 @@ export default function HomeScreen() {
         </View>
 
         <Card style={styles.syncBanner}>
-          <Text style={styles.bannerTitle}>{pendingSync} operações pendentes</Text>
+          <Text style={[styles.bannerTitle, { color: c.text }]}>{pendingSync} operações pendentes</Text>
           <Button
             label={isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
             onPress={syncNow}
@@ -63,9 +62,9 @@ export default function HomeScreen() {
         </Card>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Próximas inspeções</Text>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Próximas inspeções</Text>
           <Pressable onPress={() => router.push('/(protected)/(tabs)/inspections')}>
-            <Text style={styles.link}>Ver todas</Text>
+            <Text style={[styles.link, { color: c.primary }]}>Ver todas</Text>
           </Pressable>
         </View>
 
@@ -74,7 +73,7 @@ export default function HomeScreen() {
             <InspectionCard key={inspection.id} inspection={inspection} />
           ))}
           {inspections.length === 0 && (
-            <Text style={styles.empty}>Nenhuma inspeção atribuída. Sincronize para verificar.</Text>
+            <Text style={[styles.empty, { color: c.textSecondary }]}>Nenhuma inspeção atribuída. Sincronize para verificar.</Text>
           )}
         </View>
       </ScrollView>
@@ -86,37 +85,38 @@ export default function HomeScreen() {
 }
 
 function Stat({ value, label, tone }: { value: number; label: string; tone: 'primary' | 'danger' | 'warning' | 'success' }) {
-  const bg = { primary: Colors.primaryLight, danger: '#FEE2E2', warning: Colors.warningLight, success: '#DCFCE7' }[tone];
-  const color = { primary: Colors.primaryDark, danger: Colors.dangerDark, warning: Colors.warningDark, success: Colors.successDark }[tone];
+  const c = useThemeColors();
+  const bg = { primary: c.primaryLight, danger: c.dangerLight, warning: c.warningLight, success: c.successLight }[tone];
+  const color = { primary: c.primaryDark, danger: c.dangerDark, warning: c.warningDark, success: c.successDark }[tone];
   return (
     <Card style={styles.stat}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, { color: c.textSecondary }]}>{label}</Text>
       <View style={[styles.statDot, { backgroundColor: bg }]} />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1 },
   container: { padding: Spacing.md, paddingBottom: 120, gap: Spacing.md },
   header: { gap: Spacing.xs, marginBottom: Spacing.xs },
-  greeting: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.text },
-  date: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  greeting: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
+  date: { fontSize: FontSize.sm },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   stat: { width: '48%', minHeight: 112, gap: Spacing.xs, overflow: 'hidden' },
   statValue: { fontSize: 32, fontWeight: FontWeight.bold },
-  statLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  statLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   statDot: { position: 'absolute', right: -18, top: -18, width: 64, height: 64, borderRadius: 32 },
-  syncBanner: { gap: Spacing.sm, borderColor: Colors.primaryLight },
-  bannerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
+  syncBanner: { gap: Spacing.sm },
+  bannerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.sm },
-  sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.text },
-  link: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
+  link: { fontWeight: FontWeight.semibold },
   list: { gap: Spacing.sm },
-  empty: { color: Colors.textSecondary, textAlign: 'center', padding: Spacing.lg },
-  notice: { backgroundColor: Colors.warningLight, borderRadius: 10, padding: Spacing.sm },
-  noticeText: { color: Colors.warningDark, fontSize: FontSize.sm, textAlign: 'center' },
+  empty: { textAlign: 'center', padding: Spacing.lg },
+  notice: { borderRadius: 10, padding: Spacing.sm },
+  noticeText: { fontSize: FontSize.sm, textAlign: 'center' },
   fab: { position: 'absolute', right: Spacing.md, bottom: 86, backgroundColor: Colors.primary, minHeight: 52, paddingHorizontal: Spacing.lg, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   fabText: { color: Colors.white, fontWeight: FontWeight.semibold },
 });

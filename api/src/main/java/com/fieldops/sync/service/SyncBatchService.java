@@ -1,14 +1,23 @@
 package com.fieldops.sync.service;
 
+import com.fieldops.evidence.service.EvidenceSyncService;
+import com.fieldops.audit.service.InspectionAnswerSyncService;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.service.MobileInspectionService;
+import com.fieldops.nonconformity.service.NonConformitySyncService;
 import com.fieldops.shared.exception.BusinessException;
+import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.sync.dto.EvidenceCreatePayload;
+import com.fieldops.sync.dto.NonConformityCreatePayload;
+import com.fieldops.sync.dto.AnswerUpsertPayload;
 import com.fieldops.sync.dto.SyncOperationRequest;
 import com.fieldops.sync.dto.SyncOperationResult;
 import com.fieldops.sync.dto.SyncPushRequest;
 import com.fieldops.sync.dto.SyncPushResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -30,11 +39,21 @@ public class SyncBatchService {
 
     private final IdempotencyService idempotencyService;
     private final MobileInspectionService mobileInspectionService;
+    private final EvidenceSyncService evidenceSyncService;
+    private final InspectionAnswerSyncService answerSyncService;
+    private final NonConformitySyncService nonConformitySyncService;
+    private final ObjectMapper objectMapper;
 
     public SyncBatchService(IdempotencyService idempotencyService,
-            MobileInspectionService mobileInspectionService) {
+            MobileInspectionService mobileInspectionService, EvidenceSyncService evidenceSyncService,
+            InspectionAnswerSyncService answerSyncService, NonConformitySyncService nonConformitySyncService,
+            ObjectMapper objectMapper) {
         this.idempotencyService = idempotencyService;
         this.mobileInspectionService = mobileInspectionService;
+        this.evidenceSyncService = evidenceSyncService;
+        this.answerSyncService = answerSyncService;
+        this.nonConformitySyncService = nonConformitySyncService;
+        this.objectMapper = objectMapper;
     }
 
     public SyncPushResponse push(SyncPushRequest request, Long technicianId) {
@@ -80,9 +99,74 @@ public class SyncBatchService {
         try {
             return switch (op.type()) {
                 case INSPECTION_STATUS -> applyInspectionStatus(op, technicianId);
+                case ANSWER_UPSERT -> applyAnswerUpsert(op, technicianId);
+                case EVIDENCE_CREATE -> applyEvidenceCreate(op, technicianId);
+                case NON_CONFORMITY_CREATE -> applyNonConformityCreate(op, technicianId);
             };
+        } catch (ResourceConflictException ex) {
+            return SyncOperationResult.conflict(op.operationId(), ex.getMessage());
         } catch (ResourceNotFoundException | BusinessException ex) {
             return SyncOperationResult.failed(op.operationId(), ex.getMessage());
+        }
+    }
+
+    private SyncOperationResult applyNonConformityCreate(SyncOperationRequest op, Long technicianId) {
+        if (op.payload() == null) {
+            return SyncOperationResult.failed(op.operationId(), "NON_CONFORMITY_CREATE requires a payload");
+        }
+        NonConformityCreatePayload payload;
+        try {
+            payload = objectMapper.treeToValue(op.payload(), NonConformityCreatePayload.class);
+        } catch (JsonProcessingException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Invalid NON_CONFORMITY_CREATE payload");
+        }
+        try {
+            nonConformitySyncService.create(payload, op.operationId(), technicianId);
+            return SyncOperationResult.applied(op.operationId());
+        } catch (ResourceNotFoundException | BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Unable to persist non-conformity");
+        }
+    }
+
+    private SyncOperationResult applyAnswerUpsert(SyncOperationRequest op, Long technicianId) {
+        if (op.payload() == null) {
+            return SyncOperationResult.failed(op.operationId(), "ANSWER_UPSERT requires a payload");
+        }
+        AnswerUpsertPayload payload;
+        try {
+            payload = objectMapper.treeToValue(op.payload(), AnswerUpsertPayload.class);
+        } catch (JsonProcessingException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Invalid ANSWER_UPSERT payload");
+        }
+        try {
+            answerSyncService.upsert(payload, op.operationId(), technicianId);
+            return SyncOperationResult.applied(op.operationId());
+        } catch (ResourceNotFoundException | BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Unable to persist checklist answer");
+        }
+    }
+
+    private SyncOperationResult applyEvidenceCreate(SyncOperationRequest op, Long technicianId) {
+        if (op.payload() == null) {
+            return SyncOperationResult.failed(op.operationId(), "EVIDENCE_CREATE requires a payload");
+        }
+        EvidenceCreatePayload payload;
+        try {
+            payload = objectMapper.treeToValue(op.payload(), EvidenceCreatePayload.class);
+        } catch (JsonProcessingException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Invalid EVIDENCE_CREATE payload");
+        }
+        try {
+            evidenceSyncService.create(payload, op.operationId(), technicianId);
+            return SyncOperationResult.applied(op.operationId());
+        } catch (ResourceNotFoundException | BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            return SyncOperationResult.failed(op.operationId(), "Unable to persist evidence metadata");
         }
     }
 
@@ -101,7 +185,8 @@ public class SyncBatchService {
                     "Unknown status: " + payload.get("status").asText());
         }
 
-        var response = mobileInspectionService.updateStatus(inspectionId, op.operationId(), status, technicianId);
+        var response = mobileInspectionService.updateStatus(
+                inspectionId, op.operationId(), status, op.baseVersion(), technicianId);
         return response.applied()
                 ? SyncOperationResult.applied(op.operationId())
                 : SyncOperationResult.alreadyApplied(op.operationId());

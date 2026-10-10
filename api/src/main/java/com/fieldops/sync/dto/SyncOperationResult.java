@@ -16,6 +16,7 @@ public record SyncOperationResult(UUID operationId, Status status, String detail
     public enum Status {
         APPLIED,
         ALREADY_APPLIED,
+        CONFLICT,
         DEFERRED,
         FAILED
     }
@@ -30,6 +31,10 @@ public record SyncOperationResult(UUID operationId, Status status, String detail
 
     public static SyncOperationResult deferred(UUID id, String detail) {
         return new SyncOperationResult(id, Status.DEFERRED, detail);
+    }
+
+    public static SyncOperationResult conflict(UUID id, String detail) {
+        return new SyncOperationResult(id, Status.CONFLICT, detail);
     }
 
     public static SyncOperationResult failed(UUID id, String detail) {
