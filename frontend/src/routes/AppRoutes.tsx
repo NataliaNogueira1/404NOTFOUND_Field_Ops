@@ -85,7 +85,7 @@ const TechnicianProfilePage = lazy(() =>
 
 function LoadingRoute() {
   return (
-    <div className="rounded-card border border-border bg-white p-6 text-sm text-muted shadow-fieldops">
+    <div className="rounded-card border border-border bg-surface p-6 text-sm text-muted shadow-fieldops">
       Carregando tela...
     </div>
   )

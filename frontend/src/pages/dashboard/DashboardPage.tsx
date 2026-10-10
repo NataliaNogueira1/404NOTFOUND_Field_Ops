@@ -177,7 +177,7 @@ function QuickAction({
       to={to}
       className="focus-ring group flex items-center gap-3 rounded-fieldops border border-border p-3 transition-colors hover:border-primary-light hover:bg-primary-light/30"
     >
-      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark">
+      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
         <Icon size={19} />
       </span>
       <span className="min-w-0 flex-1">
