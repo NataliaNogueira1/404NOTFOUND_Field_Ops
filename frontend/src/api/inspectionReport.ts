@@ -1,5 +1,3 @@
-import { apiRequest } from '@/api/client'
-
 /**
  * API module for the inspection PDF report (Task 196).
  *
