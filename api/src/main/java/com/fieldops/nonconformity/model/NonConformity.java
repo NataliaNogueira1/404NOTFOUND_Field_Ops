@@ -55,6 +55,20 @@ public class NonConformity {
     protected NonConformity() {
     }
 
+    /** Creates a newly identified non-conformity in the initial OPEN state. */
+    public static NonConformity create(Inspection inspection, InspectionItemSnapshot itemSnapshot, String title,
+            String description, NonConformitySeverity severity) {
+        NonConformity nonConformity = new NonConformity();
+        nonConformity.inspection = inspection;
+        nonConformity.inspectionItemSnapshot = itemSnapshot;
+        nonConformity.title = title;
+        nonConformity.description = description;
+        nonConformity.severity = severity;
+        nonConformity.status = NonConformityStatus.OPEN;
+        nonConformity.createdAt = Instant.now();
+        return nonConformity;
+    }
+
     public Long getId() { return id; }
     public Inspection getInspection() { return inspection; }
     public InspectionItemSnapshot getInspectionItemSnapshot() { return inspectionItemSnapshot; }

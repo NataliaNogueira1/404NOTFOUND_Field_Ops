@@ -11,4 +11,7 @@ public interface InspectionItemSnapshotRepository extends JpaRepository<Inspecti
     List<InspectionItemSnapshot> findByInspectionIdOrderBySectionOrderAscItemOrderAsc(Long inspectionId);
 
     Optional<InspectionItemSnapshot> findByIdAndInspectionId(Long id, Long inspectionId);
+
+    Optional<InspectionItemSnapshot> findByInspectionIdAndSourceTemplateItemId(Long inspectionId,
+            Long sourceTemplateItemId);
 }
