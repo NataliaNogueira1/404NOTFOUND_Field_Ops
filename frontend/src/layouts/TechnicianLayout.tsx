@@ -29,7 +29,7 @@ export function TechnicianLayout() {
       />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-white transition-transform lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-sidebar transition-transform lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -84,7 +84,7 @@ export function TechnicianLayout() {
         </div>
       </aside>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-white/90 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur lg:px-8">
           <button
             className="focus-ring rounded-fieldops p-2 text-muted hover:bg-primary-light/30 lg:hidden"
             onClick={() => setOpen(true)}
@@ -96,7 +96,7 @@ export function TechnicianLayout() {
             <p className="text-sm font-semibold text-text">Portal do Tecnico</p>
             <p className="text-xs text-muted">Operacao de campo web</p>
           </div>
-          <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark">
+          <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark dark:bg-primary/25 dark:text-primary-light">
             Mock
           </span>
         </header>
