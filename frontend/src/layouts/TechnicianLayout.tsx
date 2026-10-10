@@ -1,4 +1,4 @@
-import { ClipboardList, Home, LogOut, Menu, RefreshCw, ShieldCheck, User, X } from 'lucide-react'
+import { Bell, ClipboardList, Home, LogOut, Menu, RefreshCw, ShieldCheck, User, X } from 'lucide-react'
 import { useState, useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { authSession } from '@/auth/session'
@@ -18,6 +18,12 @@ export function TechnicianLayout() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
+  const initials = (user?.name ?? technicianUser.name)
+    .split(' ')
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
   function logout() {
     authSession.logout()
     navigate('/login')
@@ -99,9 +105,23 @@ export function TechnicianLayout() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark dark:bg-primary/25 dark:text-primary-light">
-              Mock
-            </span>
+            <button
+              className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
+              aria-label="Notificacoes"
+            >
+              <Bell size={20} />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
+            </button>
+            <div className="h-8 w-px bg-border" />
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-bold text-white">
+                {initials}
+              </span>
+              <div className="hidden sm:block">
+                <p className="text-sm font-semibold leading-tight text-text">{user?.name ?? technicianUser.name}</p>
+                <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
+              </div>
+            </div>
           </div>
         </header>
         <main className="mx-auto max-w-7xl p-5 lg:p-8">
