@@ -3,6 +3,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { authSession } from '@/auth/session'
 import { technicianUser } from '@/mocks/technician'
+import { ThemeToggle } from '@/theme/ThemeToggle'
 import { cn } from '@/utils/cn'
 
 const navItems = [
@@ -96,9 +97,12 @@ export function TechnicianLayout() {
             <p className="text-sm font-semibold text-text">Portal do Tecnico</p>
             <p className="text-xs text-muted">Operacao de campo web</p>
           </div>
-          <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark dark:bg-primary/25 dark:text-primary-light">
-            Mock
-          </span>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark dark:bg-primary/25 dark:text-primary-light">
+              Mock
+            </span>
+          </div>
         </header>
         <main className="mx-auto max-w-7xl p-5 lg:p-8">
           <Outlet />
