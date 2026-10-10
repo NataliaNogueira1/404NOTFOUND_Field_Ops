@@ -112,7 +112,13 @@ function reviewResponse(status = 200) {
   })
 }
 
-function renderPage(fetchMock: ReturnType<typeof vi.fn>) {
+// Mock da API `fetch` com a assinatura real do browser. Tipar o mock com
+// `(input, init?)` garante que `mock.calls` seja a tupla `[input, init?]`,
+// permitindo desestruturar a URL (indice 0) e ler o `init` (indice 1) sem
+// erros de tupla do TypeScript (TS2493/TS2339).
+type FetchMock = ReturnType<typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>>
+
+function renderPage(fetchMock: FetchMock) {
   vi.stubGlobal('fetch', fetchMock)
   return render(
     <MemoryRouter initialEntries={['/app/inspections/42/report']}>
@@ -236,9 +242,9 @@ describe('InspectionReportPage — download do PDF via API', () => {
   })
 
   it('faz GET no endpoint correto ao clicar em Baixar PDF', async () => {
-    const fetchMock = vi.fn((url: string) => {
-      if (String(url).endsWith('/review')) return Promise.resolve(reviewResponse())
-      if (String(url).endsWith('/report.pdf')) {
+    const fetchMock: FetchMock = vi.fn((input) => {
+      if (String(input).endsWith('/review')) return Promise.resolve(reviewResponse())
+      if (String(input).endsWith('/report.pdf')) {
         return Promise.resolve(new Response(null, { status: 200 }))
       }
       return Promise.reject(new Error('unexpected url'))
@@ -263,9 +269,9 @@ describe('InspectionReportPage — download do PDF via API', () => {
     // Simula token no localStorage
     window.localStorage.setItem('fieldops:access-token', 'test-jwt-token')
 
-    const fetchMock = vi.fn((url: string) => {
-      if (String(url).endsWith('/review')) return Promise.resolve(reviewResponse())
-      if (String(url).endsWith('/report.pdf')) {
+    const fetchMock: FetchMock = vi.fn((input) => {
+      if (String(input).endsWith('/review')) return Promise.resolve(reviewResponse())
+      if (String(input).endsWith('/report.pdf')) {
         return Promise.resolve(new Response(null, { status: 200 }))
       }
       return Promise.reject(new Error('unexpected url'))
@@ -292,8 +298,8 @@ describe('InspectionReportPage — download do PDF via API', () => {
 
   it('desabilita o botao durante o download e o reabilita apos concluir', async () => {
     let resolvePdf!: (r: Response) => void
-    const fetchMock = vi.fn((url: string) => {
-      if (String(url).endsWith('/review')) return Promise.resolve(reviewResponse())
+    const fetchMock: FetchMock = vi.fn((input) => {
+      if (String(input).endsWith('/review')) return Promise.resolve(reviewResponse())
       // Deferred promise that we resolve manually to control timing
       return new Promise<Response>((resolve) => { resolvePdf = resolve })
     })
@@ -316,8 +322,8 @@ describe('InspectionReportPage — download do PDF via API', () => {
   })
 
   it('exibe mensagem de erro quando o download do PDF falha', async () => {
-    const fetchMock = vi.fn((url: string) => {
-      if (String(url).endsWith('/review')) return Promise.resolve(reviewResponse())
+    const fetchMock: FetchMock = vi.fn((input) => {
+      if (String(input).endsWith('/review')) return Promise.resolve(reviewResponse())
       const err = { status: 500, code: 'REPORT_ERROR', message: 'Falha ao gerar o relatorio' }
       return Promise.resolve(
         new Response(JSON.stringify(err), {
@@ -341,7 +347,7 @@ describe('InspectionReportPage — nao usa mais dados mock', () => {
   it('nao importa de @/mocks/domain nem de @/state/mockStores', async () => {
     // Se a pagina renderizar dados do fixture de mock (ids 'ins-compressor' etc.),
     // este teste falharia porque os dados sao diferentes dos enviados pela API.
-    const fetchMock = vi.fn(() => Promise.resolve(reviewResponse()))
+    const fetchMock: FetchMock = vi.fn(() => Promise.resolve(reviewResponse()))
     renderPage(fetchMock)
 
     await screen.findByText('Inspecao Preventiva Compressor')
@@ -351,7 +357,7 @@ describe('InspectionReportPage — nao usa mais dados mock', () => {
   })
 
   it('chama a API de review com o ID correto da rota', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(reviewResponse()))
+    const fetchMock: FetchMock = vi.fn(() => Promise.resolve(reviewResponse()))
     renderPage(fetchMock)
 
     await screen.findByText('Inspecao Preventiva Compressor')
