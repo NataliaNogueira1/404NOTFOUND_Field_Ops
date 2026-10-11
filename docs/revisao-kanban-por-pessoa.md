@@ -18,6 +18,20 @@
 > abertos (#191 e #192) aguardando merge. Confirmadas como pendentes no código:
 > #84 (offline web), #89 (deploy), #65 (GPS conclusão), #148, #147, #73, #79, #181.
 >
+> Atualização 3 (10/10/2026): nova varredura completa do código (backend/web/mobile) e
+> do board. Mudanças desde 05/10: **#149 (PDF web)** passou a ✅ — a `InspectionReportPage`
+> baixa o PDF do servidor (`inspectionReportApi.downloadPdf` → `GET /inspections/{id}/report.pdf`),
+> sem jsPDF/mocks (PRs #196/#216). **#181 (endpoints de sync de conteúdo)** passou a ✅ —
+> `SyncOperationType` ganhou `ANSWER_UPSERT`/`EVIDENCE_CREATE`/`NON_CONFORMITY_CREATE` e o
+> `SyncBatchService` aplica os três via `POST /mobile/sync/push` (PRs #181–#184). **Novo
+> descompasso:** o backend de sync de conteúdo está pronto, mas o **mobile ainda não envia**
+> esses tipos (`InspectionSyncService` lança "not supported yet"; upload de evidência atrás
+> de flag desligada; `GET /mobile/inspections/{id}` inexistente no backend). Essas lacunas de
+> integração viraram as issues **#221–#232**, separadas por camada (backend só Lucas/Marcela)
+> e hoje em *In progress*. Seguem pendentes no código: #146/#154/#151 no front (dashboard/CSV/
+> comentários), #65 (GPS conclusão), #73 (cursor), #79 (iniciar revisão), #84 (offline web),
+> #89 (deploy — *Blocked*), #147 (notificação local), #148 (assinatura).
+>
 > Legenda: ✅ Concluído · 🟡 Parcial · ❌ Não feito.
 >
 > Observação de rastreabilidade: pela regra do time, uma issue só vai para **Done**
@@ -40,7 +54,7 @@
 | Issue | Tarefa | Status real | Evidência / observação |
 |-------|--------|-------------|------------------------|
 | #84 | Estados de carregamento, vazio, erro e offline | 🟡 Parcial | Loading/vazio/erro reais nas telas integradas (Users/Clients/Sites/Equipment/Inspections/ReviewQueue, `AnswerHistoryTab`); falta tratamento de **offline** no web. |
-| #149 | Relatório PDF (web) | ❌ Não feito (apesar de a issue estar fechada) | `InspectionReportPage` ainda gera PDF via jsPDF com dados de `@/mocks/domain`; não consome o endpoint `GET /api/v1/inspections/{id}/report.pdf` (que **já existe** no backend, `ReportController`). A issue #149 foi fechada no GitHub, mas o front não foi migrado para o endpoint real. |
+| #149 | Relatório PDF (web) | ✅ Concluído | A `InspectionReportPage` carrega dados reais via `inspectionReviewApi` e baixa o PDF gerado no servidor por `inspectionReportApi.downloadPdf` → `GET /api/v1/inspections/{id}/report.pdf` (`frontend/src/api/inspectionReport.ts`). Não usa mais jsPDF/mocks (PRs #196/#216). |
 | #155 | Notificações push de nova atribuição | ✅ Concluído | Backend (`/devices/register` + envio Expo na atribuição) e mobile (`pushNotifications.ts`: permissão + Expo token + register; abre inspeção ao toque). Commits 650134d/81555ef, PR #201. |
 | #172 | Tema escuro — telas de autenticação (web) | ✅ Concluído | `LoginPage`/`AuthLayout`/`NotFoundPage` usam tokens semânticos do tema (`bg-surface`, `text-text`, `bg-app-bg`, `border-border`), redefinidos sob `.dark` em `index.css`, adaptando ao modo escuro automaticamente. PR #212 (merge `6c1a3fa`): corrigiu o resíduo `bg-slate-50` da caixa de dica (agora `bg-app-bg` + `border-border`) e adicionou o `ThemeToggle` no `AuthLayout` (alternar tema antes de autenticar); 8 testes em `LoginPage.test.tsx`. |
 | #171 | Tema escuro — padrão base das telas dark | ✅ Concluído | `ThemeProvider` + `ThemeToggle` + persistência em `localStorage` + testes, plugado no `App.tsx`. Base pronta (falta aplicar nas telas). |
@@ -72,13 +86,17 @@
 | #176 | Tema escuro — telas de inspeção (web) | ✅ Concluído | Telas de `pages/inspections/*` (listagem, agendamento, revisão, histórico, lightbox) adaptadas aos tokens semânticos do tema. PR #208. |
 | #174 | Tema escuro — telas de cadastro (web) | ✅ Concluído | Users/Clients/Sites/Equipment (tabelas, filtros, formulários, modais, badges, paginação) adaptados aos tokens do tema. PR #208. |
 | #171 | Tema escuro — padrão base das telas dark | ✅ Concluído | Mesma de Carol (base pronta e testada). O `ThemeToggle` agora está renderizado no `Header` (web), permitindo alternar Claro/Escuro/Sistema pela UI. |
+| #226 | Integração: construtor de modelos no web (front) | ⏳ Em andamento | Issue de integração recém-aberta (10/10), *In progress*. Trocar mocks/`templateDraftStore` pela `adminCatalogApi` e consumir `GET /inspection-templates/{id}/preview`. Sem código ainda. |
+| #231 | Integração: tela de não conformidades (front) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Consumir o endpoint de NCs (irmã backend #228). Sem código ainda. |
 
 ## Lucas
 
 | Issue | Tarefa | Status real | Evidência / observação |
 |-------|--------|-------------|------------------------|
-| #181 | Endpoints de sync de conteúdo (/answers, /evidences, /non-conformities) | ❌ Não feito | `SyncOperationType` só tem `INSPECTION_STATUS`; endpoints de conteúdo não existem. O enum comenta que serão adicionados depois (reaproveitando `SyncBatchService`/`IdempotencyService`). |
+| #181 | Endpoints de sync de conteúdo (/answers, /evidences, /non-conformities) | ✅ Concluído | `SyncOperationType` agora tem `ANSWER_UPSERT`/`EVIDENCE_CREATE`/`NON_CONFORMITY_CREATE`; o `SyncBatchService` aplica os três (`applyAnswerUpsert`/`applyEvidenceCreate`/`applyNonConformityCreate`) de forma idempotente via `POST /mobile/sync/push` (não há rotas REST separadas por tipo). PRs #181–#184/#214. Observação: o **cliente mobile ainda não envia** esses tipos (ver issues #229/#232). |
 | #75 | Detecção de conflito de versão | ✅ Concluído | `server_version` + `baseVersion` + `VersionConflictError` + `markConflict`, com testes (`pbi054.test.ts`). |
+| #222 | Integração: endpoint mobile de detalhe (GET por id) — backend | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Criar `GET /api/v1/mobile/inspections/{id}` (hoje inexistente; o mobile já chama e recebe 404). Sem código ainda. |
+| #223 | Integração: aplicar respostas/NCs no sync — backend | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Abrange a #181 (já concluída no enum/aplicadores); refina contrato e cobertura. Confirmar se é duplicata de #181. |
 
 ## Marcela
 
@@ -87,6 +105,8 @@
 | #73 | Pull com cursor (sync_metadata) | ❌ Não feito | `pullInspections` baixa tudo; `sync_metadata` só guarda `last_successful_sync` (timestamp), não é cursor incremental. |
 | #79 | Iniciar revisão formalmente | ❌ Não feito | Não há ação/estado de "iniciar revisão" formal; aprovar/reprovar na revisão são simulados. |
 | #67 | Visualizar evidências e NCs no admin | ✅ Concluído | `InspectionReviewPage` consome `GET /api/v1/inspections/{id}/review` (dados reais): NCs por item + coluna lateral e evidências carregadas sob demanda (`loadEvidenceImage` → Blob) no lightbox. Não é mais mock (PR #208). |
+| #221 | Integração: endpoint de upload de evidência — backend | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Criar o `POST` de upload (binário) que o mobile tenta mas não existe. Sem código ainda. |
+| #228 | Integração: endpoint de não conformidades — backend | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Criar `GET /api/v1/non-conformities` (listagem/consulta) para a tela web (irmã #231). Sem código ainda. |
 
 ## Rodrigo
 
@@ -97,6 +117,29 @@
 | #167 | Testes do lightbox | ✅ Concluído | Existe `frontend/src/components/feedback/Lightbox.test.tsx`. |
 | #179 | Tema escuro — login e abas (mobile) | ✅ Concluído | `login.tsx` e `(tabs)/_layout.tsx` consomem `useThemeColors()` (background/text/surface/border/tint dinâmicos). Restam só cores de marca fixas (brandMark/link/erro), que não mudam entre temas. |
 | #64 | Foto pendente se upload falha | ✅ Concluído | `markFailed`/`retryEvidenceUpload` + "Fotos com falha" no `sync.tsx`, com testes (`pbi044.test.ts`). |
+| #227 | Integração: portal web do técnico (front) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Trocar `@/mocks/technician` por API real nas telas do portal. Sem código ainda. |
+| #232 | Integração: enviar respostas/NCs no sync (mobile) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Remover o "not supported yet" e enviar `ANSWER_UPSERT`/`NON_CONFORMITY_CREATE` ao `/mobile/sync/push` (backend já aplica). Sem código ainda. |
+
+---
+
+## Carol (integração)
+
+| Issue | Tarefa | Status real | Evidência / observação |
+|-------|--------|-------------|------------------------|
+| #224 | Integração: timeline de auditoria no web (front) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Consumir `GET /inspections/{id}/history` (hoje a AuditPage usa mock). Sem código ainda. |
+| #225 | Integração: listagem/criação de inspeções no web (front) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Trocar `inspectionStore`/mocks por `GET`/`POST /inspections`. Sem código ainda. |
+
+## Felipe (integração)
+
+| Issue | Tarefa | Status real | Evidência / observação |
+|-------|--------|-------------|------------------------|
+| #229 | Integração: enviar upload de evidência (mobile) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Ligar o `EvidenceUploadClient` ao endpoint de upload (irmã backend #221). Sem código ainda. |
+
+## Ian (integração)
+
+| Issue | Tarefa | Status real | Evidência / observação |
+|-------|--------|-------------|------------------------|
+| #230 | Integração: consumir detalhe de inspeção (mobile) | ⏳ Em andamento | Issue recém-aberta (10/10), *In progress*. Ajustar `pullInspection` ao `GET /mobile/inspections/{id}` (irmã backend #222). Sem código ainda. |
 
 ---
 
@@ -114,15 +157,19 @@
 - #88 Build APK, #80 Reprovação propagada no pull (Felipe)
 - #67 Evidências/NCs reais no admin (Marcela) — via PR #208 / tokens de tema
 - #172 Tema escuro autenticação web (Carol) — PR #212 mergeado (merge `6c1a3fa`): `bg-slate-50` corrigido, `ThemeToggle` no `AuthLayout`, 8 testes
+- #149 Relatório PDF web (Carol) — integrado ao `GET /inspections/{id}/report.pdf`, PRs #196/#216 *(atualizado 10/10)*
+- #181 Endpoints de sync de conteúdo (Lucas) — `ANSWER_UPSERT`/`EVIDENCE_CREATE`/`NON_CONFORMITY_CREATE` aplicados via `/mobile/sync/push`, PRs #181–#184 *(atualizado 10/10)*
 
 **🟡 Parciais:** #84 (estados, falta offline no web), #89 (build web — CI+configs
-prontos, sem deploy ativo; issue fechada), #65 (GPS: capturado só no início, não na
+prontos, sem deploy ativo; board marca *Blocked*), #65 (GPS: capturado só no início, não na
 conclusão nem enviado ao servidor).
 
-**🟢 Prontas em PR aberto (ainda não mergeadas):** #146 (dashboard integrado ao
-`/dashboard/summary` — PR #191), #154 (botão/download de CSV no front — PR #192).
+**⏳ Issues de integração recém-abertas (10/10), todas *In progress* e sem código ainda:**
+backend #221/#222/#223/#228 (Marcela, Lucas), mobile #229/#230/#232 (Felipe, Ian, Rodrigo),
+front #224/#225/#226/#227/#231 (Carol, Júlia, Rodrigo). Fecham o descompasso entre o backend
+de sync de conteúdo (pronto) e os clientes, além de dashboard/CSV/comentários/auditoria/NC no front.
 
-**❌ Não feitas:** #148 (assinatura), #149 (PDF web — issue fechada, mas front ainda usa
-mocks e não consome o endpoint real que já existe), #181 (endpoints de sync de conteúdo),
-#73 (cursor de sync), #79 (iniciar revisão formal — só aprovar/reprovar existem),
-#147 (notificações locais).
+**❌ Não feitas:** #148 (assinatura), #146 (dashboard web — backend pronto, front em mock;
+issue #224/#225 e PR #191 relacionados), #154 (CSV no front — backend pronto, PR #192),
+#151 (comentários de revisão no front — backend pronto), #73 (cursor de sync),
+#79 (iniciar revisão formal — só aprovar/reprovar existem), #147 (notificações locais).
