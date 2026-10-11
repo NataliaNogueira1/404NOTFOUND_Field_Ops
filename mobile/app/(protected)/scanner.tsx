@@ -1,5 +1,5 @@
-﻿import { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -8,15 +8,28 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
+import { useAuth } from '@/features/auth';
 import { useThemeColors } from '@/features/theme';
+import { useConnectivity } from '@/infrastructure/connectivity';
+import { fetchEquipmentByQrCode, type ApiEquipment } from '@/infrastructure/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ScanResult =
-  | { kind: 'match';    qrCode: string }  // QR matches the expected equipment
-  | { kind: 'mismatch'; qrCode: string }  // QR found but wrong equipment (RN-064)
-  | { kind: 'unknown';  qrCode: string }  // QR not found in any local inspection
+  | { kind: 'match';    qrCode: string }                       // QR matches the expected equipment
+  | { kind: 'mismatch'; qrCode: string }                       // QR found but wrong equipment (RN-064)
+  | { kind: 'apiMatch'; qrCode: string; equipment: ApiEquipment } // QR resolved online via API fallback
+  | { kind: 'unknown';  qrCode: string; offline?: boolean }    // QR not found locally (nor online)
   | null;
+
+// A single pickable equipment for the manual-identification select. Built from the
+// technician's locally synced inspections (the only equipment list a TECHNICIAN
+// can see offline — the catalogue endpoint is ADMIN/SUPERVISOR only).
+interface ManualOption {
+  qrCode: string;
+  equipmentName: string;
+  siteName: string;
+}
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -26,11 +39,12 @@ type ScanResult =
  * Acceptance criteria:
  *  1. Requests camera permission
  *  2. Reads QR Code with haptic feedback (expo-haptics)
- *  3. Looks up equipment in SQLite by qr_code (searches local inspections)
+ *  3. Looks up equipment in SQLite by qr_code (searches local inspections),
+ *     with an ONLINE fallback to GET /api/v1/equipment/by-qr/{qrCode}
  *  4. If found: shows card with equipment data
  *  5. If mismatched: alerts the technician (RN-064)
  *  6. If not found: clear "not found" message
- *  7. Permission denied: explanation + manual entry fallback
+ *  7. Permission denied: explanation + manual identification (equipment select)
  *  8. Code read only once per cycle (scanningRef lock)
  */
 export default function ScannerScreen() {
@@ -38,10 +52,13 @@ export default function ScannerScreen() {
   const router = useRouter();
   const c = useThemeColors();
   const { inspections } = useFieldOps();
+  const { token } = useAuth();
+  const { isOnline } = useConnectivity();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [result, setResult] = useState<ScanResult>(null);
-  const [manualCode, setManualCode] = useState('');
+  const [resolving, setResolving] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   // ─── Criterion 8: read only once per cycle ───────────────────────────────
   const scanningRef = useRef(true);
@@ -52,72 +69,166 @@ export default function ScannerScreen() {
 
   const expectedQrCode = inspection?.equipmentQrCode ?? null;
 
-  // ─── Criterion 3: look up in SQLite by qr_code ───────────────────────────
-  // We search across all locally synced inspections — whichever one carries
-  // the scanned QR code is the equipment being looked at.
-  function resolveQrCode(scanned: string): ScanResult {
-    // Does it match the inspection we came from?
-    if (expectedQrCode) {
-      if (scanned === expectedQrCode) return { kind: 'match', qrCode: scanned };
-      // It might still belong to *another* local inspection — that's a mismatch.
-      const ownerInspection = inspections.find((i) => i.equipmentQrCode === scanned);
-      if (ownerInspection) return { kind: 'mismatch', qrCode: scanned };
-      // Not found anywhere locally.
-      return { kind: 'unknown', qrCode: scanned };
+  // Equipment options for manual identification — one per distinct QR code found
+  // in the local inspections. This is the offline-first source available to the
+  // technician (RN-064), used as the manual fallback instead of free text.
+  const manualOptions = useMemo<ManualOption[]>(() => {
+    const seen = new Set<string>();
+    const options: ManualOption[] = [];
+    for (const insp of inspections) {
+      if (!insp.equipmentQrCode || seen.has(insp.equipmentQrCode)) continue;
+      seen.add(insp.equipmentQrCode);
+      options.push({
+        qrCode: insp.equipmentQrCode,
+        equipmentName: insp.equipmentName,
+        siteName: insp.siteName,
+      });
     }
+    return options;
+  }, [inspections]);
 
-    // No expected QR (standalone mode) — any match in the local list counts.
-    const ownerInspection = inspections.find((i) => i.equipmentQrCode === scanned);
-    if (ownerInspection) return { kind: 'match', qrCode: scanned };
-    return { kind: 'unknown', qrCode: scanned };
-  }
+  // ─── Criterion 3 (local): look up in SQLite by qr_code ───────────────────
+  // Whichever locally synced inspection carries the scanned QR is the equipment
+  // being looked at. Returns null when nothing local matches (caller then tries
+  // the online fallback).
+  const resolveLocal = useCallback(
+    (scanned: string): ScanResult => {
+      if (expectedQrCode) {
+        if (scanned === expectedQrCode) return { kind: 'match', qrCode: scanned };
+        const ownerInspection = inspections.find((i) => i.equipmentQrCode === scanned);
+        if (ownerInspection) return { kind: 'mismatch', qrCode: scanned };
+        return null;
+      }
+      const ownerInspection = inspections.find((i) => i.equipmentQrCode === scanned);
+      if (ownerInspection) return { kind: 'match', qrCode: scanned };
+      return null;
+    },
+    [expectedQrCode, inspections],
+  );
 
-  // ─── Criterion 2: haptic feedback ────────────────────────────────────────
+  const buzz = useCallback((success: boolean) => {
+    void Haptics.notificationAsync(
+      success ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
+    );
+  }, []);
+
+  // ─── Criterion 3 (online fallback): resolve a code end-to-end ────────────
+  // Tries the local inspections first; if nothing matches and the device is
+  // online, asks the server (GET /api/v1/equipment/by-qr/{qrCode}). Offline or
+  // 404 ends up as "unknown"; a reachable server that knows the QR becomes an
+  // `apiMatch` so the technician still sees the equipment data.
+  const resolveCode = useCallback(
+    async (scanned: string): Promise<ScanResult> => {
+      const local = resolveLocal(scanned);
+      if (local) return local;
+
+      if (!isOnline || !token) {
+        return { kind: 'unknown', qrCode: scanned, offline: !isOnline };
+      }
+
+      try {
+        const equipment = await fetchEquipmentByQrCode(scanned, token);
+        if (equipment) return { kind: 'apiMatch', qrCode: scanned, equipment };
+        return { kind: 'unknown', qrCode: scanned };
+      } catch {
+        // Network/server error while online — fall back to "unknown" and flag it
+        // so the message can hint that the server could not be reached.
+        return { kind: 'unknown', qrCode: scanned, offline: true };
+      }
+    },
+    [resolveLocal, isOnline, token],
+  );
+
+  // Shared handler for both camera reads and manual selection.
+  const processCode = useCallback(
+    async (scanned: string) => {
+      setResolving(true);
+      try {
+        const resolved = await resolveCode(scanned);
+        setResult(resolved);
+        buzz(resolved?.kind === 'match' || resolved?.kind === 'apiMatch');
+      } finally {
+        setResolving(false);
+      }
+    },
+    [resolveCode, buzz],
+  );
+
+  // ─── Criterion 2: haptic feedback on read ────────────────────────────────
   const handleBarcode = useCallback(
     ({ data }: { data: string }) => {
       if (!scanningRef.current) return;
       scanningRef.current = false;
-
-      const resolved = resolveQrCode(data);
-      setResult(resolved);
-
-      if (resolved?.kind === 'match') {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }
+      void processCode(data);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [expectedQrCode, inspections],
+    [processCode],
   );
 
-  // ─── Manual entry (criterion 7 fallback) ─────────────────────────────────
-  function submitManual() {
-    const code = manualCode.trim();
-    if (!code) return;
-    const resolved = resolveQrCode(code);
-    setResult(resolved);
-    if (resolved?.kind === 'match') {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    }
+  // ─── Criterion 7: manual identification (equipment select) ───────────────
+  function pickManual(option: ManualOption) {
+    setManualOpen(false);
+    scanningRef.current = false;
+    void processCode(option.qrCode);
   }
 
   function rescan() {
     setResult(null);
     scanningRef.current = true;
-    setManualCode('');
   }
 
   function confirm() {
     router.back();
   }
 
-  // Find the inspection that owns the scanned QR (for the result card details).
+  // Local inspection that owns the scanned QR (for the result card details).
   const matchedInspection = result
     ? inspections.find((i) => i.equipmentQrCode === result.qrCode)
     : null;
+
+  // ─── Manual identification modal (shared across screens) ──────────────────
+  const manualModal = (
+    <Modal visible={manualOpen} animationType="slide" transparent onRequestClose={() => setManualOpen(false)}>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.modalSheet, { backgroundColor: c.surface }]}>
+          <Text style={[styles.modalTitle, { color: c.text }]}>Identificar equipamento</Text>
+          <Text style={[styles.muted, { color: c.textSecondary }]}>
+            Selecione o equipamento das suas inspeções sincronizadas.
+          </Text>
+
+          {manualOptions.length === 0 ? (
+            <Text style={[styles.muted, { color: c.textSecondary, paddingVertical: Spacing.lg }]}>
+              Nenhum equipamento disponível nas inspeções baixadas.
+            </Text>
+          ) : (
+            <FlatList
+              data={manualOptions}
+              keyExtractor={(item) => item.qrCode}
+              style={styles.optionList}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.option,
+                    { borderBottomColor: c.border },
+                    pressed && styles.optionPressed,
+                  ]}
+                  onPress={() => pickManual(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Selecionar ${item.equipmentName}`}
+                >
+                  <Text style={[styles.optionName, { color: c.text }]}>{item.equipmentName}</Text>
+                  <Text style={[styles.optionMeta, { color: c.textSecondary }]}>
+                    {item.siteName} · {item.qrCode}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          )}
+
+          <Button label="Fechar" onPress={() => setManualOpen(false)} variant="ghost" fullWidth />
+        </View>
+      </View>
+    </Modal>
+  );
 
   // ─── Criterion 1: permission gate ────────────────────────────────────────
 
@@ -133,7 +244,7 @@ export default function ScannerScreen() {
     );
   }
 
-  // ─── Criterion 7: permission denied → explanation + manual fallback ───────
+  // ─── Criterion 7: permission denied → explanation + manual identification ──
 
   if (!permission.granted) {
     return (
@@ -141,31 +252,19 @@ export default function ScannerScreen() {
         <View style={styles.centered}>
           <Text style={[styles.permTitle, { color: c.text }]}>Câmera necessária</Text>
           <Text style={[styles.muted, { color: c.textSecondary }]}>
-            Para escanear o QR Code é preciso conceder acesso à câmera. Se preferir, digite
-            o código manualmente abaixo.
+            Para escanear o QR Code é preciso conceder acesso à câmera. Se preferir, identifique
+            o equipamento manualmente.
           </Text>
           <Button label="Conceder permissão" onPress={requestPermission} fullWidth />
-
-          {/* Manual entry alternative */}
-          <View style={styles.manualBox}>
-            <Text style={[styles.manualLabel, { color: c.textSecondary }]}>
-              Ou insira o código manualmente:
-            </Text>
-            <TextInput
-              style={[styles.manualInput, { borderColor: c.border, color: c.text, backgroundColor: c.surface }]}
-              placeholder="Ex.: COMP-004"
-              placeholderTextColor={Colors.gray400}
-              value={manualCode}
-              onChangeText={setManualCode}
-              autoCapitalize="characters"
-              returnKeyType="done"
-              onSubmitEditing={submitManual}
-            />
-            <Button label="Confirmar" onPress={submitManual} fullWidth />
-          </View>
-
+          <Button
+            label="Identificar manualmente"
+            onPress={() => setManualOpen(true)}
+            variant="secondary"
+            fullWidth
+          />
           <Button label="Voltar" onPress={() => router.back()} variant="ghost" fullWidth />
         </View>
+        {manualModal}
       </SafeAreaView>
     );
   }
@@ -178,7 +277,7 @@ export default function ScannerScreen() {
         <View style={styles.resultContainer}>
 
           {result.kind === 'match' && (
-            // Criterion 4: found — show equipment data card
+            // Criterion 4: found locally — show equipment data card
             <Card style={styles.card}>
               <Text style={styles.resultIcon}>✅</Text>
               <Text style={[styles.resultTitle, { color: c.text }]}>
@@ -198,6 +297,36 @@ export default function ScannerScreen() {
                     <Text style={[styles.dataValue, { color: c.text }]}>{matchedInspection.clientName}</Text>
                   </View>
                 </>
+              ) : null}
+              <Text style={[styles.qrCode, { color: c.textSecondary }]}>QR: {result.qrCode}</Text>
+            </Card>
+          )}
+
+          {result.kind === 'apiMatch' && (
+            // Criterion 4 (online fallback): resolved via API, show server data
+            <Card style={styles.card}>
+              <Text style={styles.resultIcon}>✅</Text>
+              <Text style={[styles.resultTitle, { color: c.text }]}>
+                Equipamento encontrado
+              </Text>
+              <Text style={[styles.resultSub, { color: c.text }]}>{result.equipment.name}</Text>
+              <View style={[styles.dataRow, { borderTopColor: c.border }]}>
+                <Text style={[styles.dataLabel, { color: c.textSecondary }]}>Patrimônio</Text>
+                <Text style={[styles.dataValue, { color: c.text }]}>{result.equipment.assetNumber}</Text>
+              </View>
+              <View style={[styles.dataRow, { borderTopColor: c.border }]}>
+                <Text style={[styles.dataLabel, { color: c.textSecondary }]}>Local</Text>
+                <Text style={[styles.dataValue, { color: c.text }]}>{result.equipment.siteName}</Text>
+              </View>
+              <View style={[styles.dataRow, { borderTopColor: c.border }]}>
+                <Text style={[styles.dataLabel, { color: c.textSecondary }]}>Status</Text>
+                <Text style={[styles.dataValue, { color: c.text }]}>{result.equipment.status}</Text>
+              </View>
+              {inspection && inspection.equipmentQrCode && inspection.equipmentQrCode !== result.qrCode ? (
+                <Text style={[styles.warning, { color: c.warningDark ?? Colors.warningDark }]}>
+                  Atenção: diferente do equipamento previsto para esta inspeção
+                  ({inspection.equipmentName}).
+                </Text>
               ) : null}
               <Text style={[styles.qrCode, { color: c.textSecondary }]}>QR: {result.qrCode}</Text>
             </Card>
@@ -228,31 +357,47 @@ export default function ScannerScreen() {
           )}
 
           {result.kind === 'unknown' && (
-            // Criterion 6: not found in any local inspection
+            // Criterion 6: not found locally nor online
             <Card style={styles.card}>
               <Text style={styles.resultIcon}>❓</Text>
               <Text style={[styles.resultTitle, { color: c.text }]}>
                 Equipamento não encontrado
               </Text>
               <Text style={[styles.resultSub, { color: c.textSecondary }]}>
-                O código lido não corresponde a nenhum equipamento das suas inspeções
-                sincronizadas.
+                {result.offline
+                  ? 'Não foi possível consultar o servidor. O código não corresponde a nenhuma inspeção sincronizada.'
+                  : 'O código lido não corresponde a nenhum equipamento conhecido.'}
               </Text>
               <Text style={[styles.qrCode, { color: c.textSecondary }]}>QR: {result.qrCode}</Text>
             </Card>
           )}
 
-          {result.kind === 'match' && (
+          {(result.kind === 'match' || result.kind === 'apiMatch') && (
             <Button label="Continuar" onPress={confirm} fullWidth size="lg" />
           )}
           {(result.kind === 'mismatch' || result.kind === 'unknown') && (
             <>
               <Button label="Escanear novamente" onPress={rescan} fullWidth size="lg" />
+              <Button label="Identificar manualmente" onPress={() => setManualOpen(true)} variant="secondary" fullWidth />
               <Button label="Prosseguir mesmo assim" onPress={confirm} variant="secondary" fullWidth />
             </>
           )}
           <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
 
+        </View>
+        {manualModal}
+      </SafeAreaView>
+    );
+  }
+
+  // ─── Resolving overlay (API fallback round-trip) ──────────────────────────
+
+  if (resolving) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={[styles.muted, { color: c.textSecondary }]}>Consultando equipamento...</Text>
         </View>
       </SafeAreaView>
     );
@@ -288,8 +433,11 @@ export default function ScannerScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
+        <Button label="Identificar manualmente" onPress={() => setManualOpen(true)} variant="secondary" fullWidth />
         <Button label="Cancelar" onPress={() => router.back()} variant="ghost" fullWidth />
       </View>
+
+      {manualModal}
     </SafeAreaView>
   );
 }
@@ -299,7 +447,7 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
 
-  // Generic centred layout (permission screens)
+  // Generic centred layout (permission / loading screens)
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -309,17 +457,6 @@ const styles = StyleSheet.create({
   },
   permTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, textAlign: 'center' },
   muted: { fontSize: FontSize.md, textAlign: 'center', lineHeight: 22 },
-
-  // Manual entry (permission denied fallback)
-  manualBox: { width: '100%', gap: Spacing.sm },
-  manualLabel: { fontSize: FontSize.sm },
-  manualInput: {
-    height: 48,
-    borderWidth: 1.5,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.md,
-    fontSize: FontSize.md,
-  },
 
   // Camera viewfinder
   title:    { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.white },
@@ -355,6 +492,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: Spacing.md,
+    gap: Spacing.sm,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
 
@@ -380,4 +518,28 @@ const styles = StyleSheet.create({
   dataValue: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   qrCode:  { fontSize: FontSize.xs, textAlign: 'center' },
   warning: { fontSize: FontSize.sm, textAlign: 'center', lineHeight: 20 },
+
+  // Manual identification modal (equipment select)
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    maxHeight: '75%',
+  },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  optionList: { marginVertical: Spacing.sm },
+  option: {
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+  },
+  optionPressed: { opacity: 0.6 },
+  optionName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  optionMeta: { fontSize: FontSize.sm },
 });
