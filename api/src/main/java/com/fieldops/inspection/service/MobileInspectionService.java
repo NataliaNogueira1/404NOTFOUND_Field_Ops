@@ -128,6 +128,7 @@ public class MobileInspectionService {
                 inspection.getSiteName(),
                 "eq-" + inspection.getId(),     // simplified
                 inspection.getEquipmentName(),
+                inspection.getEquipmentQrCode(),
                 String.valueOf(inspection.getTechnician().getId()),
                 String.valueOf(inspection.getSupervisor().getId()),
                 inspection.getSupervisor().getName(),

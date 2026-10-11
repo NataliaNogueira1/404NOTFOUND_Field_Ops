@@ -33,6 +33,7 @@ interface ApiInspection {
   siteName: string;
   equipmentId: string;
   equipmentName: string;
+  equipmentQrCode?: string;
   technicianId: string;
   supervisorId: string;
   supervisorName: string;
@@ -182,6 +183,7 @@ export class InspectionSyncService {
       siteName: apiInsp.siteName,
       equipmentId: apiInsp.equipmentId,
       equipmentName: apiInsp.equipmentName,
+      equipmentQrCode: apiInsp.equipmentQrCode,
       technicianId: apiInsp.technicianId,
       supervisorId: apiInsp.supervisorId,
       supervisorName: apiInsp.supervisorName,

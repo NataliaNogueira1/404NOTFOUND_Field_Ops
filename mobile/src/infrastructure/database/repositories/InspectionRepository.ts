@@ -47,6 +47,7 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  equipment_qr_code: string | null;
   server_version: number;
 }
 
@@ -129,11 +130,11 @@ export class InspectionRepository {
     await this.db.runAsync(
       `INSERT INTO inspections (
         id, title, template_id, client_id, client_name, site_id, site_name,
-        equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
+        equipment_id, equipment_name, equipment_qr_code, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
         progress, supervisor_instructions, rejection_reason, rejected_by, rejected_at,
         sync_status, pending_sync_count, server_version, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -143,6 +144,7 @@ export class InspectionRepository {
         site_name = excluded.site_name,
         equipment_id = excluded.equipment_id,
         equipment_name = excluded.equipment_name,
+        equipment_qr_code = excluded.equipment_qr_code,
         technician_id = excluded.technician_id,
         supervisor_id = excluded.supervisor_id,
         supervisor_name = excluded.supervisor_name,
@@ -167,6 +169,7 @@ export class InspectionRepository {
       inspection.siteName,
       inspection.equipmentId,
       inspection.equipmentName,
+      inspection.equipmentQrCode ?? null,
       inspection.technicianId,
       inspection.supervisorId,
       inspection.supervisorName,
@@ -390,6 +393,7 @@ export class InspectionRepository {
     siteName: row.site_name,
     equipmentId: row.equipment_id,
     equipmentName: row.equipment_name,
+    equipmentQrCode: row.equipment_qr_code ?? undefined,
     technicianId: row.technician_id,
     supervisorId: row.supervisor_id,
     supervisorName: row.supervisor_name,
