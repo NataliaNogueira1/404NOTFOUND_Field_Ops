@@ -121,6 +121,10 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}) {
   return request<T>(path, options, false)
 }
 
+export async function apiRequestBlob(path: string) {
+  return requestBlob(path, false)
+}
+
 async function request<T>(path: string, options: RequestInit, isRetry: boolean): Promise<T> {
   const token = tokenStorage.get()
   const headers = new Headers(options.headers)
@@ -145,6 +149,29 @@ async function request<T>(path: string, options: RequestInit, isRetry: boolean):
       throw error
     }
     throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'Nao foi possivel conectar ao servidor.' })
+  }
+}
+
+async function requestBlob(path: string, isRetry: boolean): Promise<Blob> {
+  const token = tokenStorage.get()
+  const headers = new Headers({ Accept: 'image/*,application/octet-stream' })
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  try {
+    const response = await fetch(`${API_URL}${path}`, { headers })
+    if (response.status === 401 && token && !isRetry) {
+      try { await renewAccessToken(); return requestBlob(path, true) }
+      catch { expireSession(); throw new ApiError({ status: 401, code: 'SESSION_EXPIRED', message: 'Sessao expirada. Faca login novamente.' }) }
+    }
+    if (!response.ok) {
+      const text = await response.text()
+      let body: Partial<ApiErrorBody> = {}
+      try { body = text ? JSON.parse(text) : {} } catch { /* response may be empty or non-JSON */ }
+      throw new ApiError({ status: body.status ?? response.status, code: body.code ?? 'HTTP_ERROR', message: body.message ?? 'Falha ao carregar a evidencia.' })
+    }
+    return response.blob()
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'Nao foi possivel carregar a evidencia.' })
   }
 }
 

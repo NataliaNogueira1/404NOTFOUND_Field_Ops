@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 
@@ -27,9 +28,11 @@ export function ReviewQueuePage() {
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const result = await adminCatalogApi.listInspections({
         name: debouncedQuery,
@@ -48,9 +51,7 @@ export function ReviewQueuePage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch {
-      setRows([])
-      setTotalElements(0)
-      setTotalPages(1)
+      setError('Não foi possível carregar as inspeções pendentes.')
     } finally {
       setLoading(false)
     }
@@ -128,6 +129,8 @@ export function ReviewQueuePage() {
           className="max-w-sm"
         />
       </Card>
+
+      {error && <ErrorState message={error} onRetry={() => void load()} />}
 
       <DataTable
         columns={columns}

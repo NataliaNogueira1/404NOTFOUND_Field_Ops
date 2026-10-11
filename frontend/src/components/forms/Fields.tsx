@@ -12,7 +12,7 @@ export const Textarea = forwardRef<
       id={id}
       ref={ref}
       className={cn(
-        'focus-ring min-h-24 w-full rounded-fieldops border bg-white px-3.5 py-3 text-sm text-text placeholder:text-muted/70 focus:border-primary',
+        'focus-ring min-h-24 w-full rounded-fieldops border bg-surface px-3.5 py-3 text-sm text-text placeholder:text-muted/70 focus:border-primary',
         error ? 'border-danger' : 'border-border',
         className,
       )}
@@ -40,7 +40,7 @@ export function Select({
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn(
-          'focus-ring h-11 w-full rounded-fieldops border bg-white px-3.5 text-sm text-text focus:border-primary disabled:bg-slate-50',
+          'focus-ring h-11 w-full rounded-fieldops border bg-surface px-3.5 text-sm text-text focus:border-primary disabled:bg-app-bg',
           error ? 'border-danger' : 'border-border',
           className,
         )}

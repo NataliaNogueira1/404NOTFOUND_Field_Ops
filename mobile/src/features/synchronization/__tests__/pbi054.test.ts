@@ -159,6 +159,23 @@ describe('PBI-054 — sync status screen data layer', () => {
     expect(operations[0].error).toBe('Timeout durante upload');
   });
 
+  it('preserves a version conflict in the outbox and exposes it to the sync screen', async () => {
+    await service.enqueueStatusChange(INSPECTION_ID, 'SUBMITTED');
+    mockPost.mockResolvedValue({
+      results: [{ operationId: 'op', status: 'CONFLICT', detail: 'Inspection version conflict: local=0, server=1' }],
+    });
+
+    const result = await service.pushPendingOperations(TOKEN);
+    const [operation] = await queueRepo.getAll();
+    const [view] = mapOutboxToViews(await queueRepo.getAll());
+
+    expect(result.sent).toBe(0);
+    expect(operation.status).toBe('conflict');
+    expect(operation.payload).toContain('baseVersion');
+    expect(view.displayStatus).toBe('conflict');
+    expect(view.error).toContain('server=1');
+  });
+
   // Test 8 — a photo whose answer is still pending is shown as ⚠️ (waiting on
   // dependency, RN-069), not a misleading error/plain pending.
   it('maps a photo waiting on its pending answer to the waiting (⚠️) status', async () => {

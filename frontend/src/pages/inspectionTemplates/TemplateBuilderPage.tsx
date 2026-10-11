@@ -463,7 +463,7 @@ function SectionCard({
       </div>
       <div className="space-y-3">
         {section.items.map((item, itemIndex) => (
-          <div key={item.id} className="rounded-fieldops border border-border bg-slate-50 p-4">
+          <div key={item.id} className="rounded-fieldops border border-border bg-app-bg p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="font-medium">{item.question || 'Item sem pergunta'}</p>

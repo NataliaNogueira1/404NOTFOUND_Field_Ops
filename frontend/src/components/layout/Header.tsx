@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { authSession } from '@/auth/session'
 import { MobileMenuButton } from '@/components/layout/Sidebar'
+import { ThemeToggle } from '@/theme/ThemeToggle'
 
 const titles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -32,7 +33,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
     navigate('/login')
   }
   return (
-    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-white/95 px-5 backdrop-blur lg:px-8">
+    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-surface/95 px-5 backdrop-blur lg:px-8">
       <div className="flex items-center gap-3">
         <MobileMenuButton onClick={onMenuClick} />
         <div>
@@ -43,6 +44,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <button
           className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
           aria-label="Notificacoes"

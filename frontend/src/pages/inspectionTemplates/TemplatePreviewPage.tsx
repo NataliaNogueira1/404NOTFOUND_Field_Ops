@@ -105,7 +105,7 @@ export function TemplatePreviewPage() {
       )}
 
       <div
-        className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-slate-100 p-3 shadow-fieldops"
+        className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-border p-3 shadow-fieldops"
         aria-label="Previa do aplicativo do tecnico"
       >
         <div className="overflow-hidden rounded-[22px] bg-app-bg">

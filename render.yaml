@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: fieldops-api-demo
+    runtime: docker
+    plan: free
+    rootDir: api
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fieldops-demo-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+databases:
+  - name: fieldops-demo-db
+    plan: free
+    databaseName: fieldops
+    user: fieldops

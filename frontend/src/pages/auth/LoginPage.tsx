@@ -95,7 +95,7 @@ export function LoginPage() {
           {isSubmitting ? 'Entrando...' : 'Entrar'} <ArrowRight size={17} />
         </Button>
       </form>
-      <div className="mt-7 rounded-fieldops bg-slate-50 p-3 text-xs text-muted">
+      <div className="mt-7 rounded-fieldops border border-border bg-app-bg p-3 text-xs text-muted">
         <p>Use credenciais cadastradas no backend.</p>
         <p>O perfil e o redirecionamento vêm da API.</p>
       </div>

@@ -4,7 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 export type OperationType = 'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSITION' | 'UPLOAD';
 export type EntityType = 'inspection' | 'answer' | 'evidence' | 'non_conformity';
-export type SyncOperationStatus = 'pending' | 'in_progress' | 'sent' | 'error';
+export type SyncOperationStatus = 'pending' | 'in_progress' | 'sent' | 'error' | 'conflict';
 
 export interface SyncQueueEntry {
   id: string;
@@ -126,6 +126,15 @@ export class SyncQueueRepository {
     await this.db.runAsync(
       "UPDATE sync_queue SET status = 'error', last_error = ?, attempts = attempts + 1, updated_at = datetime('now') WHERE id = ?",
       error,
+      id,
+    );
+  }
+
+  /** A server-version conflict is terminal until the technician resolves it. */
+  async markConflict(id: string, detail: string): Promise<void> {
+    await this.db.runAsync(
+      "UPDATE sync_queue SET status = 'conflict', last_error = ?, updated_at = datetime('now') WHERE id = ?",
+      detail,
       id,
     );
   }

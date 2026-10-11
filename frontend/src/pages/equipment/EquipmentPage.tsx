@@ -13,6 +13,7 @@ import { DataTable, type Column } from '@/components/tables/DataTable'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 
 export function EquipmentPage() {
@@ -196,14 +197,7 @@ export function EquipmentPage() {
           <option value={EquipmentStatus.DECOMMISSIONED}>Descomissionado</option>
         </Select>
       </Card>
-      {error && (
-        <div
-          role="alert"
-          className="rounded-fieldops border border-danger-light bg-danger-light/10 px-4 py-3 text-sm text-danger-dark"
-        >
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} onRetry={() => void loadEquipment()} />}
       <DataTable
         columns={columns}
         rows={rows}
@@ -448,7 +442,7 @@ function QrModal({ item, onClose }: { item: ManagedEquipment | null; onClose: ()
         <div className="grid place-items-center gap-4">
           <div
             aria-label={`Representacao visual do QR Code ${item.qrCode}`}
-            className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-white p-4"
+            className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-surface p-4"
           >
             {Array.from({ length: 49 }, (_, index) => (
               <span key={index} className={(index + item.qrCode.length) % 3 === 0 ? 'bg-text' : 'bg-primary-light'} />

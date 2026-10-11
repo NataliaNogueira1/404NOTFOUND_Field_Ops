@@ -6,6 +6,7 @@ import { normalizeRole } from '@/api/auth'
 import { apiRequest, tokenStorage } from '@/api/client'
 import { authSession } from '@/auth/session'
 import { AppRoutes } from '@/routes/AppRoutes'
+import { ThemeProvider } from '@/theme/ThemeProvider'
 import { UserRole } from '@/types/domain'
 
 const technicianUser = { id: 2, name: 'Carlos Henrique', email: 'carlos@fieldops.com', role: 'TECHNICIAN' }
@@ -30,9 +31,11 @@ function mockFetch(handler: (url: string, init?: RequestInit) => Promise<Respons
 
 function renderRoute(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </ThemeProvider>,
   )
 }
 
