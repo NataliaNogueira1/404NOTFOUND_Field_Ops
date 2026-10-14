@@ -82,13 +82,12 @@ interface ApiItem {
 
 // ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
 
-/** One operation in a sync batch. Only INSPECTION_STATUS is supported server-side today. */
 interface SyncPushOperation {
   operationId: string;
-  type: 'INSPECTION_STATUS';
+  type: 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
   baseVersion: number;
   dependencyIds: string[];
-  payload: { inspectionId: string; status: string };
+  payload: Record<string, unknown>;
 }
 
 interface SyncPushBody {
@@ -298,7 +297,7 @@ export class InspectionSyncService {
 
   private async sendOperation(
     token: string,
-    operation: { operationType: string; entityType: string; entityId: string; payload: string },
+    operation: { id: string; operationType: string; entityType: string; entityId: string; payload: string; dependencyIds: string[] },
   ): Promise<void> {
     const payload = JSON.parse(operation.payload);
 
@@ -314,16 +313,32 @@ export class InspectionSyncService {
         // the upload endpoint is unavailable it throws, keeping the photo FAILED.
         await this.uploadEvidence(token, operation.entityId, payload);
         break;
-      // answer/non_conformity have no server endpoint yet: only INSPECTION_STATUS
-      // is implemented in POST /mobile/sync/push (PBI-051/052). They stay queued
-      // (marked error → retried) until their endpoints exist.
       case 'answer':
+        await this.pushContentOperation(token, operation, 'ANSWER_UPSERT', payload);
+        break;
       case 'non_conformity':
-        throw new Error(
-          `Sync for '${operation.entityType}' is not supported by the API yet; keeping it queued.`,
-        );
+        await this.pushContentOperation(token, operation, 'NON_CONFORMITY_CREATE', payload);
+        break;
       default:
         throw new Error(`Unknown entity type: ${operation.entityType}`);
+    }
+  }
+
+  private async pushContentOperation(
+    token: string,
+    operation: { id: string; entityType: string; entityId: string; dependencyIds: string[] },
+    type: 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE',
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const inspectionId = String(payload.inspectionId ?? '');
+    const inspection = await this.requireInspection(inspectionId);
+    const operationId = typeof payload.operationId === 'string' ? payload.operationId : randomUuidV4();
+    const response = await apiClient.post<SyncPushResult>('/api/v1/mobile/sync/push', {
+      operations: [{ operationId, type, baseVersion: inspection.serverVersion ?? 0, dependencyIds: [], payload }],
+    } satisfies SyncPushBody, token);
+    const result = response.results?.[0];
+    if (!result || !['APPLIED', 'ALREADY_APPLIED'].includes(result.status)) {
+      throw new Error(result?.detail ?? `Sync failed for ${operation.entityType}:${operation.entityId}`);
     }
   }
 
@@ -472,6 +487,7 @@ export class InspectionSyncService {
   ): Promise<void> {
     const id = InspectionSyncService.answerOperationId(inspectionId, itemId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'answer', `${inspectionId}-${itemId}`, {
+      operationId: randomUuidV4(),
       inspectionId,
       itemId,
       value,
@@ -524,6 +540,7 @@ export class InspectionSyncService {
   async enqueueNonConformity(nc: NonConformity): Promise<void> {
     const id = `nc-${nc.id}`;
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
+      operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
       itemId: nc.itemId,
       title: nc.title,
