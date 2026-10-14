@@ -147,6 +147,37 @@ class MobileInspectionControllerTest {
                         .value(String.valueOf(otherTechnician.getId())));
     }
 
+    @Test
+    void returnsInspectionDetailForItsAssignedTechnician() throws Exception {
+        Inspection assignedInspection = inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technician.getId())
+                .getFirst();
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", assignedInspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(String.valueOf(assignedInspection.getId())))
+                .andExpect(jsonPath("$.technicianId").value(String.valueOf(technician.getId())))
+                .andExpect(jsonPath("$.version").value(assignedInspection.getVersion()))
+                .andExpect(jsonPath("$.template.sections", hasSize(1)));
+    }
+
+    @Test
+    void forbidsInspectionDetailForAnotherTechnician() throws Exception {
+        Inspection assignedInspection = inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technician.getId())
+                .getFirst();
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", assignedInspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken("other-tech@fieldops.com", "pass123")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsNotFoundForUnknownInspectionDetail() throws Exception {
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", Long.MAX_VALUE)
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isNotFound());
+    }
+
     private User persistUser(String email, Role role) {
         User user = new User();
         user.setName("User " + email);
