@@ -107,6 +107,15 @@ public class MobileInspectionService {
         return inspections.stream().map(this::toResponse).toList();
     }
 
+    /** Returns all technician-owned inspections changed after the supplied cursor for mobile pull. */
+    @Transactional(readOnly = true)
+    public List<MobileInspectionResponse> getChangesForTechnician(Long technicianId, Instant cursor) {
+        return inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technicianId).stream()
+                .filter(inspection -> cursor == null || inspection.getUpdatedAt().isAfter(cursor))
+                .map(this::toResponse)
+                .toList();
+    }
+
     /**
      * Fetches one inspection detail for its assigned technician (issue #222).
      *

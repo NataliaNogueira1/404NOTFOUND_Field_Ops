@@ -80,6 +80,8 @@ interface ApiItem {
   options?: string[];
 }
 
+interface SyncPullResponse { inspections: ApiInspection[]; nextCursor: string }
+
 // ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
 
 interface SyncPushOperation {
@@ -137,10 +139,14 @@ export class InspectionSyncService {
     let downloaded = 0;
 
     try {
-      const apiInspections = await apiClient.get<ApiInspection[]>(
-        '/api/v1/mobile/inspections',
+      const cursor = await this.metadataRepo.getPullCursor();
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const pull = await apiClient.get<SyncPullResponse>(
+        `/api/v1/mobile/sync/pull${query}`,
         token,
       );
+
+      const apiInspections = pull.inspections;
 
       for (const apiInsp of apiInspections) {
         try {
@@ -151,6 +157,7 @@ export class InspectionSyncService {
           errors.push(`[${apiInsp.id}] ${msg}`);
         }
       }
+      if (errors.length === 0) await this.metadataRepo.setPullCursor(pull.nextCursor);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
       errors.push(msg);
