@@ -146,6 +146,37 @@ export interface AuditLog {
   entity: string
   entityId: string
 }
+
+/**
+ * Enum mirroring com.fieldops.audit.model.AuditAction (PBI-063).
+ * Mantido em sync com o backend — adicionar novos valores aqui quando o enum Java for expandido.
+ */
+export enum AuditAction {
+  INSPECTION_CREATED = 'INSPECTION_CREATED',
+  INSPECTION_ASSIGNED = 'INSPECTION_ASSIGNED',
+  INSPECTION_STARTED = 'INSPECTION_STARTED',
+  INSPECTION_SUBMITTED = 'INSPECTION_SUBMITTED',
+  INSPECTION_REVIEW_STARTED = 'INSPECTION_REVIEW_STARTED',
+  INSPECTION_APPROVED = 'INSPECTION_APPROVED',
+  INSPECTION_REJECTED = 'INSPECTION_REJECTED',
+  INSPECTION_CANCELED = 'INSPECTION_CANCELED',
+  REVIEW_COMMENT_ADDED = 'REVIEW_COMMENT_ADDED',
+}
+
+/**
+ * Um evento da timeline de auditoria conforme retornado pelo endpoint
+ * GET /api/v1/inspections/{id}/history (PBI-063).
+ * Corresponde ao AuditEventResponse do backend.
+ */
+export interface AuditTimelineEntry {
+  id: number
+  actorId: number | null
+  action: AuditAction
+  entityType: string
+  entityId: number
+  detail: string | null
+  occurredAt: string
+}
 export interface ReviewAnswer {
   id: string
   section: string
