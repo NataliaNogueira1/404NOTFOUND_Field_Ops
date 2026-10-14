@@ -39,6 +39,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -187,6 +188,24 @@ class MobileSyncBatchTest {
         assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
                 .isEqualTo(InspectionStatus.ASSIGNED);
         assertThat(processedOperationRepository.count()).isZero();
+    }
+
+    @Test
+    void pullsOnlyInspectionsChangedAfterCursor() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
+        String token = obtainToken();
+
+        mockMvc.perform(get("/api/v1/mobile/sync/pull")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inspections[0].id").value(inspection.getId().toString()))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/mobile/sync/pull")
+                        .queryParam("cursor", "2999-01-01T00:00:00Z")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inspections").isEmpty());
     }
 
     @Test

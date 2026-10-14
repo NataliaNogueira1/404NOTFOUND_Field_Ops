@@ -12,6 +12,7 @@ import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.dto.RejectInspectionRequest;
 import com.fieldops.inspection.dto.ReviewDecisionResponse;
+import com.fieldops.inspection.dto.ReviewStartResponse;
 import com.fieldops.inspection.dto.InspectionReviewResponse;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.Priority;
@@ -98,6 +99,18 @@ public class AdminInspectionController {
     @GetMapping("/{id}/review")
     public ResponseEntity<InspectionReviewResponse> review(@PathVariable Long id) {
         return ResponseEntity.ok(reviewService.getReview(id));
+    }
+
+    @Operation(summary = "Begin the formal review of a submitted inspection")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection moved to UNDER_REVIEW"),
+            @ApiResponse(responseCode = "404", description = "Inspection not found"),
+            @ApiResponse(responseCode = "422", description = "Inspection is not submitted")
+    })
+    @PostMapping("/{id}/begin-review")
+    public ResponseEntity<ReviewStartResponse> beginReview(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(inspectionService.beginReview(id, user.getId()));
     }
 
     @Operation(summary = "Approve an inspection under review")
