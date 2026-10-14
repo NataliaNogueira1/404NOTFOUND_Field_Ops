@@ -13,6 +13,7 @@ import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.dto.ReviewDecisionResponse;
+import com.fieldops.inspection.dto.ReviewStartResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
@@ -136,6 +137,24 @@ public class InspectionService {
 
         return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
                 reviewer.getId(), null, saved.getRejectionReason());
+    }
+
+    /**
+     * Starts the formal review workflow for a submitted inspection (PBI-059).
+     * A review can only begin once, after the technician submits the inspection.
+     */
+    @Transactional
+    public ReviewStartResponse beginReview(Long inspectionId, Long reviewerId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (inspection.getStatus() != InspectionStatus.SUBMITTED) {
+            throw new BusinessException("Inspection must be submitted to begin review, but was "
+                    + inspection.getStatus());
+        }
+        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
+        Inspection saved = inspectionRepository.save(inspection);
+        auditService.recordInspection(reviewerId, AuditAction.INSPECTION_REVIEW_STARTED, saved.getId(), null);
+        return new ReviewStartResponse(saved.getId(), saved.getStatus());
     }
 
     /** Loads an inspection and enforces that it is currently UNDER_REVIEW (RN state machine). */
