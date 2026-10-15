@@ -11,7 +11,7 @@
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import {
   Bar,
   BarChart,
@@ -23,11 +23,16 @@ import {
   YAxis,
 } from 'recharts'
 import { Link } from 'react-router-dom'
-import { dashboardApi, type DashboardSummary } from '@/api/dashboard'
+import {
+  dashboardApi,
+  type DashboardFilters,
+  type DashboardSummary,
+} from '@/api/dashboard'
 import { Badge } from '@/components/badges/Badge'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { authSession } from '@/auth/session'
 import { InspectionStatus, Priority } from '@/types/domain'
 
@@ -109,15 +114,59 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  useEffect(() => {
+  // Filtro de cliente usa input de texto livre: o adminCatalog.ts não expõe um
+  // endpoint de listagem de clientes para popular um <select>, e o backend aceita
+  // `clientName` como texto (coerente com DashboardFilters.clientName).
+  const [fromInput, setFromInput] = useState('')
+  const [toInput, setToInput] = useState('')
+  const [clientInput, setClientInput] = useState('')
+  const [appliedFilters, setAppliedFilters] = useState<DashboardFilters>({})
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Carregamento centralizado: usado pelo render inicial, pelo "tente novamente"
+  // e pelos botões de aplicar/limpar filtros, evitando duplicação de fetch.
+  const loadSummary = useCallback((filters: DashboardFilters = {}) => {
     setLoading(true)
     setError(false)
     dashboardApi
-      .getSummary()
+      .getSummary(filters)
       .then(data => setSummary(data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    const pendingLoad = window.setTimeout(() => loadSummary(), 0)
+    return () => window.clearTimeout(pendingLoad)
+  }, [loadSummary])
+
+  const applyFilters = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (fromInput && toInput && fromInput > toInput) {
+        setValidationError('A data inicial não pode ser maior que a data final.')
+        return
+      }
+      setValidationError(null)
+      const next: DashboardFilters = {
+        from: fromInput || undefined,
+        to: toInput || undefined,
+        clientName: clientInput || undefined,
+      }
+      setAppliedFilters(next)
+      loadSummary(next)
+    },
+    [fromInput, toInput, clientInput, loadSummary],
+  )
+
+  const clearFilters = useCallback(() => {
+    setFromInput('')
+    setToInput('')
+    setClientInput('')
+    setValidationError(null)
+    setAppliedFilters({})
+    loadSummary({})
+  }, [loadSummary])
 
   const chartData = summary ? toChartData(summary.byStatus) : []
   const total = summary ? totalInspections(summary.byStatus) : 0
@@ -145,6 +194,61 @@ export function DashboardPage() {
         description="Aqui está um resumo das operações de hoje."
       />
 
+      {/* ── Filtros ─────────────────────────────────────────────────────────── */}
+      <section aria-label="Filtros do dashboard">
+        <Card className="p-5">
+          <h2 className="mb-4 text-base font-semibold">Período</h2>
+          <form onSubmit={applyFilters}>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Input
+                id="dashboard-filter-from"
+                label="De"
+                type="date"
+                value={fromInput}
+                onChange={event => setFromInput(event.target.value)}
+                aria-invalid={Boolean(validationError)}
+                aria-describedby={validationError ? 'dashboard-filter-error' : undefined}
+              />
+              <Input
+                id="dashboard-filter-to"
+                label="Até"
+                type="date"
+                value={toInput}
+                onChange={event => setToInput(event.target.value)}
+              />
+              <Input
+                id="dashboard-filter-client"
+                label="Cliente"
+                type="text"
+                placeholder="Nome do cliente"
+                value={clientInput}
+                onChange={event => setClientInput(event.target.value)}
+              />
+              <div className="flex items-end gap-3">
+                <button
+                  type="submit"
+                  className="focus-ring h-11 flex-1 rounded-fieldops bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+                >
+                  Aplicar filtros
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="focus-ring h-11 flex-1 rounded-fieldops border border-border px-4 text-sm font-semibold text-text transition-colors hover:bg-app-bg"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+            {validationError && (
+              <p id="dashboard-filter-error" role="alert" className="mt-3 text-sm text-danger">
+                {validationError}
+              </p>
+            )}
+          </form>
+        </Card>
+      </section>
+
       {/* ── Estado de erro global ───────────────────────────────────────────── */}
       {error && (
         <div className="flex items-center gap-3 rounded-fieldops border border-danger-light/40 bg-danger-light/10 px-4 py-3 text-sm text-danger">
@@ -152,16 +256,9 @@ export function DashboardPage() {
           <span>
             Não foi possível carregar os indicadores. Verifique sua conexão e{' '}
             <button
+              type="button"
               className="font-semibold underline"
-              onClick={() => {
-                setError(false)
-                setLoading(true)
-                dashboardApi
-                  .getSummary()
-                  .then(data => setSummary(data))
-                  .catch(() => setError(true))
-                  .finally(() => setLoading(false))
-              }}
+              onClick={() => loadSummary(appliedFilters)}
             >
               tente novamente
             </button>
