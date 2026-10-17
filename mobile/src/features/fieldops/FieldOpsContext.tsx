@@ -8,6 +8,7 @@ import {
   AnswerRepository,
   EvidenceRepository,
   NonConformityRepository,
+  ReviewCommentRepository,
   SyncQueueRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '@/infrastructure/sync';
@@ -20,6 +21,7 @@ import {
   type Evidence,
   type Inspection,
   type NonConformity,
+  type ReviewComment,
   type SyncOperation,
 } from './types';
 
@@ -31,6 +33,7 @@ interface FieldOpsContextValue {
   answers: Record<string, ChecklistAnswer>;
   evidences: Evidence[];
   nonConformities: NonConformity[];
+  reviewComments: ReviewComment[];
   syncOperations: SyncOperation[];
   startInspection: (
     inspectionId: string,
@@ -102,6 +105,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
   const [evidences, setEvidences] = useState<Evidence[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
+  const [reviewComments, setReviewComments] = useState<ReviewComment[]>([]);
   const [syncOperations, setSyncOperations] = useState<SyncOperation[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
@@ -119,6 +123,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const ansRepo = new AnswerRepository(db);
     const evRepo = new EvidenceRepository(db);
     const ncRepo = new NonConformityRepository(db);
+    const commentRepo = new ReviewCommentRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
     const dbInspections = await inspRepo.getAll();
@@ -144,6 +149,10 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       allNCs.push(...n);
     }
     setNonConformities(allNCs);
+
+    const allComments: ReviewComment[] = [];
+    for (const insp of dbInspections) allComments.push(...await commentRepo.getByInspection(insp.id));
+    setReviewComments(allComments);
 
     const queue = await sqRepo.getAll();
     setSyncOperations(queue.map((entry) => ({
@@ -484,6 +493,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     setAnswers({});
     setEvidences([]);
     setNonConformities([]);
+    setReviewComments([]);
     setSyncOperations([]);
 
     // Reset DB
@@ -492,6 +502,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         await db.execAsync(`
           DELETE FROM sync_queue;
           DELETE FROM non_conformities;
+          DELETE FROM review_comments;
           DELETE FROM evidences;
           DELETE FROM answers;
           DELETE FROM inspection_items;
@@ -515,6 +526,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       answers,
       evidences,
       nonConformities,
+      reviewComments,
       syncOperations,
       startInspection,
       answerItem,
@@ -529,7 +541,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       lastSyncError,
     }),
     [
-      inspections, isLoading, answers, evidences, nonConformities, syncOperations,
+      inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
       concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
     ],

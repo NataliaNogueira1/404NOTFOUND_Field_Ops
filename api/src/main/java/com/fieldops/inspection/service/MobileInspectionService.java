@@ -7,6 +7,7 @@ import com.fieldops.inspection.dto.MobileInspectionResponse.*;
 import com.fieldops.inspection.dto.MobileStatusUpdateResponse;
 import com.fieldops.inspection.model.*;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.reviewcomment.repository.ReviewCommentRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.shared.exception.ResourceConflictException;
@@ -38,12 +39,14 @@ public class MobileInspectionService {
     private final InspectionRepository inspectionRepository;
     private final ObjectMapper objectMapper;
     private final IdempotencyService idempotencyService;
+    private final ReviewCommentRepository reviewCommentRepository;
 
     public MobileInspectionService(InspectionRepository inspectionRepository, ObjectMapper objectMapper,
-            IdempotencyService idempotencyService) {
+            IdempotencyService idempotencyService, ReviewCommentRepository reviewCommentRepository) {
         this.inspectionRepository = inspectionRepository;
         this.objectMapper = objectMapper;
         this.idempotencyService = idempotencyService;
+        this.reviewCommentRepository = reviewCommentRepository;
     }
 
     /**
@@ -144,7 +147,12 @@ public class MobileInspectionService {
                 inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
                 inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
                 inspection.getVersion(),
-                templateDto
+                templateDto,
+                reviewCommentRepository.findByInspectionIdOrdered(inspection.getId()).stream()
+                        .map(comment -> new ReviewCommentDto(String.valueOf(comment.getId()),
+                                String.valueOf(comment.getItemSnapshot().getSourceTemplateItemId()),
+                                comment.getComment(), comment.getCreatedBy().getName(), comment.getCreatedAt().toString()))
+                        .toList()
         );
     }
 

@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/inspections")
 @Tag(name = "Review comments")
 @SecurityRequirement(name = "bearer-jwt")
-@PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')")
 public class ReviewCommentController {
 
     private final ReviewCommentService reviewCommentService;
@@ -37,6 +36,7 @@ public class ReviewCommentController {
     @ApiResponse(responseCode = "200", description = "Review comment recorded")
     @ApiResponse(responseCode = "404", description = "Inspection or checklist item not found")
     @PostMapping("/{id}/items/{itemId}/review-comment")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR')")
     public ResponseEntity<ReviewCommentResponse> add(@PathVariable Long id, @PathVariable Long itemId,
             @Valid @RequestBody CreateReviewCommentRequest request,
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -47,7 +47,9 @@ public class ReviewCommentController {
     @ApiResponse(responseCode = "200", description = "Comments ordered by checklist section and item")
     @ApiResponse(responseCode = "404", description = "Inspection not found")
     @GetMapping("/{id}/review-comments")
-    public ResponseEntity<List<ReviewCommentResponse>> list(@PathVariable Long id) {
-        return ResponseEntity.ok(reviewCommentService.list(id));
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR', 'SUPERVISOR', 'TECHNICIAN')")
+    public ResponseEntity<List<ReviewCommentResponse>> list(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(reviewCommentService.list(id, user));
     }
 }
