@@ -138,6 +138,34 @@ public class InspectionService {
                 reviewer.getId(), null, saved.getRejectionReason());
     }
 
+    /**
+     * Starts the formal review of a submitted inspection (PBI-059). Only a SUBMITTED inspection
+     * can begin review (state machine), transitioning to UNDER_REVIEW; the start is audited.
+     */
+    @Transactional
+    public ReviewDecisionResponse beginReview(Long inspectionId, Long reviewerId) {
+        Inspection inspection = requireSubmitted(inspectionId);
+        User reviewer = findUser(reviewerId);
+
+        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
+        Inspection saved = inspectionRepository.save(inspection);
+
+        auditService.recordInspection(reviewer.getId(), AuditAction.INSPECTION_REVIEW_STARTED, saved.getId(), null);
+
+        return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), null, null, null, null);
+    }
+
+    /** Loads an inspection and enforces that it is currently SUBMITTED (RN state machine). */
+    private Inspection requireSubmitted(Long inspectionId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (inspection.getStatus() != InspectionStatus.SUBMITTED) {
+            throw new BusinessException(
+                    "Inspection must be submitted to begin review, but was " + inspection.getStatus());
+        }
+        return inspection;
+    }
+
     /** Loads an inspection and enforces that it is currently UNDER_REVIEW (RN state machine). */
     private Inspection requireReviewable(Long inspectionId) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
