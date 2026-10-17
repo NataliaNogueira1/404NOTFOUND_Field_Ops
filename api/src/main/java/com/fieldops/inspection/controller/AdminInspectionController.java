@@ -100,6 +100,16 @@ public class AdminInspectionController {
         return ResponseEntity.ok(reviewService.getReview(id));
     }
 
+    @Operation(summary = "Begin the formal review of a submitted inspection")
+    @ApiResponse(responseCode = "200", description = "Review started; inspection is now under review")
+    @ApiResponse(responseCode = "404", description = "Inspection not found")
+    @ApiResponse(responseCode = "422", description = "Inspection is not submitted")
+    @PostMapping("/{id}/begin-review")
+    public ResponseEntity<ReviewDecisionResponse> beginReview(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(inspectionService.beginReview(id, user.getId()));
+    }
+
     @Operation(summary = "Approve an inspection under review")
     @ApiResponse(responseCode = "200", description = "Inspection approved")
     @ApiResponse(responseCode = "404", description = "Inspection not found")

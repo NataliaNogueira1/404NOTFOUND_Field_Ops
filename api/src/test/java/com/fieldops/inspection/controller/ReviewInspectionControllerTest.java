@@ -157,6 +157,63 @@ class ReviewInspectionControllerTest {
     }
 
     @Test
+    void beginsReviewOnSubmittedInspectionAndRecordsAudit() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.SUBMITTED);
+        String token = obtainToken();
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", inspection.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
+
+        Inspection reloaded = inspectionRepository.findById(inspection.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(InspectionStatus.UNDER_REVIEW);
+
+        // The review start is recorded in the audit trail (PBI-059).
+        assertThat(auditEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAction()).isEqualTo(AuditAction.INSPECTION_REVIEW_STARTED);
+                    assertThat(event.getEntityId()).isEqualTo(inspection.getId());
+                    assertThat(event.getActorId()).isEqualTo(supervisor.getId());
+                });
+    }
+
+    @Test
+    void refusesBeginReviewWhenNotSubmittedWith422() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
+        String token = obtainToken();
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", inspection.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE"));
+
+        assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionStatus.ASSIGNED);
+    }
+
+    @Test
+    void refusesBeginReviewForUnknownInspectionWith404() throws Exception {
+        String token = obtainToken();
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", Long.MAX_VALUE)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void refusesBeginReviewForTechnicianWith403() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.SUBMITTED);
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", inspection.getId())
+                        .header("Authorization", "Bearer " + obtainTechnicianToken()))
+                .andExpect(status().isForbidden());
+
+        assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionStatus.SUBMITTED);
+    }
+
+    @Test
     void approvesWithoutCommentWhenBodyIsAbsent() throws Exception {
         Inspection inspection = saveInspection(InspectionStatus.UNDER_REVIEW);
         String token = obtainToken();

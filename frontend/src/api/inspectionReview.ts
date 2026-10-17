@@ -10,12 +10,13 @@ interface BackendSection { title: string; order: number; items: BackendItem[] }
 interface BackendItem extends Omit<ReviewItem, 'snapshotId' | 'evidences' | 'nonConformities'> { snapshotId: number; evidences: BackendEvidence[]; nonConformities: BackendNonConformity[] }
 interface BackendEvidence extends Omit<ReviewEvidence, 'id' | 'itemSnapshotId'> { id: number; itemSnapshotId: number }
 interface BackendNonConformity extends Omit<ReviewNonConformity, 'id' | 'snapshotId'> { id: number; snapshotId: number | null }
-interface Decision { id: number; status: InspectionStatus; reviewedAt: string; reviewedBy: number; comment: string | null; rejectionReason: string | null }
+interface Decision { id: number; status: InspectionStatus; reviewedAt: string | null; reviewedBy: number | null; comment: string | null; rejectionReason: string | null }
 function nc(value: BackendNonConformity): ReviewNonConformity { return { ...value, id: String(value.id), snapshotId: value.snapshotId === null ? null : String(value.snapshotId) } }
 function item(value: BackendItem): ReviewItem { return { ...value, snapshotId: String(value.snapshotId), evidences: value.evidences.map(evidence => ({ ...evidence, id: String(evidence.id), itemSnapshotId: String(evidence.itemSnapshotId) })), nonConformities: value.nonConformities.map(nc) } }
 export const inspectionReviewApi = {
   async get(id: string): Promise<InspectionReview> { const value = await httpClient.get<BackendReview>(`/api/v1/inspections/${id}/review`); return { ...value, id: String(value.id), sections: value.sections.map(section => ({ ...section, items: section.items.map(item) })), nonConformities: value.nonConformities.map(nc) } },
   async loadEvidenceImage(contentUrl: string) { return URL.createObjectURL(await apiRequestBlob(contentUrl)) },
+  beginReview: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/begin-review`),
   approve: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`),
   reject: (id: string, reason: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/reject`, { reason: reason.trim() }),
 }
