@@ -9,9 +9,7 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { byId, templates } from '@/mocks/domain'
 import { PublicationIssuesDialog } from '@/pages/inspectionTemplates/PublicationIssuesDialog'
-import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
 import {
   inspectionTemplatePendingIssues,
@@ -23,8 +21,8 @@ type OptionDraft = { id: string; value: string }
 
 export function TemplateBuilderPage() {
   const navigate = useNavigate()
-  const { id = 'tpl-compressor' } = useParams()
-  const source = templateDraftStore.get(id) ?? byId(templates, id) ?? emptyPersistedDraft(id)
+  const { id = '' } = useParams()
+  const source = emptyPersistedDraft(id)
   const [title, setTitle] = useState(source.title)
   const [category, setCategory] = useState(source.category)
   const [description, setDescription] = useState(source.description)
@@ -43,7 +41,7 @@ export function TemplateBuilderPage() {
     () => inspectionTemplatePendingIssues(title, category, sections),
     [title, category, sections],
   )
-  const persistedTemplate = /^\d+$/.test(id)
+  const persistedTemplate = Boolean(id)
 
   useEffect(() => {
     if (!persistedTemplate) return
@@ -59,20 +57,7 @@ export function TemplateBuilderPage() {
       .catch(() => setSaveError('Nao foi possivel carregar o modelo.'))
   }, [id, persistedTemplate])
 
-  function draft(): InspectionTemplate {
-    return {
-      id,
-      title,
-      category,
-      description,
-      version: source.version,
-      status: isDraft ? 'Rascunho' : 'Ativa',
-      sections,
-    }
-  }
-
   async function saveDraft(showToast = true) {
-    templateDraftStore.set(draft())
     setSaveError('')
     try {
       if (persistedTemplate) {
@@ -208,17 +193,15 @@ export function TemplateBuilderPage() {
     setPublishing(true)
     setSaveError('')
     try {
-      let publishedVersion = source.version + 1
       if (persistedTemplate) {
         await adminCatalogApi.updateTemplate(id, {
           title: title.trim(),
           category: category.trim(),
           description: description.trim(),
         })
-        publishedVersion = (await adminCatalogApi.publishTemplate(id)).versionNumber
+        await adminCatalogApi.publishTemplate(id)
       }
       setIsDraft(false)
-      templateDraftStore.set({ ...draft(), version: publishedVersion, status: 'Ativa' })
       setPublish(false)
       showSuccess()
     } catch {
