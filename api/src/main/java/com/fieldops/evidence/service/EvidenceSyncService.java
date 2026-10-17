@@ -4,7 +4,6 @@ import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
-import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
@@ -24,17 +23,17 @@ public class EvidenceSyncService {
     private static final String OPERATION_TYPE = "EVIDENCE_CREATE";
 
     private final InspectionRepository inspectionRepository;
-    private final InspectionItemSnapshotRepository snapshotRepository;
     private final InspectionEvidenceRepository evidenceRepository;
     private final IdempotencyService idempotencyService;
+    private final EvidenceMetadataFactory metadataFactory;
 
     public EvidenceSyncService(InspectionRepository inspectionRepository,
-            InspectionItemSnapshotRepository snapshotRepository,
-            InspectionEvidenceRepository evidenceRepository, IdempotencyService idempotencyService) {
+            InspectionEvidenceRepository evidenceRepository, IdempotencyService idempotencyService,
+            EvidenceMetadataFactory metadataFactory) {
         this.inspectionRepository = inspectionRepository;
-        this.snapshotRepository = snapshotRepository;
         this.evidenceRepository = evidenceRepository;
         this.idempotencyService = idempotencyService;
+        this.metadataFactory = metadataFactory;
     }
 
     /**
@@ -47,14 +46,12 @@ public class EvidenceSyncService {
         validate(payload);
         Inspection inspection = inspectionRepository.findById(payload.inspectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + payload.inspectionId()));
-        assertTechnicianOwns(inspection, technicianId);
-        InspectionItemSnapshot item = snapshotRepository
-                .findByInspectionIdAndSourceTemplateItemId(inspection.getId(), payload.itemId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Inspection item not found for inspection: " + payload.itemId()));
+        metadataFactory.assertTechnicianOwns(inspection, technicianId);
+        InspectionItemSnapshot item = metadataFactory.resolveItem(inspection, payload.itemId());
 
         InspectionEvidence evidence = InspectionEvidence.create(inspection, item, payload.reference(),
-                checksum(payload.reference()), payload.description(), location(payload), payload.capturedAt(),
+                checksum(payload.reference()), payload.description(),
+                metadataFactory.locationJson(payload.latitude(), payload.longitude()), payload.capturedAt(),
                 inspection.getTechnician());
         InspectionEvidence saved = evidenceRepository.save(evidence);
         idempotencyService.markProcessed(operationId, OPERATION_TYPE, saved.getId(), saved.getReference());
@@ -66,27 +63,7 @@ public class EvidenceSyncService {
                 || payload.capturedAt() == null || payload.reference() == null || payload.reference().isBlank()) {
             throw new BusinessException("EVIDENCE_CREATE requires inspectionId, itemId, fileRef or url, and capturedAt");
         }
-        if ((payload.latitude() == null) != (payload.longitude() == null)) {
-            throw new BusinessException("EVIDENCE_CREATE requires both latitude and longitude when location is provided");
-        }
-        if (payload.latitude() != null && (payload.latitude().abs().compareTo(new java.math.BigDecimal("90")) > 0
-                || payload.longitude().abs().compareTo(new java.math.BigDecimal("180")) > 0)) {
-            throw new BusinessException("EVIDENCE_CREATE location is outside valid latitude/longitude bounds");
-        }
-    }
-
-    private void assertTechnicianOwns(Inspection inspection, Long technicianId) {
-        if (!inspection.getTechnician().getId().equals(technicianId)) {
-            throw new BusinessException("Inspection is not assigned to this technician: " + inspection.getId());
-        }
-    }
-
-    private String location(EvidenceCreatePayload payload) {
-        if (payload.latitude() == null) {
-            return null;
-        }
-        return "{\"latitude\":" + payload.latitude().toPlainString()
-                + ",\"longitude\":" + payload.longitude().toPlainString() + "}";
+        metadataFactory.validateLocation(payload.latitude(), payload.longitude());
     }
 
     private String checksum(String reference) {
