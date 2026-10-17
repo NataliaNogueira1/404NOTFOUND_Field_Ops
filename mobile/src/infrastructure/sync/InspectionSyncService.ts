@@ -103,6 +103,35 @@ interface SyncPushResult {
   }>;
 }
 
+// ─── Incremental pull (GET /mobile/sync/pull) — PBI-053 ──────────────────────────
+
+/**
+ * Server-side classification of each change (SyncPullService.classify):
+ * - INSPECTION: ordinary create/update
+ * - REVIEW: supervisor decision (status APPROVED/REJECTED)
+ * - CANCELLATION: inspection cancelled (status CANCELED)
+ */
+type SyncChangeType = 'INSPECTION' | 'REVIEW' | 'CANCELLATION';
+
+interface SyncChange {
+  type: SyncChangeType;
+  /** Same DTO (MobileInspectionResponse) consumed by GET /mobile/inspections. */
+  inspection: ApiInspection;
+}
+
+interface SyncPullResponse {
+  changes: SyncChange[];
+  /**
+   * Opaque Base64 URL-safe cursor for the NEXT page. `null` means "no more
+   * changes to hand out" — in that case the previous cursor is kept as-is.
+   */
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/** Safety net so a server/bug that keeps returning hasMore never loops forever. */
+const MAX_PULL_PAGES = 1000;
+
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 /**
@@ -111,6 +140,7 @@ interface SyncPushResult {
  * - Push: sends local answers/evidences/non-conformities → API
  */
 export class InspectionSyncService {
+  private db: SQLiteDatabase;
   private inspectionRepo: InspectionRepository;
   private answerRepo: AnswerRepository;
   private evidenceRepo: EvidenceRepository;
@@ -119,6 +149,9 @@ export class InspectionSyncService {
   private metadataRepo: SyncMetadataRepository;
 
   constructor(db: SQLiteDatabase) {
+    // Kept so the incremental pull can wrap a whole changes batch in a single
+    // SQLite transaction (db.withTransactionAsync), PBI-053.
+    this.db = db;
     this.inspectionRepo = new InspectionRepository(db);
     this.answerRepo = new AnswerRepository(db);
     this.evidenceRepo = new EvidenceRepository(db);
@@ -169,6 +202,83 @@ export class InspectionSyncService {
       token,
     );
     await this.saveInspectionLocally(apiInsp);
+  }
+
+  /**
+   * Incremental pull by opaque cursor (PBI-053, GET /mobile/sync/pull).
+   *
+   * Reads the stored cursor and fetches the delta for the authenticated
+   * technician. The FIRST sync (no local cursor) is issued WITHOUT the `cursor`
+   * query param, so the server returns the full initial set. Each page's whole
+   * `changes` batch is written inside a SINGLE SQLite transaction; the cursor is
+   * advanced ONLY after that transaction commits. On ANY error (network, parse,
+   * 422 INVALID_CURSOR, or a write/rollback) the cursor is left untouched and the
+   * loop stops — a resend re-applies idempotently via upsert-by-id. Pagination
+   * continues while `hasMore` is true.
+   */
+  async pullChanges(token: string): Promise<{ downloaded: number; errors: string[] }> {
+    const errors: string[] = [];
+    let downloaded = 0;
+
+    // The first sync has no cursor → start WITHOUT the query param.
+    let cursor = await this.metadataRepo.getPullCursor();
+
+    for (let page = 0; page < MAX_PULL_PAGES; page++) {
+      let response: SyncPullResponse;
+      try {
+        // `limit` is omitted → server default (100). `cursor` is only sent when
+        // present, URL-encoded because it is an opaque Base64 URL-safe string.
+        const query = cursor !== null ? `?cursor=${encodeURIComponent(cursor)}` : '';
+        response = await apiClient.get<SyncPullResponse>(
+          `/api/v1/mobile/sync/pull${query}`,
+          token,
+        );
+      } catch (err) {
+        // Network failure or a non-2xx (e.g. 422 INVALID_CURSOR) — do NOT advance.
+        const msg = err instanceof Error ? err.message : 'Failed to pull changes';
+        errors.push(msg);
+        break;
+      }
+
+      const changes = response.changes ?? [];
+      try {
+        // Atomic per-page write: either the whole batch lands or none of it does,
+        // so a mid-batch failure cannot leave a half-applied page behind.
+        await this.db.withTransactionAsync(async () => {
+          for (const change of changes) {
+            await this.applyChange(change);
+          }
+        });
+      } catch (err) {
+        // Rollback already ran; keep the old cursor so the page is retried.
+        const msg = err instanceof Error ? err.message : 'Failed to persist changes';
+        errors.push(msg);
+        break;
+      }
+
+      downloaded += changes.length;
+
+      // Only AFTER a successful commit do we move the cursor forward. A null
+      // nextCursor means "nothing new to hand out" → keep the previous cursor.
+      if (response.nextCursor !== null) {
+        cursor = response.nextCursor;
+        await this.metadataRepo.setPullCursor(cursor);
+      }
+
+      if (!response.hasMore) break;
+    }
+
+    return { downloaded, errors };
+  }
+
+  /**
+   * Apply one change to the local store. INSPECTION/REVIEW/CANCELLATION all go
+   * through the same {@link saveInspectionLocally} upsert: the extended
+   * InspectionRepository.upsert applies REJECTED/APPROVED/CANCELED coming from
+   * the server while preserving the technician's pending child rows (RN-077).
+   */
+  private async applyChange(change: SyncChange): Promise<void> {
+    await this.saveInspectionLocally(change.inspection);
   }
 
   private async saveInspectionLocally(apiInsp: ApiInspection): Promise<void> {
@@ -418,9 +528,21 @@ export class InspectionSyncService {
     const pushResult = await this.pushPendingOperations(token);
     errors.push(...pushResult.errors);
 
-    // Then pull (to get server-side updates)
-    const pullResult = await this.pullInspections(token);
+    // Then pull server-side updates incrementally by cursor (PBI-053). With no
+    // local cursor this does the initial full pull; with one it only fetches the
+    // delta (new inspections, reviews, cancellations). `pullInspections` is kept
+    // as a recovery fallback: if the incremental pull failed AND we have never
+    // stored a cursor (so there is nothing local to lose), fall back to the plain
+    // full pull so a first-run sync still populates the device.
+    const pullResult = await this.pullChanges(token);
     errors.push(...pullResult.errors);
+    let pulled = pullResult.downloaded;
+
+    if (pullResult.errors.length > 0 && (await this.metadataRepo.getPullCursor()) === null) {
+      const fallback = await this.pullInspections(token);
+      errors.push(...fallback.errors);
+      pulled += fallback.downloaded;
+    }
 
     // Record the timestamp of the last *successful* sync only when the whole
     // cycle finished with no errors (RN-072). A failed attempt must NOT advance
@@ -430,7 +552,7 @@ export class InspectionSyncService {
     }
 
     return {
-      pulled: pullResult.downloaded,
+      pulled,
       pushed: pushResult.sent,
       errors,
     };
