@@ -1,15 +1,13 @@
-import { Bell, ClipboardList, Home, LogOut, Menu, RefreshCw, ShieldCheck, User, X } from 'lucide-react'
+import { Bell, ClipboardList, Home, LogOut, Menu, ShieldCheck, User, X } from 'lucide-react'
 import { useState, useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { authSession } from '@/auth/session'
-import { technicianUser } from '@/mocks/technician'
 import { ThemeToggle } from '@/theme/ThemeToggle'
 import { cn } from '@/utils/cn'
 
 const navItems = [
   { label: 'Inicio', to: '/technician/home', icon: Home },
   { label: 'Minhas Inspecoes', to: '/technician/inspections', icon: ClipboardList },
-  { label: 'Sincronizacao', to: '/technician/sync', icon: RefreshCw },
   { label: 'Perfil', to: '/technician/profile', icon: User },
 ]
 
@@ -18,7 +16,8 @@ export function TechnicianLayout() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
-  const initials = (user?.name ?? technicianUser.name)
+  const displayName = user?.name ?? 'Tecnico'
+  const initials = displayName
     .split(' ')
     .map((part) => part[0])
     .slice(0, 2)
@@ -79,7 +78,7 @@ export function TechnicianLayout() {
           ))}
         </nav>
         <div className="border-t border-border p-4">
-          <p className="text-sm font-semibold">{user?.name ?? technicianUser.name}</p>
+          <p className="text-sm font-semibold">{displayName}</p>
           <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
           <button
             className="focus-ring mt-3 inline-flex items-center gap-2 rounded-fieldops px-2 py-1.5 text-sm font-semibold text-danger hover:bg-danger-light/20"
@@ -118,7 +117,7 @@ export function TechnicianLayout() {
                 {initials}
               </span>
               <div className="hidden sm:block">
-                <p className="text-sm font-semibold leading-tight text-text">{user?.name ?? technicianUser.name}</p>
+                <p className="text-sm font-semibold leading-tight text-text">{displayName}</p>
                 <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
               </div>
             </div>

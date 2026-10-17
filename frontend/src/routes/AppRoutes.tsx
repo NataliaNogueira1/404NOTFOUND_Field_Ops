@@ -70,14 +70,8 @@ const TechnicianStartInspectionPage = lazy(() =>
 const TechnicianChecklistPage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianChecklistPage })),
 )
-const TechnicianNonConformitiesPage = lazy(() =>
-  import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianNonConformitiesPage })),
-)
 const TechnicianSummaryPage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianSummaryPage })),
-)
-const TechnicianSyncPage = lazy(() =>
-  import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianSyncPage })),
 )
 const TechnicianProfilePage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianProfilePage })),
@@ -333,26 +327,10 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="inspections/:id/non-conformities"
-            element={
-              <LazyPage>
-                <TechnicianNonConformitiesPage />
-              </LazyPage>
-            }
-          />
-          <Route
             path="inspections/:id/summary"
             element={
               <LazyPage>
                 <TechnicianSummaryPage />
-              </LazyPage>
-            }
-          />
-          <Route
-            path="sync"
-            element={
-              <LazyPage>
-                <TechnicianSyncPage />
               </LazyPage>
             }
           />
