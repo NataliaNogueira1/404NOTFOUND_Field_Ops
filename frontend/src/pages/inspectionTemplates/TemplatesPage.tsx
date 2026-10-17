@@ -1,5 +1,5 @@
 import { Copy, Eye, FileClock, Pencil, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type TemplateListStatus, type TemplateSummary, adminCatalogApi } from '@/api/adminCatalog'
 import { Badge } from '@/components/badges/Badge'
@@ -10,20 +10,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
-import { templates } from '@/mocks/domain'
-import { templateDraftStore } from '@/state/mockStores'
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const drafts = useSyncExternalStore(
-    templateDraftStore.subscribe,
-    templateDraftStore.snapshot,
-    templateDraftStore.snapshot,
-  )
-  const fallbackRows = useMemo(
-    () => [...drafts, ...templates.filter((template) => !drafts.some((draft) => draft.id === template.id))],
-    [drafts],
-  )
   const list = useListQuery('title,asc')
   const query = list.value('name')
   const debouncedQuery = useDebouncedValue(query)
@@ -32,9 +21,11 @@ export function TemplatesPage() {
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const result = await adminCatalogApi.listTemplates({
         name: debouncedQuery,
@@ -47,14 +38,14 @@ export function TemplatesPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch {
-      const fallback = localTemplates(fallbackRows, debouncedQuery, status, list.sort)
-      setRows(fallback.slice(list.page * list.size, (list.page + 1) * list.size))
-      setTotalElements(fallback.length)
-      setTotalPages(Math.max(Math.ceil(fallback.length / list.size), 1))
+      setRows([])
+      setTotalElements(0)
+      setTotalPages(1)
+      setError('Nao foi possivel carregar os modelos. Tente novamente.')
     } finally {
       setLoading(false)
     }
-  }, [debouncedQuery, fallbackRows, list.page, list.size, list.sort, status])
+  }, [debouncedQuery, list.page, list.size, list.sort, status])
 
   useEffect(() => {
     const pendingLoad = window.setTimeout(() => void loadTemplates(), 0)
@@ -148,6 +139,7 @@ export function TemplatesPage() {
           <option value="DRAFT">Rascunho</option>
         </Select>
       </Card>
+      {error && <div role="alert" className="flex items-center justify-between gap-3 text-sm text-danger"><span>{error}</span><Button variant="secondary" onClick={() => void loadTemplates()}>Tentar novamente</Button></div>}
       <DataTable
         columns={columns}
         rows={rows}
@@ -163,31 +155,5 @@ export function TemplatesPage() {
         onPageSizeChange={list.setSize}
       />
     </div>
-  )
-}
-
-function localTemplates(source: typeof templates, name: string, status: TemplateListStatus | '', sort: string) {
-  const query = name.toLowerCase()
-  const rows = source
-    .filter(
-      (template) =>
-        `${template.title} ${template.category}`.toLowerCase().includes(query) &&
-        (!status || (status === 'ACTIVE') === (template.status === 'Ativa')),
-    )
-    .map((template) => ({
-      id: template.id,
-      title: template.title,
-      category: template.category,
-      version: template.version,
-      sectionCount: template.sections.length,
-      itemCount: template.sections.reduce((sum, section) => sum + section.items.length, 0),
-      status: (template.status === 'Ativa' ? 'ACTIVE' : 'DRAFT') as TemplateListStatus,
-    }))
-  const [key, direction] = sort.split(',')
-  return rows.sort(
-    (left, right) =>
-      String(left[key as keyof TemplateSummary] ?? '').localeCompare(
-        String(right[key as keyof TemplateSummary] ?? ''),
-      ) * (direction === 'desc' ? -1 : 1),
   )
 }
