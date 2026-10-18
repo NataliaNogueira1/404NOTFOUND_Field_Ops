@@ -76,7 +76,10 @@ export function AuditPage() {
     return () => window.clearTimeout(timer)
   }, [inspectionId, load])
 
-  const entries = state.status === 'ready' ? state.entries : []
+  const entries = useMemo(
+    () => (state.status === 'ready' ? state.entries : []),
+    [state],
+  )
 
   const filtered = useMemo(
     () =>
