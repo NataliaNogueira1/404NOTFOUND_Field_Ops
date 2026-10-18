@@ -210,6 +210,14 @@ class InspectionTemplateControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.title").value("Pressao em conformidade"));
+
+        // Persisting the child through its own repository must not duplicate it via the cascade:
+        // the template keeps exactly one section with exactly one item (#237).
+        mockMvc.perform(get("/api/v1/inspection-templates/{id}", template.getId())
+                        .with(authentication(authenticationFor(supervisor))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections.length()").value(1))
+                .andExpect(jsonPath("$.sections[0].items.length()").value(1));
     }
 
     @Test

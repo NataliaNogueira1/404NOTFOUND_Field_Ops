@@ -44,12 +44,13 @@ public class TemplateItemService {
         TemplateItem item = new TemplateItem();
         item.setSection(section);
         apply(item, request);
-        section.getItems().add(item);
-        // Flush the reordered siblings via the template, then persist the new item through its own
-        // repository so the generated id is populated on the returned instance (see #237).
+        // Persist the item through its own repository first so the generated id is populated on the
+        // response (the template cascade alone left it null, #237). It already has an id when added
+        // to the collection, so the template flush does not insert a duplicate row.
+        TemplateItem saved = itemRepository.saveAndFlush(item);
+        section.getItems().add(saved);
         templateRepository.saveAndFlush(section.getTemplate());
-        itemRepository.saveAndFlush(item);
-        return toResponse(item);
+        return toResponse(saved);
     }
 
     /** Updates an item and moves it to the requested position within its section. */

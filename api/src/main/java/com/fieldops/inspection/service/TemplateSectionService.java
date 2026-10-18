@@ -39,13 +39,15 @@ public class TemplateSectionService {
         TemplateSection section = new TemplateSection();
         section.setTemplate(template);
         apply(section, request);
-        template.getSections().add(section);
-        // Persist the reordered siblings via the template, then flush the new section through its
-        // own repository so the generated IDENTITY id (and @PrePersist createdAt) are populated on
-        // the instance returned to the client. Relying on cascade left the response id null (#237).
+        // Persist the section through its own repository first so the generated IDENTITY id and
+        // the @PrePersist createdAt are populated on the returned instance (relying on the
+        // template cascade alone left the response id null, #237). It already has an id when added
+        // to the collection below, so the template flush treats it as managed and does not insert
+        // a duplicate row.
+        TemplateSection saved = sectionRepository.saveAndFlush(section);
+        template.getSections().add(saved);
         templateRepository.saveAndFlush(template);
-        sectionRepository.saveAndFlush(section);
-        return toResponse(section);
+        return toResponse(saved);
     }
 
     /** Updates section metadata and moves it to the requested one-based position. */
