@@ -12,7 +12,10 @@ interface BackendItem extends Omit<ReviewItem, 'snapshotId' | 'evidences' | 'non
 interface BackendEvidence extends Omit<ReviewEvidence, 'id' | 'itemSnapshotId'> { id: number; itemSnapshotId: number }
 interface BackendNonConformity extends Omit<ReviewNonConformity, 'id' | 'snapshotId'> { id: number; snapshotId: number | null }
 interface Decision { id: number; status: InspectionStatus; reviewedAt: string; reviewedBy: number; comment: string | null; rejectionReason: string | null }
-interface BackendReviewComment extends Omit<ReviewComment, 'id' | 'itemSnapshotId'> { id: number; itemSnapshotId: number }
+// Backend contract (com.fieldops.reviewcomment.dto.ReviewCommentResponse): the item snapshot id is
+// `itemId`, and the section/item titles are `section`/`item`. Mapped to the UI names below.
+interface BackendReviewComment { id: number; itemId: number; section: string; item: string; comment: string; createdAt: string; createdBy: string }
+function reviewComment(value: BackendReviewComment): ReviewComment { return { id: String(value.id), itemSnapshotId: String(value.itemId), sectionTitle: value.section, itemTitle: value.item, comment: value.comment, createdAt: value.createdAt, createdBy: value.createdBy } }
 function nc(value: BackendNonConformity): ReviewNonConformity { return { ...value, id: String(value.id), snapshotId: value.snapshotId === null ? null : String(value.snapshotId) } }
 function item(value: BackendItem): ReviewItem { return { ...value, snapshotId: String(value.snapshotId), evidences: value.evidences.map(evidence => ({ ...evidence, id: String(evidence.id), itemSnapshotId: String(evidence.itemSnapshotId) })), nonConformities: value.nonConformities.map(nc) } }
 export const inspectionReviewApi = {
@@ -21,6 +24,6 @@ export const inspectionReviewApi = {
   beginReview: (id: string) => httpClient.post<{ id: number; status: InspectionStatus }>(`/api/v1/inspections/${id}/begin-review`),
   approve: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`),
   reject: (id: string, reason: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/reject`, { reason: reason.trim() }),
-  async listComments(id: string): Promise<ReviewComment[]> { const values = await httpClient.get<BackendReviewComment[]>(`/api/v1/inspections/${id}/review-comments`); return values.map(value => ({ ...value, id: String(value.id), itemSnapshotId: String(value.itemSnapshotId) })) },
-  async addComment(id: string, itemSnapshotId: string, comment: string): Promise<ReviewComment> { const value = await httpClient.post<BackendReviewComment>(`/api/v1/inspections/${id}/items/${itemSnapshotId}/review-comment`, { comment: comment.trim() }); return { ...value, id: String(value.id), itemSnapshotId: String(value.itemSnapshotId) } },
+  async listComments(id: string): Promise<ReviewComment[]> { const values = await httpClient.get<BackendReviewComment[]>(`/api/v1/inspections/${id}/review-comments`); return values.map(reviewComment) },
+  async addComment(id: string, itemSnapshotId: string, comment: string): Promise<ReviewComment> { return reviewComment(await httpClient.post<BackendReviewComment>(`/api/v1/inspections/${id}/items/${itemSnapshotId}/review-comment`, { comment: comment.trim() })) },
 }
