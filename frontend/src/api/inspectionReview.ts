@@ -18,6 +18,7 @@ function item(value: BackendItem): ReviewItem { return { ...value, snapshotId: S
 export const inspectionReviewApi = {
   async get(id: string): Promise<InspectionReview> { const value = await httpClient.get<BackendReview>(`/api/v1/inspections/${id}/review`); return { ...value, id: String(value.id), sections: value.sections.map(section => ({ ...section, items: section.items.map(item) })), nonConformities: value.nonConformities.map(nc) } },
   async loadEvidenceImage(contentUrl: string) { return URL.createObjectURL(await apiRequestBlob(contentUrl)) },
+  beginReview: (id: string) => httpClient.post<{ id: number; status: InspectionStatus }>(`/api/v1/inspections/${id}/begin-review`),
   approve: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`),
   reject: (id: string, reason: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/reject`, { reason: reason.trim() }),
   async listComments(id: string): Promise<ReviewComment[]> { const values = await httpClient.get<BackendReviewComment[]>(`/api/v1/inspections/${id}/review-comments`); return values.map(value => ({ ...value, id: String(value.id), itemSnapshotId: String(value.itemSnapshotId) })) },

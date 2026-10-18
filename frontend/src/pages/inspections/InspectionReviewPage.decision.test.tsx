@@ -6,10 +6,17 @@ import { InspectionReviewPage } from '@/pages/inspections/InspectionReviewPage'
 
 const review = { id: 1, title: 'Inspecao', status: 'UNDER_REVIEW', priority: 'MEDIUM', clientName: 'Cliente', siteName: 'Local', equipmentName: null, technicianName: 'Ana', dueDate: '2026-10-02', progress: 0, sections: [], nonConformities: [] }
 const approved = { ...review, status: 'APPROVED' }
+const submitted = { ...review, status: 'SUBMITTED' }
 function body(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } }) }
 function renderPage(fetchMock: ReturnType<typeof vi.fn>) { vi.stubGlobal('fetch', fetchMock); return render(<MemoryRouter initialEntries={['/app/inspections/1/review']}><Routes><Route path="/app/inspections/:id/review" element={<InspectionReviewPage />} /></Routes></MemoryRouter>) }
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('InspectionReviewPage decisions', () => {
+  it('starts a formal review for a submitted inspection', async () => {
+    const fetchMock = vi.fn((url: string) => url.endsWith('/review') ? Promise.resolve(body(fetchMock.mock.calls.length > 1 ? review : submitted)) : Promise.resolve(body({ id: 1, status: 'UNDER_REVIEW' })))
+    renderPage(fetchMock); await screen.findByText('Inspecao'); await userEvent.click(screen.getByRole('button', { name: 'Iniciar revisao' }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/begin-review'))).toBe(true))
+    await screen.findByRole('button', { name: 'Aprovar' })
+  })
   it('posts approval once, disables duplicate submission, and refreshes state', async () => {
     let resolveApproval: ((response: Response) => void) | undefined
     const fetchMock = vi.fn((url: string) => url.endsWith('/review') ? Promise.resolve(body(fetchMock.mock.calls.length > 1 ? approved : review)) : new Promise<Response>(resolve => { resolveApproval = resolve }))
