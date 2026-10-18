@@ -463,7 +463,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Mover ${item.question} para cima`}
-                  disabled={itemIndex === 0}
+                  disabled={!editable || itemIndex === 0}
                   onClick={() => onMoveItem(item.id, -1)}
                 >
                   <ArrowUp size={16} />
@@ -472,7 +472,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Mover ${item.question} para baixo`}
-                  disabled={itemIndex === section.items.length - 1}
+                  disabled={!editable || itemIndex === section.items.length - 1}
                   onClick={() => onMoveItem(item.id, 1)}
                 >
                   <ArrowDown size={16} />
@@ -481,6 +481,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Editar ${item.question}`}
+                  disabled={!editable}
                   onClick={() => onEditItem(item)}
                 >
                   <Pencil size={16} />
@@ -489,6 +490,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Excluir ${item.question}`}
+                  disabled={!editable}
                   onClick={() => onDeleteItem(item.id)}
                 >
                   <Trash2 size={16} />
