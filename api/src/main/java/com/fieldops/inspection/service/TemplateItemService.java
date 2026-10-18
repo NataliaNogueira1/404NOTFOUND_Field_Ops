@@ -11,6 +11,7 @@ import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateItemRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import java.util.Comparator;
@@ -22,10 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemplateItemService {
 
     private final InspectionTemplateRepository templateRepository;
+    private final TemplateItemRepository itemRepository;
     private final ObjectMapper objectMapper;
 
-    public TemplateItemService(InspectionTemplateRepository templateRepository, ObjectMapper objectMapper) {
+    public TemplateItemService(InspectionTemplateRepository templateRepository,
+            TemplateItemRepository itemRepository, ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
+        this.itemRepository = itemRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -41,7 +45,10 @@ public class TemplateItemService {
         item.setSection(section);
         apply(item, request);
         section.getItems().add(item);
+        // Flush the reordered siblings via the template, then persist the new item through its own
+        // repository so the generated id is populated on the returned instance (see #237).
         templateRepository.saveAndFlush(section.getTemplate());
+        itemRepository.saveAndFlush(item);
         return toResponse(item);
     }
 

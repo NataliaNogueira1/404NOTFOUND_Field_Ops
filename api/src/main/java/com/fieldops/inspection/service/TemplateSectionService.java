@@ -6,6 +6,7 @@ import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import java.util.Comparator;
@@ -17,10 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemplateSectionService {
 
     private final InspectionTemplateRepository templateRepository;
+    private final TemplateSectionRepository sectionRepository;
     private final TemplateItemService itemService;
 
-    public TemplateSectionService(InspectionTemplateRepository templateRepository, TemplateItemService itemService) {
+    public TemplateSectionService(InspectionTemplateRepository templateRepository,
+            TemplateSectionRepository sectionRepository, TemplateItemService itemService) {
         this.templateRepository = templateRepository;
+        this.sectionRepository = sectionRepository;
         this.itemService = itemService;
     }
 
@@ -36,7 +40,11 @@ public class TemplateSectionService {
         section.setTemplate(template);
         apply(section, request);
         template.getSections().add(section);
+        // Persist the reordered siblings via the template, then flush the new section through its
+        // own repository so the generated IDENTITY id (and @PrePersist createdAt) are populated on
+        // the instance returned to the client. Relying on cascade left the response id null (#237).
         templateRepository.saveAndFlush(template);
+        sectionRepository.saveAndFlush(section);
         return toResponse(section);
     }
 

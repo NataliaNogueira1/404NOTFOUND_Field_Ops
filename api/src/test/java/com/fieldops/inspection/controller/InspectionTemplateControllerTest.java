@@ -57,6 +57,9 @@ class InspectionTemplateControllerTest {
     @Autowired
     private UserRepository userRepository;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     @Test
     void createsDraftForAuthenticatedUser() throws Exception {
         User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
@@ -160,6 +163,53 @@ class InspectionTemplateControllerTest {
                 .andExpect(jsonPath("$.sections[0].displayOrder").value(1))
                 .andExpect(jsonPath("$.sections[1].title").value("Funcionamento"))
                 .andExpect(jsonPath("$.sections[1].displayOrder").value(2));
+    }
+
+    @Test
+    void returnsPersistedIdWhenCreatingSectionSoItemsCanBeAttached() throws Exception {
+        User supervisor = persistUser("Marina Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistDraft(supervisor);
+
+        String sectionBody = mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections", template.getId())
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Seguranca",
+                                  "description": "Itens de protecao",
+                                  "displayOrder": 1
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andReturn().getResponse().getContentAsString();
+
+        Long sectionId = com.jayway.jsonpath.JsonPath.parse(sectionBody).read("$.id", Long.class);
+
+        // Each HTTP request runs in its own transaction in production; detach persisted entities so
+        // the item creation re-reads the section from the database like a separate request would.
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(post("/api/v1/inspection-templates/{id}/sections/{sectionId}/items",
+                        template.getId(), sectionId)
+                        .with(authentication(authenticationFor(supervisor)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Pressao em conformidade",
+                                  "description": "",
+                                  "responseType": "CONFORMITY",
+                                  "required": true,
+                                  "observationRequiredOnFailure": false,
+                                  "evidenceRequiredOnFailure": false,
+                                  "optionsJson": null,
+                                  "displayOrder": 1
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.title").value("Pressao em conformidade"));
     }
 
     @Test
