@@ -146,7 +146,10 @@ export class InspectionSyncService {
         token,
       );
 
-      const apiInspections = pull.inspections;
+      // The endpoint returns { inspections, nextCursor }; guard against a
+      // missing/malformed list so an empty pull is a no-op instead of throwing
+      // a cryptic "not iterable" error that would fail the whole sync cycle.
+      const apiInspections = Array.isArray(pull?.inspections) ? pull.inspections : [];
 
       for (const apiInsp of apiInspections) {
         try {
@@ -157,7 +160,9 @@ export class InspectionSyncService {
           errors.push(`[${apiInsp.id}] ${msg}`);
         }
       }
-      if (errors.length === 0) await this.metadataRepo.setPullCursor(pull.nextCursor);
+      if (errors.length === 0 && pull?.nextCursor) {
+        await this.metadataRepo.setPullCursor(pull.nextCursor);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
       errors.push(msg);
