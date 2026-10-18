@@ -35,7 +35,8 @@ public record MobileInspectionResponse(
         String rejectedBy,
         String rejectedAt,
         Long version,
-        TemplateDto template
+        TemplateDto template,
+        List<ReviewCommentDto> reviewComments
 ) {
 
     public record TemplateDto(
@@ -62,4 +63,7 @@ public record MobileInspectionResponse(
             boolean requireEvidenceOnFailure,
             List<String> options
     ) {}
+
+    /** Read-only reviewer guidance delivered with the technician's offline pull. */
+    public record ReviewCommentDto(String id, String itemId, String comment, String createdBy, String createdAt) {}
 }

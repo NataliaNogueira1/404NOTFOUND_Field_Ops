@@ -8,6 +8,7 @@ import {
   AnswerRepository,
   EvidenceRepository,
   NonConformityRepository,
+  ReviewCommentRepository,
   SyncQueueRepository,
   SyncMetadataRepository,
 } from '@/infrastructure/database/repositories';
@@ -19,6 +20,7 @@ import type {
   ChecklistValue,
   Evidence,
   NonConformity,
+  ReviewComment,
 } from '@/features/fieldops/types';
 
 // ─── API Response types ────────────────────────────────────────────────────────
@@ -53,7 +55,10 @@ interface ApiInspection {
   rejectedAt?: string;
   version: number;
   template: ApiTemplate;
+  reviewComments?: ApiReviewComment[];
 }
+
+interface ApiReviewComment { id: string; itemId: string; comment: string; createdBy: string; createdAt: string }
 
 interface ApiTemplate {
   id: string;
@@ -116,6 +121,7 @@ export class InspectionSyncService {
   private answerRepo: AnswerRepository;
   private evidenceRepo: EvidenceRepository;
   private ncRepo: NonConformityRepository;
+  private reviewCommentRepo: ReviewCommentRepository;
   private syncQueueRepo: SyncQueueRepository;
   private metadataRepo: SyncMetadataRepository;
 
@@ -124,6 +130,7 @@ export class InspectionSyncService {
     this.answerRepo = new AnswerRepository(db);
     this.evidenceRepo = new EvidenceRepository(db);
     this.ncRepo = new NonConformityRepository(db);
+    this.reviewCommentRepo = new ReviewCommentRepository(db);
     this.syncQueueRepo = new SyncQueueRepository(db);
     this.metadataRepo = new SyncMetadataRepository(db);
   }
@@ -226,6 +233,7 @@ export class InspectionSyncService {
       const template = this.mapApiTemplate(apiInsp.template);
       await this.inspectionRepo.saveTemplate(apiInsp.id, template);
     }
+    await this.reviewCommentRepo.replaceForInspection(apiInsp.id, (apiInsp.reviewComments ?? []).map((comment): ReviewComment => ({ ...comment, inspectionId: apiInsp.id, itemId: `${apiInsp.id}::${comment.itemId}` })));
   }
 
   private mapApiTemplate(api: ApiTemplate): InspectionTemplate {
