@@ -14,6 +14,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 export const SyncMetadataKeys = {
   /** ISO timestamp of the last sync that finished with NO errors (RN-072). */
   LAST_SUCCESSFUL_SYNC: 'last_successful_sync',
+  PULL_CURSOR: 'pull_cursor',
 } as const;
 
 export class SyncMetadataRepository {
@@ -60,4 +61,7 @@ export class SyncMetadataRepository {
   async setLastSuccessfulSync(isoTimestamp: string = new Date().toISOString()): Promise<void> {
     await this.set(SyncMetadataKeys.LAST_SUCCESSFUL_SYNC, isoTimestamp);
   }
+
+  async getPullCursor(): Promise<string | null> { return this.get(SyncMetadataKeys.PULL_CURSOR); }
+  async setPullCursor(cursor: string): Promise<void> { await this.set(SyncMetadataKeys.PULL_CURSOR, cursor); }
 }
