@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  BarChart3,
   CalendarClock,
   ClipboardCheck,
   ClipboardPlus,
@@ -10,26 +9,22 @@ import {
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react'
-import { useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
+import { dashboardApi, type DashboardFilters, type DashboardSummary } from '@/api/dashboard'
 import { authSession } from '@/auth/session'
-import { Badge } from '@/components/badges/Badge'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorState } from '@/components/ui/ErrorState'
+import { Input } from '@/components/ui/Input'
+import { LoadingState } from '@/components/ui/LoadingState'
 import { useReviewCount } from '@/hooks/useReviewCount'
 import { useTheme } from '@/theme'
-import {
-  dashboardStats,
-  inspections,
-  inspectionsByStatus,
-  nonConformitiesBySeverity,
-  byId,
-  clients,
-  equipment,
-} from '@/mocks/domain'
+import { Priority } from '@/types/domain'
 
 /**
  * Recharts renders SVG and cannot consume Tailwind classes, so chart colors
@@ -46,12 +41,86 @@ const CHART_COLORS = {
   dark: { grid: '#2a3852', tick: '#94a3b8', cursor: '#0b1220', surface: '#111a2e', bar: '#2563eb' },
 } as const
 
+const PRIORITY_LABEL: Record<Priority, string> = {
+  [Priority.LOW]: 'Baixa',
+  [Priority.MEDIUM]: 'Média',
+  [Priority.HIGH]: 'Alta',
+  [Priority.CRITICAL]: 'Crítica',
+}
+
+// Explicit view state so the render never branches on undefined summary data.
+type ViewState =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; summary: DashboardSummary }
+
+function totalInspections(summary: DashboardSummary) {
+  return Object.values(summary.byStatus).reduce((sum, count) => sum + count, 0)
+}
+
+function toCriticalityData(summary: DashboardSummary) {
+  return Object.entries(summary.byCriticality).map(([priority, value]) => ({
+    name: PRIORITY_LABEL[priority as Priority] ?? priority,
+    value,
+  }))
+}
+
+// The /app/dashboard route and its RequireAdmin guard are declared in
+// AppRoutes.tsx and left untouched here. Hiding UI is never authorization — the
+// backend @PreAuthorize on GET /api/v1/dashboard/summary stays the source of truth.
 export function DashboardPage() {
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const reviewCount = useReviewCount()
   const { effectiveTheme } = useTheme()
   const chart = CHART_COLORS[effectiveTheme]
-  const hasStatusData = inspectionsByStatus.length > 0
+
+  const [view, setView] = useState<ViewState>({ kind: 'loading' })
+  const [fromInput, setFromInput] = useState('')
+  const [toInput, setToInput] = useState('')
+  const [clientInput, setClientInput] = useState('')
+  const [appliedFilters, setAppliedFilters] = useState<DashboardFilters>({})
+  const [dateError, setDateError] = useState<string | null>(null)
+
+  // Reload whenever the applied filters change (initial render included) and on
+  // explicit retry. `reloadToken` lets the error retry re-run the same filters.
+  const [reloadToken, setReloadToken] = useState(0)
+  const retry = useCallback(() => setReloadToken((token) => token + 1), [])
+
+  useEffect(() => {
+    let cancelled = false
+    // Flip to loading inside an async callback (not synchronously in the effect
+    // body) to satisfy react-hooks/set-state-in-effect.
+    async function loadSummary() {
+      setView({ kind: 'loading' })
+      try {
+        const summary = await dashboardApi.getSummary(appliedFilters)
+        if (!cancelled) setView({ kind: 'ready', summary })
+      } catch {
+        if (!cancelled) setView({ kind: 'error' })
+      }
+    }
+    void loadSummary()
+    return () => {
+      cancelled = true
+    }
+  }, [appliedFilters, reloadToken])
+
+  const applyFilters = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (fromInput && toInput && fromInput > toInput) {
+        setDateError('A data inicial não pode ser posterior à data final.')
+        return
+      }
+      setDateError(null)
+      setAppliedFilters({
+        from: fromInput || undefined,
+        to: toInput || undefined,
+        client: clientInput.trim() || undefined,
+      })
+    },
+    [fromInput, toInput, clientInput],
+  )
 
   const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
   const pendingLabel =
@@ -65,136 +134,139 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title={`Olá, ${firstName}`} description="Aqui está um resumo das operações de hoje." />
 
-      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total de inspeções" value={dashboardStats.total} icon={ClipboardCheck} tone="blue" />
-        <Link to="/app/inspections/review" className="focus-ring rounded-card">
-          <StatCard
-            title="Revisões pendentes"
-            value={reviewCount ?? dashboardStats.pending}
-            icon={CalendarClock}
-            tone="amber"
+      {/* ── Filters ────────────────────────────────────────────────────────── */}
+      <Card className="p-5">
+        <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end" onSubmit={applyFilters}>
+          <Input
+            id="dashboard-from"
+            type="date"
+            label="Data inicial"
+            value={fromInput}
+            error={dateError ?? undefined}
+            onChange={(event) => setFromInput(event.target.value)}
           />
+          <Input
+            id="dashboard-to"
+            type="date"
+            label="Data final"
+            value={toInput}
+            onChange={(event) => setToInput(event.target.value)}
+          />
+          <Input
+            id="dashboard-client"
+            label="Cliente"
+            placeholder="Nome do cliente"
+            value={clientInput}
+            onChange={(event) => setClientInput(event.target.value)}
+          />
+          <Button type="submit" className="h-11">
+            Aplicar filtros
+          </Button>
+        </form>
+      </Card>
+
+      <DashboardBody view={view} chart={chart} reviewCount={reviewCount} pendingLabel={pendingLabel} onRetry={retry} />
+    </div>
+  )
+}
+
+function DashboardBody({
+  view,
+  chart,
+  reviewCount,
+  pendingLabel,
+  onRetry,
+}: {
+  view: ViewState
+  chart: (typeof CHART_COLORS)[keyof typeof CHART_COLORS]
+  reviewCount: number | null
+  pendingLabel: string
+  onRetry: () => void
+}) {
+  if (view.kind === 'loading') {
+    return <LoadingState label="Carregando resumo..." />
+  }
+  if (view.kind === 'error') {
+    return <ErrorState message="Não foi possível carregar o resumo do dashboard." onRetry={onRetry} />
+  }
+
+  const { summary } = view
+  const total = totalInspections(summary)
+  const criticalityData = toCriticalityData(summary)
+  const isEmpty = total === 0 && summary.openNonConformities === 0 && summary.overdue === 0
+
+  if (isEmpty) {
+    return (
+      <EmptyState
+        icon={ClipboardCheck}
+        title="Sem dados para o período"
+        description="Não há inspeções ou não conformidades para os filtros selecionados."
+      />
+    )
+  }
+
+  return (
+    <>
+      {/* ── KPI cards ────────────────────────────────────────────────────── */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Total de inspeções" value={total} icon={ClipboardCheck} tone="blue" />
+        <Link to="/app/inspections/review" className="focus-ring rounded-card">
+          <StatCard title="Revisões pendentes" value={reviewCount ?? 0} icon={CalendarClock} tone="amber" />
         </Link>
-        <StatCard title="Inspeções atrasadas" value={dashboardStats.overdue} icon={ClockAlert} tone="red" />
-        <StatCard title="NCs críticas" value={dashboardStats.critical} icon={ShieldAlert} tone="green" />
+        <StatCard title="Inspeções atrasadas" value={summary.overdue} icon={ClockAlert} tone="red" />
+        <StatCard title="NCs abertas" value={summary.openNonConformities} icon={ShieldAlert} tone="green" />
       </section>
 
-      {/* ── Charts + quick actions ─────────────────────────────────────────── */}
+      {/* ── Criticality chart + quick actions ────────────────────────────── */}
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <Card className="p-5 lg:p-6">
-          <div className="mb-6">
-            <h2 className="text-base font-semibold">Inspeções por estado</h2>
-            <p className="text-sm text-muted">Distribuição das inspeções ativas</p>
+          <div className="mb-6 flex items-center gap-2">
+            <TriangleAlert className="text-warning" size={20} aria-hidden />
+            <h2 className="text-base font-semibold">Não conformidades por criticidade</h2>
           </div>
-          {hasStatusData ? (
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={inspectionsByStatus} margin={{ left: -20, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: chart.tick, fontSize: 12 }} />
-                  <YAxis
-                    allowDecimals={false}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: chart.tick, fontSize: 12 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: chart.cursor }}
-                    contentStyle={{
-                      borderRadius: 10,
-                      borderColor: chart.grid,
-                      backgroundColor: chart.surface,
-                      color: chart.tick,
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} fill={chart.bar} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyState
-              icon={BarChart3}
-              title="Sem inspeções para exibir"
-              description="Assim que houver inspeções registradas, a distribuição por estado aparecerá aqui."
-            />
-          )}
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={criticalityData} margin={{ left: -20, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: chart.tick, fontSize: 12 }} />
+                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: chart.tick, fontSize: 12 }} />
+                <Tooltip
+                  cursor={{ fill: chart.cursor }}
+                  contentStyle={{
+                    borderRadius: 10,
+                    borderColor: chart.grid,
+                    backgroundColor: chart.surface,
+                    color: chart.tick,
+                  }}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} fill={chart.bar} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </Card>
 
-        <div className="space-y-6">
-          <Card className="p-5">
-            <h2 className="text-base font-semibold">Ações rápidas</h2>
-            <p className="mb-4 text-sm text-muted">Atalhos para tarefas frequentes</p>
-            <div className="space-y-3">
-              <QuickAction
-                to="/app/inspections/new"
-                icon={ClipboardPlus}
-                title="Nova inspeção"
-                description="Agendar atividade"
-              />
-              <QuickAction
-                to="/app/inspection-templates/new"
-                icon={FilePlus2}
-                title="Criar modelo"
-                description="Abrir construtor"
-              />
-              {/* Deep-link direto para a fila de revisão, com contagem dinâmica */}
-              <QuickAction
-                to="/app/inspections/review"
-                icon={Eye}
-                title="Revisar pendentes"
-                description={pendingLabel}
-              />
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <TriangleAlert className="text-warning" size={20} />
-              <h2 className="text-base font-semibold">Não conformidades por criticidade</h2>
-            </div>
-            <div className="space-y-3">
-              {nonConformitiesBySeverity.map((item) => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <Badge tone={item.tone}>{item.label}</Badge>
-                  <span className="font-semibold">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── Recent inspections ─────────────────────────────────────────────── */}
-      <Card className="p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold">Inspeções recentes</h2>
-            <p className="text-sm text-muted">Últimos registros movimentados</p>
+        <Card className="p-5">
+          <h2 className="text-base font-semibold">Ações rápidas</h2>
+          <p className="mb-4 text-sm text-muted">Atalhos para tarefas frequentes</p>
+          <div className="space-y-3">
+            <QuickAction
+              to="/app/inspections/new"
+              icon={ClipboardPlus}
+              title="Nova inspeção"
+              description="Agendar atividade"
+            />
+            <QuickAction
+              to="/app/inspection-templates/new"
+              icon={FilePlus2}
+              title="Criar modelo"
+              description="Abrir construtor"
+            />
+            {/* Deep-link direto para a fila de revisão, com contagem dinâmica */}
+            <QuickAction to="/app/inspections/review" icon={Eye} title="Revisar pendentes" description={pendingLabel} />
           </div>
-          <Link className="text-sm font-semibold text-primary" to="/app/inspections">
-            Ver todas
-          </Link>
-        </div>
-        <div className="divide-y divide-border">
-          {inspections.slice(0, 5).map((item) => (
-            <Link
-              to={`/app/inspections/${item.id}/review`}
-              key={item.id}
-              className="flex flex-col gap-2 py-3 hover:bg-primary-light/10 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium">{item.title}</p>
-                <p className="text-sm text-muted">
-                  {byId(clients, item.clientId)?.name} - {byId(equipment, item.equipmentId)?.name}
-                </p>
-              </div>
-              <span className="text-sm text-muted">{item.dueDate}</span>
-            </Link>
-          ))}
-        </div>
-      </Card>
-    </div>
+        </Card>
+      </section>
+    </>
   )
 }
 
