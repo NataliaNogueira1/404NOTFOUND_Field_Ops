@@ -49,7 +49,7 @@ export function LoginPage() {
     setValue('password', '123456', { shouldValidate: true })
   }
   return (
-    <Card className="mx-auto w-full max-w-md p-7 sm:p-9">
+    <Card className="mx-auto w-full max-w-md px-7 py-10 sm:px-9 sm:py-14">
       <div className="mb-8 text-center">
         <img
           src={fieldOpsLogo}
