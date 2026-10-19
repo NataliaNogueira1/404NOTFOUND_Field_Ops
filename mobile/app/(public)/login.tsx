@@ -14,14 +14,6 @@ const MIN_PASSWORD_LENGTH = 6;
 // Logo image shared with the app icon (Expo Go). require() needs a static path.
 const fieldOpsLogo = require('../../assets/images/icon.png');
 
-// Quick-fill shortcuts mirroring the web login screen.
-const QUICK_FILL_PROFILES = [
-  { label: 'Admin', email: 'ana@fieldops.com' },
-  { label: 'Supervisor', email: 'marina@fieldops.com' },
-  { label: 'Tecnico', email: 'carlos@fieldops.com' },
-] as const;
-const QUICK_FILL_PASSWORD = '123456';
-
 // ─── Password field with visibility toggle ────────────────────────────────────
 
 /**
@@ -94,12 +86,6 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  function fillProfile(profileEmail: string) {
-    setEmail(profileEmail);
-    setPassword(QUICK_FILL_PASSWORD);
-    setError('');
-  }
-
   function validate(): string | null {
     if (!email.trim() || !password) return 'Preencha e-mail e senha.';
     if (!EMAIL_REGEX.test(email.trim())) return 'Formato de e-mail inválido.';
@@ -127,20 +113,8 @@ export default function LoginScreen() {
         <Image source={fieldOpsLogo} style={styles.brandMark} accessibilityLabel="FieldOps" />
         <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
         <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          Transforme inspecoes de campo em decisoes confiaveis
+          Suas inspecoes de campo, mesmo offline
         </Text>
-        <View style={styles.quickFillRow}>
-          {QUICK_FILL_PROFILES.map((profile) => (
-            <Button
-              key={profile.label}
-              label={profile.label}
-              variant="secondary"
-              size="sm"
-              onPress={() => fillProfile(profile.email)}
-              style={styles.quickFillButton}
-            />
-          ))}
-        </View>
         <Card style={styles.form} shadow="md">
           <TextInput
             label="E-mail"
@@ -172,8 +146,6 @@ const styles = StyleSheet.create({
   brandMark: { width: 64, height: 64, borderRadius: 18, alignSelf: 'center', marginBottom: Spacing.md },
   title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, textAlign: 'center' },
   subtitle: { marginTop: Spacing.sm, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.xl },
-  quickFillRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
-  quickFillButton: { flex: 1 },
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
