@@ -7,10 +7,12 @@ import com.fieldops.inspection.dto.MobileInspectionResponse.*;
 import com.fieldops.inspection.dto.MobileStatusUpdateResponse;
 import com.fieldops.inspection.model.*;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.reviewcomment.repository.ReviewCommentRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.sync.service.IdempotencyService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +40,14 @@ public class MobileInspectionService {
     private final InspectionRepository inspectionRepository;
     private final ObjectMapper objectMapper;
     private final IdempotencyService idempotencyService;
+    private final ReviewCommentRepository reviewCommentRepository;
 
     public MobileInspectionService(InspectionRepository inspectionRepository, ObjectMapper objectMapper,
-            IdempotencyService idempotencyService) {
+            IdempotencyService idempotencyService, ReviewCommentRepository reviewCommentRepository) {
         this.inspectionRepository = inspectionRepository;
         this.objectMapper = objectMapper;
         this.idempotencyService = idempotencyService;
+        this.reviewCommentRepository = reviewCommentRepository;
     }
 
     /**
@@ -106,6 +110,31 @@ public class MobileInspectionService {
         return inspections.stream().map(this::toResponse).toList();
     }
 
+    /** Returns all technician-owned inspections changed after the supplied cursor for mobile pull. */
+    @Transactional(readOnly = true)
+    public List<MobileInspectionResponse> getChangesForTechnician(Long technicianId, Instant cursor) {
+        return inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technicianId).stream()
+                .filter(inspection -> cursor == null || inspection.getUpdatedAt().isAfter(cursor))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Fetches one inspection detail for its assigned technician (issue #222).
+     *
+     * <p>Use this after a list sync when the device needs to refresh one local inspection;
+     * ownership is verified before the snapshot is exposed.</p>
+     */
+    @Transactional(readOnly = true)
+    public MobileInspectionResponse getInspectionForTechnician(Long inspectionId, Long technicianId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (!inspection.getTechnician().getId().equals(technicianId)) {
+            throw new AccessDeniedException("Inspection is not assigned to this technician");
+        }
+        return toResponse(inspection);
+    }
+
     private MobileInspectionResponse toResponse(Inspection inspection) {
         InspectionTemplate tpl = inspection.getTemplate();
         InspectionTemplateVersion version = inspection.getTemplateVersion();
@@ -144,7 +173,12 @@ public class MobileInspectionService {
                 inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
                 inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
                 inspection.getVersion(),
-                templateDto
+                templateDto,
+                reviewCommentRepository.findByInspectionIdOrdered(inspection.getId()).stream()
+                        .map(comment -> new ReviewCommentDto(String.valueOf(comment.getId()),
+                                String.valueOf(comment.getItemSnapshot().getSourceTemplateItemId()),
+                                comment.getComment(), comment.getCreatedBy().getName(), comment.getCreatedAt().toString()))
+                        .toList()
         );
     }
 

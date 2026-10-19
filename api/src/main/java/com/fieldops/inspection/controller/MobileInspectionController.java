@@ -53,6 +53,19 @@ public class MobileInspectionController {
         return ResponseEntity.ok(inspections);
     }
 
+    @Operation(summary = "Get one inspection assigned to the authenticated technician")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Inspection with template snapshot"),
+            @ApiResponse(responseCode = "403", description = "Forbidden — inspection belongs to another technician"),
+            @ApiResponse(responseCode = "404", description = "Inspection not found")
+    })
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('TECHNICIAN')")
+    public ResponseEntity<MobileInspectionResponse> getById(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(service.getInspectionForTechnician(id, user.getId()));
+    }
+
     @Operation(summary = "Apply a status transition from the device (idempotent by operationId)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Applied, or ALREADY_APPLIED on a resend"),

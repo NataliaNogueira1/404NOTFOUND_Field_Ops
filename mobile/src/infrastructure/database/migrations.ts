@@ -187,6 +187,19 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN equipment_qr_code TEXT;
     `,
   },
+  {
+    version: 6,
+    description: 'Persist review comments delivered with the inspection snapshot',
+    sql: `
+      CREATE TABLE IF NOT EXISTS review_comments (
+        id TEXT PRIMARY KEY NOT NULL, inspection_id TEXT NOT NULL, item_id TEXT NOT NULL,
+        comment TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
+        FOREIGN KEY (item_id) REFERENCES inspection_items(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_review_comments_inspection_item ON review_comments(inspection_id, item_id);
+    `,
+  },
 ];
 
 /**

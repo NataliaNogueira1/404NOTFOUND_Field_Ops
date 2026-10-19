@@ -8,6 +8,7 @@ import {
   AnswerRepository,
   EvidenceRepository,
   NonConformityRepository,
+  ReviewCommentRepository,
   SyncQueueRepository,
   SyncMetadataRepository,
 } from '@/infrastructure/database/repositories';
@@ -19,6 +20,7 @@ import type {
   ChecklistValue,
   Evidence,
   NonConformity,
+  ReviewComment,
 } from '@/features/fieldops/types';
 
 // ─── API Response types ────────────────────────────────────────────────────────
@@ -53,7 +55,10 @@ interface ApiInspection {
   rejectedAt?: string;
   version: number;
   template: ApiTemplate;
+  reviewComments?: ApiReviewComment[];
 }
+
+interface ApiReviewComment { id: string; itemId: string; comment: string; createdBy: string; createdAt: string }
 
 interface ApiTemplate {
   id: string;
@@ -79,6 +84,8 @@ interface ApiItem {
   requireEvidenceOnFailure: boolean;
   options?: string[];
 }
+
+interface SyncPullResponse { inspections: ApiInspection[]; nextCursor: string }
 
 // ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
 
@@ -124,6 +131,7 @@ export class InspectionSyncService {
   private answerRepo: AnswerRepository;
   private evidenceRepo: EvidenceRepository;
   private ncRepo: NonConformityRepository;
+  private reviewCommentRepo: ReviewCommentRepository;
   private syncQueueRepo: SyncQueueRepository;
   private metadataRepo: SyncMetadataRepository;
 
@@ -132,6 +140,7 @@ export class InspectionSyncService {
     this.answerRepo = new AnswerRepository(db);
     this.evidenceRepo = new EvidenceRepository(db);
     this.ncRepo = new NonConformityRepository(db);
+    this.reviewCommentRepo = new ReviewCommentRepository(db);
     this.syncQueueRepo = new SyncQueueRepository(db);
     this.metadataRepo = new SyncMetadataRepository(db);
   }
@@ -147,10 +156,17 @@ export class InspectionSyncService {
     let downloaded = 0;
 
     try {
-      const apiInspections = await apiClient.get<ApiInspection[]>(
-        '/api/v1/mobile/inspections',
+      const cursor = await this.metadataRepo.getPullCursor();
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const pull = await apiClient.get<SyncPullResponse>(
+        `/api/v1/mobile/sync/pull${query}`,
         token,
       );
+
+      // The endpoint returns { inspections, nextCursor }; guard against a
+      // missing/malformed list so an empty pull is a no-op instead of throwing
+      // a cryptic "not iterable" error that would fail the whole sync cycle.
+      const apiInspections = Array.isArray(pull?.inspections) ? pull.inspections : [];
 
       for (const apiInsp of apiInspections) {
         try {
@@ -160,6 +176,9 @@ export class InspectionSyncService {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           errors.push(`[${apiInsp.id}] ${msg}`);
         }
+      }
+      if (errors.length === 0 && pull?.nextCursor) {
+        await this.metadataRepo.setPullCursor(pull.nextCursor);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
@@ -224,6 +243,7 @@ export class InspectionSyncService {
       const template = this.mapApiTemplate(apiInsp.template);
       await this.inspectionRepo.saveTemplate(apiInsp.id, template);
     }
+    await this.reviewCommentRepo.replaceForInspection(apiInsp.id, (apiInsp.reviewComments ?? []).map((comment): ReviewComment => ({ ...comment, inspectionId: apiInsp.id, itemId: `${apiInsp.id}::${comment.itemId}` })));
   }
 
   private mapApiTemplate(api: ApiTemplate): InspectionTemplate {
@@ -307,7 +327,7 @@ export class InspectionSyncService {
 
   private async sendOperation(
     token: string,
-    operation: { operationType: string; entityType: string; entityId: string; payload: string },
+    operation: { id: string; operationType: string; entityType: string; entityId: string; payload: string; dependencyIds: string[] },
   ): Promise<void> {
     const payload = JSON.parse(operation.payload);
 

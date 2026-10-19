@@ -224,7 +224,9 @@ describe('PBI-054 — sync status screen data layer', () => {
 
   // Test 2 — "última sincronização" shows the last SUCCESSFUL sync timestamp.
   it('records the last successful sync timestamp after a clean full sync', async () => {
-    mockGet.mockResolvedValue([]); // pull returns nothing, no errors
+    // The real /mobile/sync/pull endpoint returns { inspections, nextCursor }
+    // (see SyncPullResponse); an empty pull is still that shape, not a bare [].
+    mockGet.mockResolvedValue({ inspections: [], nextCursor: null }); // pull returns nothing, no errors
     const result = await service.fullSync(TOKEN);
     expect(result.errors).toHaveLength(0);
 
@@ -236,7 +238,7 @@ describe('PBI-054 — sync status screen data layer', () => {
   // Test 15 — a FAILED attempt must NOT advance the last successful sync.
   it('does not advance last successful sync when the attempt fails', async () => {
     // First: a clean sync sets a baseline timestamp.
-    mockGet.mockResolvedValueOnce([]);
+    mockGet.mockResolvedValueOnce({ inspections: [], nextCursor: null });
     await service.fullSync(TOKEN);
     const baseline = await metadataRepo.getLastSuccessfulSync();
     expect(baseline).not.toBeNull();
@@ -254,7 +256,7 @@ describe('PBI-054 — sync status screen data layer', () => {
   // (RN-066): a new set of repositories over the same DB sees the same data.
   it('keeps operations and last successful sync after an app restart', async () => {
     await service.enqueueStatusChange(INSPECTION_ID, 'SUBMITTED');
-    mockGet.mockResolvedValue([]);
+    mockGet.mockResolvedValue({ inspections: [], nextCursor: null });
     // Status push succeeds (APPLIED) so the op is sent and cleaned up.
     mockPost.mockResolvedValue({ results: [{ operationId: 'op', status: 'APPLIED' }] });
     await service.fullSync(TOKEN); // clears the sent op, sets last successful sync

@@ -61,7 +61,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DemoSeedRunnerTest {
 
     private static final String CLIENT_DOCUMENT = "12.345.678/0001-90";
-    private static final int EXPECTED_INSPECTIONS = 7;
+    private static final int EXPECTED_INSPECTIONS = 9;
 
     @Mock private UserRepository userRepository;
     @Mock private ClientRepository clientRepository;
@@ -81,7 +81,7 @@ class DemoSeedRunnerTest {
     @InjectMocks private DemoSeedRunner runner;
 
     @Test
-    void seedsSevenInspectionsWithVariedPrioritiesCancelsOneAndRejectsOne() {
+    void seedsNineInspectionsWithVariedPrioritiesCancelsOneRejectsOneAndLeavesTwoForReview() {
         enableSeed();
         when(clientRepository.existsByDocument(CLIENT_DOCUMENT)).thenReturn(false);
         stubUsers();
@@ -108,13 +108,13 @@ class DemoSeedRunnerTest {
             assertThat(request.dueDate()).isNotNull();
         });
 
-        Long canceledId = createdIds.get(createdIds.size() - 2);
-        Long rejectedId = createdIds.get(createdIds.size() - 1);
+        Long canceledId = createdIds.get(createdIds.size() - 4);
+        Long rejectedId = createdIds.get(createdIds.size() - 3);
 
-        // The penultimate inspection is canceled through the real cancel flow (terminal state).
+        // The fourth-from-last inspection is canceled through the real cancel flow (terminal state).
         verify(inspectionService).cancel(eq(canceledId), anyString(), eq(10L));
-        // The last inspection is rejected through the real reject flow so the technician can
-        // receive a rejected inspection for correction (PBI-062 / #80).
+        // The third-from-last inspection is rejected through the real reject flow so the technician
+        // can receive a rejected inspection for correction (PBI-062 / #80).
         verify(inspectionService).reject(eq(rejectedId), anyString(), eq(10L));
     }
 

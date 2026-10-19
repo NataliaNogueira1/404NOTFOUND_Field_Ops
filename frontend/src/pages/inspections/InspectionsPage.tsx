@@ -1,7 +1,9 @@
 import { Ban, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { type AdminInspectionSummary, adminCatalogApi } from '@/api/adminCatalog'
+import { ClientStatus, clientsApi } from '@/api/clients'
+import { usersApi } from '@/api/users'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
@@ -12,9 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
-import { byId, clients, equipment, users } from '@/mocks/domain'
-import { inspectionStore } from '@/state/mockStores'
-import { InspectionStatus, Priority, type Inspection } from '@/types/domain'
+import { InspectionStatus, Priority, UserRole, UserStatus } from '@/types/domain'
 
 const cancelable = [
   InspectionStatus.DRAFT,
@@ -27,11 +27,6 @@ const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority
 
 export function InspectionsPage() {
   const navigate = useNavigate()
-  const source = useSyncExternalStore(
-    inspectionStore.subscribe,
-    inspectionStore.adminSnapshot,
-    inspectionStore.adminSnapshot,
-  )
   const list = useListQuery('dueDate,asc')
   const query = list.value('name')
   const debouncedQuery = useDebouncedValue(query)
@@ -42,17 +37,42 @@ export function InspectionsPage() {
   const dueDate = list.value('dueDate')
   const overdue = list.value('overdue') === 'true'
   const review = list.value('review') === 'true'
+
+  // ── Lista principal ─────────────────────────────────────────────────────────
   const [rows, setRows] = useState<AdminInspectionSummary[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+
+  // ── Dados para os filtros ───────────────────────────────────────────────────
+  const [technicianNames, setTechnicianNames] = useState<string[]>([])
+  const [clientNames, setClientNames] = useState<string[]>([])
+
+  // ── Cancelamento ────────────────────────────────────────────────────────────
   const [canceling, setCanceling] = useState<AdminInspectionSummary | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [toast, setToast] = useState(false)
+
   const hasFilters = filterNames.some((name) => Boolean(list.value(name)))
 
+  // ── Carrega técnicos e clientes para os filtros ─────────────────────────────
+  useEffect(() => {
+    usersApi
+      .list({ name: '', role: UserRole.TECHNICIAN, status: UserStatus.ACTIVE, page: 0, size: 200, sort: 'name,asc' })
+      .then((result) => setTechnicianNames(result.content.map((u) => u.name)))
+      .catch(() => { /* silently ignore — filters degrade gracefully */ })
+  }, [])
+
+  useEffect(() => {
+    clientsApi
+      .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 200 })
+      .then((result) => setClientNames(result.content.map((c) => c.name)))
+      .catch(() => { /* silently ignore */ })
+  }, [])
+
+  // ── Carrega inspeções ───────────────────────────────────────────────────────
   const loadInspections = useCallback(async () => {
     setLoading(true)
     try {
@@ -73,14 +93,9 @@ export function InspectionsPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch {
-      const fallback = localInspections(
-        source,
-        { name: debouncedQuery, status, technicianName, clientName, priority, dueDate, overdue, review },
-        list.sort,
-      )
-      setRows(fallback.slice(list.page * list.size, (list.page + 1) * list.size))
-      setTotalElements(fallback.length)
-      setTotalPages(Math.max(Math.ceil(fallback.length / list.size), 1))
+      setRows([])
+      setTotalElements(0)
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }
@@ -94,7 +109,6 @@ export function InspectionsPage() {
     overdue,
     priority,
     review,
-    source,
     status,
     technicianName,
   ])
@@ -104,6 +118,7 @@ export function InspectionsPage() {
     return () => window.clearTimeout(pendingLoad)
   }, [loadInspections])
 
+  // ── Cancelamento ────────────────────────────────────────────────────────────
   function openCancelModal(item: AdminInspectionSummary) {
     setCanceling(item)
     setCancelReason('')
@@ -239,9 +254,9 @@ export function InspectionsPage() {
           onChange={(event) => list.update('technicianName', event.target.value)}
         >
           <option value="">Todos</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.name}>
-              {user.name}
+          {technicianNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </Select>
@@ -252,9 +267,9 @@ export function InspectionsPage() {
           onChange={(event) => list.update('clientName', event.target.value)}
         >
           <option value="">Todos</option>
-          {clients.map((client) => (
-            <option key={client.id} value={client.name}>
-              {client.name}
+          {clientNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </Select>
@@ -351,58 +366,4 @@ export function InspectionsPage() {
       <Toast show={toast} message="Inspecao cancelada com sucesso" />
     </div>
   )
-}
-
-interface LocalFilters {
-  name: string
-  status: InspectionStatus | ''
-  technicianName: string
-  clientName: string
-  priority: Priority | ''
-  dueDate: string
-  overdue: boolean
-  review: boolean
-}
-
-function localInspections(source: Inspection[], filters: LocalFilters, sort: string) {
-  const query = filters.name.toLowerCase()
-  const rows = source
-    .map((item) => inspectionSummary(item))
-    .filter((item) => {
-      const haystack = `${item.title} ${item.clientName} ${item.equipmentName}`.toLowerCase()
-      return (
-        haystack.includes(query) &&
-        (!filters.status || item.status === filters.status) &&
-        (!filters.technicianName || item.technicianName === filters.technicianName) &&
-        (!filters.clientName || item.clientName === filters.clientName) &&
-        (!filters.priority || item.priority === filters.priority) &&
-        (!filters.dueDate || item.dueDate === filters.dueDate) &&
-        (!filters.overdue || item.overdue) &&
-        (!filters.review || [InspectionStatus.SUBMITTED, InspectionStatus.UNDER_REVIEW].includes(item.status))
-      )
-    })
-  const [key, direction] = sort.split(',')
-  return rows.sort(
-    (left, right) =>
-      String(left[key as keyof AdminInspectionSummary] ?? '').localeCompare(
-        String(right[key as keyof AdminInspectionSummary] ?? ''),
-      ) * (direction === 'desc' ? -1 : 1),
-  )
-}
-
-function inspectionSummary(item: Inspection): AdminInspectionSummary {
-  return {
-    id: item.id,
-    title: item.title,
-    clientName: byId(clients, item.clientId)?.name ?? '',
-    siteName: item.siteName ?? '',
-    equipmentName: byId(equipment, item.equipmentId)?.name ?? '',
-    technicianId: item.technicianId,
-    technicianName: byId(users, item.technicianId)?.name ?? '',
-    priority: item.priority,
-    dueDate: item.dueDate,
-    status: item.status,
-    progress: item.progress,
-    overdue: Boolean(item.overdue),
-  }
 }

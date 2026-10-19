@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR")
                         .requestMatchers("/api/v1/users/**").hasAuthority("ADMINISTRATOR")
                         .requestMatchers("/api/v1/mobile/**").hasAuthority("TECHNICIAN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/inspections/*/review-comments")
+                        .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers("/api/v1/equipment/by-qr/**")
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers(SUPERVISOR_SCOPED_PATHS)

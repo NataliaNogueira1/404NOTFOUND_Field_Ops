@@ -73,4 +73,5 @@ export interface Evidence {
 }
 export interface ChecklistAnswer { itemId: string; value: ChecklistValue; observation?: string; savedAt: string }
 export interface NonConformity { id: string; inspectionId: string; itemId: string; title: string; description: string; severity: Severity; evidenceCount: number }
+export interface ReviewComment { id: string; inspectionId: string; itemId: string; comment: string; createdBy: string; createdAt: string }
 export interface SyncOperation { id: string; title: string; status: 'Enviada' | 'Upload concluído' | 'Pendente' | 'Erro'; error?: string }
