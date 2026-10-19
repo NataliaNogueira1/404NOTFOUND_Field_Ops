@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { InspectionStatus, Priority, UserRole, UserStatus } from '@/types/domain'
+import { formatDate } from '@/utils/formatDate'
 
 const cancelable = [
   InspectionStatus.DRAFT,
@@ -176,7 +177,7 @@ export function InspectionsPage() {
     {
       header: 'Data prevista',
       sortKey: 'dueDate',
-      cell: (item) => <span className={item.overdue ? 'font-semibold text-danger' : ''}>{item.dueDate}</span>,
+      cell: (item) => <span className={item.overdue ? 'font-semibold text-danger' : ''}>{formatDate(item.dueDate)}</span>,
     },
     { header: 'Estado', sortKey: 'status', cell: (item) => <StatusBadge status={item.status} /> },
     {

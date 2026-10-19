@@ -8,6 +8,7 @@ import { PriorityBadge, SeverityBadge, StatusBadge } from '@/components/badges/B
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { formatDate } from '@/utils/formatDate'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -308,8 +309,4 @@ function isNonConforming(answer: string | null): boolean {
   return answer?.trim().toUpperCase() === 'NON_CONFORMING'
 }
 
-function formatDate(isoString: string): string {
-  const d = new Date(isoString)
-  if (Number.isNaN(d.getTime())) return isoString
-  return d.toLocaleDateString('pt-BR')
-}
+
