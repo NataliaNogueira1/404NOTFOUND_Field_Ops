@@ -2,98 +2,116 @@ import {
   AlertTriangle,
   ArrowLeft,
   Camera,
-  CheckCircle2,
   ClipboardCheck,
-  FileWarning,
+  Info as InfoIcon,
   MapPin,
   Play,
-  Plus,
   RefreshCw,
-  Upload,
   UserCircle,
 } from 'lucide-react'
 import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Badge, PriorityBadge, SeverityBadge, StatusBadge } from '@/components/badges/Badge'
-import { Modal } from '@/components/feedback/Modal'
-import { Select, Textarea } from '@/components/forms/Fields'
+import { Badge, PriorityBadge, StatusBadge } from '@/components/badges/Badge'
+import { Select } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
+import { LoadingState } from '@/components/ui/LoadingState'
 import { authSession } from '@/auth/session'
-import {
-  inspectionTemplate,
-  technicianAnswers,
-  technicianEvidences,
-  technicianNonConformities,
-  technicianSyncOperations,
-  technicianUser,
-} from '@/mocks/technician'
-import { inspectionStore } from '@/state/mockStores'
-import {
-  InspectionStatus,
-  Priority,
-  ResponseType,
-  Severity,
-  type ChecklistAnswer,
-  type ChecklistValue,
-  type Inspection,
-  type TemplateItem,
-} from '@/types/domain'
+import { type TechnicianInspection } from '@/api/mobileInspections'
+import { useTechnicianInspections } from '@/hooks/useTechnicianInspections'
+import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/types/domain'
+import { formatDate } from '@/utils/formatDate'
 
 export function TechnicianHomePage() {
-  const technicianInspections = useTechnicianInspections()
+  const { state, reload } = useTechnicianInspections()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
-  const today = new Date().toISOString().slice(0, 10)
-  const todayCount = technicianInspections.filter((item) => item.dueDate === today).length
-  const overdue = technicianInspections.filter((item) => item.overdue).length
-  const inProgress = technicianInspections.filter((item) => item.status === InspectionStatus.IN_PROGRESS).length
-  const pendingSync = technicianInspections.reduce((sum, item) => sum + (item.pendingSyncCount ?? 0), 0)
+  const firstName = session.user?.name.split(' ')[0] ?? 'Tecnico'
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Ola, {session.user?.name.split(' ')[0] ?? 'Tecnico'}</h1>
-        <p className="text-sm text-muted">Suas atividades de campo para hoje.</p>
+        <h1 className="text-2xl font-semibold">Ola, {firstName}</h1>
+        <p className="text-sm text-muted">Suas atividades de campo atribuidas.</p>
       </div>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TechStat label="Hoje" value={todayCount} tone="primary" />
-        <TechStat label="Atrasadas" value={overdue} tone="danger" />
-        <TechStat label="Em andamento" value={inProgress} tone="warning" />
-        <TechStat label="Pendencias de sync" value={pendingSync} tone="success" />
-      </section>
-      <Card className="flex flex-col gap-4 border-primary-light/70 p-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="font-semibold">{pendingSync} operacoes pendentes</p>
-          <p className="text-sm text-muted">Ultima sincronizacao mockada: hoje, 11:20</p>
-        </div>
-        <Button variant="secondary">
-          <RefreshCw size={17} />
-          Sincronizar agora
-        </Button>
-      </Card>
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Proximas inspecoes</h2>
-          <Link className="text-sm font-semibold text-primary" to="/technician/inspections">
-            Ver todas
-          </Link>
-        </div>
-        <div className="grid gap-4 xl:grid-cols-2">
-          {technicianInspections.slice(0, 4).map((inspection) => (
-            <TechnicianInspectionCard key={inspection.id} inspection={inspection} />
-          ))}
-        </div>
-      </section>
+      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspecao atribuida a voce no momento.">
+        {(inspections) => <HomeContent inspections={inspections} reload={reload} />}
+      </InspectionsAsync>
     </div>
   )
 }
 
+function HomeContent({
+  inspections,
+  reload,
+}: {
+  inspections: TechnicianInspection[]
+  reload: () => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const todayCount = inspections.filter((item) => item.dueDate === today).length
+  const overdue = inspections.filter((item) => item.overdue).length
+  const inProgress = inspections.filter((item) => item.status === InspectionStatus.IN_PROGRESS).length
+  const assigned = inspections.filter((item) => item.status === InspectionStatus.ASSIGNED).length
+  return (
+    <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <TechStat label="Hoje" value={todayCount} tone="primary" />
+        <TechStat label="Atrasadas" value={overdue} tone="danger" />
+        <TechStat label="Em andamento" value={inProgress} tone="warning" />
+        <TechStat label="Atribuidas" value={assigned} tone="success" />
+      </section>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Proximas inspecoes</h2>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={reload}>
+              <RefreshCw size={16} />
+              Atualizar
+            </Button>
+            <Link className="text-sm font-semibold text-primary" to="/technician/inspections">
+              Ver todas
+            </Link>
+          </div>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {inspections.slice(0, 4).map((inspection) => (
+            <TechnicianInspectionCard key={inspection.id} inspection={inspection} />
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
 export function TechnicianInspectionsPage() {
-  const technicianInspections = useTechnicianInspections()
+  const { state, reload } = useTechnicianInspections()
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Minhas Inspecoes</h1>
+          <p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuidas.</p>
+        </div>
+        <Button variant="ghost" onClick={reload}>
+          <RefreshCw size={16} />
+          Atualizar
+        </Button>
+      </div>
+      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspecao atribuida a voce no momento.">
+        {(inspections) => <InspectionsList inspections={inspections} />}
+      </InspectionsAsync>
+    </div>
+  )
+}
+
+function InspectionsList({ inspections }: { inspections: TechnicianInspection[] }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [period, setPeriod] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const { today, weekEnd } = useMemo(() => {
     const current = new Date()
     const end = new Date(current)
@@ -102,35 +120,34 @@ export function TechnicianInspectionsPage() {
   }, [])
   const filtered = useMemo(
     () =>
-      technicianInspections.filter((inspection) => {
+      inspections.filter((inspection) => {
         const haystack = `${inspection.title} ${inspection.clientName} ${inspection.equipmentName}`.toLowerCase()
         const matchesPeriod =
           !period ||
           (period === 'today' && inspection.dueDate === today) ||
           (period === 'week' && inspection.dueDate >= today && inspection.dueDate <= weekEnd)
+        const matchesDueDate = !dueDate || inspection.dueDate === dueDate
         return (
           haystack.includes(query.toLowerCase()) &&
           (!status || inspection.status === status) &&
           (!priority || inspection.priority === priority) &&
-          matchesPeriod
+          matchesPeriod &&
+          matchesDueDate
         )
       }),
-    [period, priority, query, status, technicianInspections, today, weekEnd],
+    [inspections, dueDate, period, priority, query, status, today, weekEnd],
   )
-  const hasFilters = Boolean(query || status || priority || period)
+  const hasFilters = Boolean(query || status || priority || period || dueDate)
   function clearFilters() {
     setQuery('')
     setStatus('')
     setPriority('')
     setPeriod('')
+    setDueDate('')
   }
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Minhas Inspecoes</h1>
-        <p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuuidas.</p>
-      </div>
-      <Card className="grid gap-4 p-4 lg:grid-cols-4">
+    <>
+      <Card className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Input
           label="Buscar"
           id="tech-search"
@@ -142,8 +159,10 @@ export function TechnicianInspectionsPage() {
           <option value="">Todos</option>
           <option value={InspectionStatus.ASSIGNED}>Atribuida</option>
           <option value={InspectionStatus.IN_PROGRESS}>Em andamento</option>
-          <option value={InspectionStatus.REJECTED}>Reprovada</option>
           <option value={InspectionStatus.SUBMITTED}>Enviada</option>
+          <option value={InspectionStatus.UNDER_REVIEW}>Em revisao</option>
+          <option value={InspectionStatus.APPROVED}>Aprovada</option>
+          <option value={InspectionStatus.REJECTED}>Reprovada</option>
           <option value={InspectionStatus.CANCELED}>Cancelada</option>
         </Select>
         <Select
@@ -164,8 +183,15 @@ export function TechnicianInspectionsPage() {
           <option value="today">Hoje</option>
           <option value="week">Esta semana</option>
         </Select>
+        <Input
+          label="Data"
+          id="tech-due-date"
+          type="date"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+        />
         {hasFilters && (
-          <div className="lg:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
             <Button variant="ghost" onClick={clearFilters}>
               Limpar filtros
             </Button>
@@ -180,46 +206,58 @@ export function TechnicianInspectionsPage() {
       {filtered.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted">Nenhuma inspecao encontrada.</Card>
       )}
-    </div>
+    </>
   )
 }
 
 export function TechnicianInspectionDetailsPage() {
-  const inspection = useInspection()
-  const template = inspectionTemplate(inspection)
-  const evidences = technicianEvidences.filter((evidence) => evidence.inspectionId === inspection.id)
-  const ncs = technicianNonConformities.filter((nc) => nc.inspectionId === inspection.id)
+  const { state, reload, id } = useInspection()
+  return (
+    <div className="space-y-6">
+      <BackLink to="/technician/inspections" label="Minhas inspecoes" />
+      <InspectionAsync state={state} reload={reload} id={id}>
+        {(inspection) => <DetailsContent inspection={inspection} />}
+      </InspectionAsync>
+    </div>
+  )
+}
+
+function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
+  const template = inspection.template
+  const totalItems = template.sections.reduce((sum, section) => sum + section.items.length, 0)
   const action =
     inspection.status === InspectionStatus.IN_PROGRESS
       ? 'Continuar'
       : inspection.status === InspectionStatus.REJECTED
         ? 'Corrigir'
-        : 'Iniciar inspecao'
+        : 'Abrir checklist'
   const isCanceled = inspection.status === InspectionStatus.CANCELED
+  const canOpenChecklist =
+    inspection.status === InspectionStatus.ASSIGNED ||
+    inspection.status === InspectionStatus.IN_PROGRESS ||
+    inspection.status === InspectionStatus.REJECTED
   return (
-    <div className="space-y-6">
-      <BackLink to="/technician/inspections" label="Minhas inspecoes" />
+    <>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{inspection.title}</h1>
           <div className="mt-3 flex flex-wrap gap-2">
             <PriorityBadge priority={inspection.priority} />
             <StatusBadge status={inspection.status} />
-            <SyncBadge status={inspection.syncStatus} />
           </div>
         </div>
-        {isCanceled ? (
-          <Button disabled>
-            <Play size={17} />
-            Cancelada
-          </Button>
-        ) : (
+        {canOpenChecklist ? (
           <Link to={`/technician/inspections/${inspection.id}/start`}>
             <Button>
               <Play size={17} />
               {action}
             </Button>
           </Link>
+        ) : (
+          <Button disabled>
+            <Play size={17} />
+            {isCanceled ? 'Cancelada' : 'Somente leitura'}
+          </Button>
         )}
       </div>
       <section className="grid gap-4 lg:grid-cols-3">
@@ -234,61 +272,71 @@ export function TechnicianInspectionDetailsPage() {
               Esta inspecao foi cancelada pelo Admin/Supervisor e nao pode ser iniciada ou continuada.
             </Card>
           )}
+          {inspection.status === InspectionStatus.REJECTED && inspection.rejectionReason && (
+            <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">
+              <p className="font-semibold">Motivo da reprovacao</p>
+              <p className="mt-1">{inspection.rejectionReason}</p>
+            </Card>
+          )}
           <Card className="p-5">
             <h2 className="text-base font-semibold">Dados da inspecao</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Info label="Data" value={`${inspection.dueDate} ${inspection.dueTime ?? ''}`} />
-              <Info label="Supervisora" value={inspection.supervisorName} />
+              <Info label="Data" value={`${formatDate(inspection.dueDate)} ${inspection.dueTime ?? ''}`.trim()} />
+              <Info label="Supervisor" value={inspection.supervisorName} />
               <Info label="Modelo" value={template.title} />
               <Info label="Progresso" value={`${inspection.progress}%`} />
             </div>
           </Card>
           <Card className="p-5">
             <h2 className="text-base font-semibold">Instrucoes</h2>
-            <p className="mt-2 text-sm text-muted">{inspection.supervisorInstructions}</p>
+            <p className="mt-2 text-sm text-muted">
+              {inspection.supervisorInstructions || 'Sem instrucoes adicionais.'}
+            </p>
           </Card>
           <Card className="p-5">
             <h2 className="text-base font-semibold">Progresso</h2>
             <Progress value={inspection.progress} />
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Info label="Nao conformidades" value={String(ncs.length)} />
-              <Info label="Evidencias" value={String(evidences.length)} />
+              <Info label="Secoes" value={String(template.sections.length)} />
+              <Info label="Itens do checklist" value={String(totalItems)} />
             </div>
           </Card>
         </div>
         <Card className="h-fit p-5">
-          <h2 className="text-base font-semibold">Nao conformidades</h2>
-          <div className="mt-4 space-y-3">
-            {ncs.map((nc) => (
-              <div key={nc.id} className="rounded-fieldops border border-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{nc.title}</p>
-                  <SeverityBadge severity={nc.severity} />
-                </div>
-                <p className="mt-1 text-xs text-muted">{nc.item}</p>
-              </div>
-            ))}
-          </div>
-          <Link className="mt-4 block" to={`/technician/inspections/${inspection.id}/non-conformities`}>
+          <h2 className="text-base font-semibold">Checklist</h2>
+          <p className="mt-2 text-sm text-muted">
+            {template.sections.length} secoes e {totalItems} itens neste modelo.
+          </p>
+          <Link className="mt-4 block" to={`/technician/inspections/${inspection.id}/checklist`}>
             <Button variant="secondary" className="w-full">
-              <FileWarning size={17} />
-              Abrir NCs
+              <ClipboardCheck size={17} />
+              Ver checklist
             </Button>
           </Link>
         </Card>
       </div>
-    </div>
+    </>
   )
 }
 
 export function TechnicianStartInspectionPage() {
-  const inspection = useInspection()
-  const navigate = useNavigate()
-  const totalItems = inspectionTemplate(inspection).sections.reduce((sum, section) => sum + section.items.length, 0)
+  const { state, reload, id } = useInspection()
   return (
     <div className="space-y-6">
-      <BackLink to={`/technician/inspections/${inspection.id}`} label="Detalhes" />
-      <h1 className="text-2xl font-semibold">Pronto para iniciar?</h1>
+      <BackLink to={`/technician/inspections/${id}`} label="Detalhes" />
+      <InspectionAsync state={state} reload={reload} id={id}>
+        {(inspection) => <StartContent inspection={inspection} />}
+      </InspectionAsync>
+    </div>
+  )
+}
+
+function StartContent({ inspection }: { inspection: TechnicianInspection }) {
+  const navigate = useNavigate()
+  const totalItems = inspection.template.sections.reduce((sum, section) => sum + section.items.length, 0)
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">Pronto para abrir o checklist?</h1>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]">
         <Card className="p-5">
           <h2 className="text-base font-semibold">{inspection.title}</h2>
@@ -298,47 +346,52 @@ export function TechnicianStartInspectionPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Info label="Equipamento" value={inspection.equipmentName} />
             <Info label="Itens" value={String(totalItems)} />
-            <Info label="Tempo estimado" value="45 min" />
             <Info label="Prioridade" value={inspection.priority} />
+            <Info label="Modelo" value={inspection.template.title} />
           </div>
         </Card>
-        <Card className="p-5">
-          <h2 className="text-base font-semibold">Permissoes mockadas</h2>
-          <div className="mt-4 space-y-3">
-            <Permission label="Localizacao" value="Permitida" />
-            <Permission label="Camera" value="Permitida" />
-            <Permission label="Upload" value="Simulado" />
+        <Card className="border-primary-light/60 p-5">
+          <div className="flex items-start gap-3">
+            <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
+              <InfoIcon size={19} />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold">Execucao em campo</h2>
+              <p className="mt-1 text-sm text-muted">
+                O preenchimento com fotos, QR Code e localizacao e feito pelo aplicativo mobile. No portal web voce
+                acompanha o checklist e o andamento.
+              </p>
+            </div>
           </div>
         </Card>
       </div>
       <div className="flex justify-end gap-3">
         <Button variant="secondary" onClick={() => navigate(`/technician/inspections/${inspection.id}`)}>
-          Cancelar
+          Voltar
         </Button>
-        <Button onClick={() => navigate(`/technician/inspections/${inspection.id}/checklist`)}>Confirmar inicio</Button>
+        <Button onClick={() => navigate(`/technician/inspections/${inspection.id}/checklist`)}>Ver checklist</Button>
       </div>
-    </div>
+    </>
   )
 }
 
 export function TechnicianChecklistPage() {
-  const inspection = useInspection()
-  const template = inspectionTemplate(inspection)
-  const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>(technicianAnswers)
-  const [evidenceItem, setEvidenceItem] = useState<TemplateItem | null>(null)
-  const [ncItem, setNcItem] = useState<TemplateItem | null>(null)
-  const items = template.sections.flatMap((section) => section.items)
-  const answered = items.filter((item) => answers[item.id]).length
-  const progress = Math.round((answered / items.length) * 100)
-  function answer(itemId: string, value: ChecklistValue, observation?: string) {
-    setAnswers((current) => ({
-      ...current,
-      [itemId]: { itemId, value, observation, savedAt: new Date().toISOString().slice(0, 10) },
-    }))
-  }
+  const { state, reload, id } = useInspection()
   return (
     <div className="space-y-6">
-      <BackLink to={`/technician/inspections/${inspection.id}`} label="Detalhes" />
+      <BackLink to={`/technician/inspections/${id}`} label="Detalhes" />
+      <InspectionAsync state={state} reload={reload} id={id}>
+        {(inspection) => <ChecklistContent inspection={inspection} />}
+      </InspectionAsync>
+    </div>
+  )
+}
+
+function ChecklistContent({ inspection }: { inspection: TechnicianInspection }) {
+  const template = inspection.template
+  const items = template.sections.flatMap((section) => section.items)
+  return (
+    <>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{template.title}</h1>
@@ -346,254 +399,106 @@ export function TechnicianChecklistPage() {
             {template.sections.length} secoes / {items.length} itens
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to={`/technician/inspections/${inspection.id}/summary`}>
-            <Button>Ver resumo</Button>
-          </Link>
-          <Link to={`/technician/inspections/${inspection.id}/non-conformities`}>
-            <Button variant="secondary">NCs</Button>
-          </Link>
-        </div>
+        <Link to={`/technician/inspections/${inspection.id}/summary`}>
+          <Button>Ver resumo</Button>
+        </Link>
       </div>
-      <Card className="p-5">
-        <Progress value={progress} />
-        <p className="mt-2 text-sm text-muted">
-          {answered} de {items.length} itens respondidos
+      <Card className="flex items-start gap-3 border-primary-light/60 p-4">
+        <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
+          <InfoIcon size={18} />
+        </span>
+        <p className="text-sm text-muted">
+          Visualizacao do checklist atribuido. O preenchimento das respostas, evidencias e nao conformidades e feito
+          pelo aplicativo mobile em campo.
         </p>
       </Card>
-      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <Card className="h-fit p-4">
-          <p className="text-sm font-semibold">Secoes</p>
-          <div className="mt-3 space-y-2">
+      {items.length === 0 ? (
+        <EmptyState
+          icon={ClipboardCheck}
+          title="Checklist sem itens"
+          description="O modelo desta inspecao nao possui itens para exibir."
+        />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <Card className="h-fit p-4">
+            <p className="text-sm font-semibold">Secoes</p>
+            <div className="mt-3 space-y-2">
+              {template.sections.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className="focus-ring block rounded-fieldops px-3 py-2 text-sm text-muted hover:bg-primary-light/25 hover:text-text"
+                >
+                  {section.title}
+                </a>
+              ))}
+            </div>
+          </Card>
+          <div className="space-y-5">
             {template.sections.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                className="block rounded-fieldops px-3 py-2 text-sm text-muted hover:bg-primary-light/25 hover:text-text"
-              >
-                {section.title}
-              </a>
+              <section key={section.id} id={section.id} className="scroll-mt-24 space-y-3">
+                <h2 className="text-lg font-semibold">{section.title}</h2>
+                {section.items.map((item) => (
+                  <ChecklistItem
+                    key={item.id}
+                    item={item}
+                    index={items.findIndex((candidate) => candidate.id === item.id) + 1}
+                  />
+                ))}
+              </section>
             ))}
           </div>
-        </Card>
-        <div className="space-y-5">
-          {template.sections.map((section) => (
-            <section key={section.id} id={section.id} className="space-y-3">
-              <h2 className="text-lg font-semibold">{section.title}</h2>
-              {section.items.map((item, index) => (
-                <ChecklistItem
-                  key={item.id}
-                  item={item}
-                  index={items.findIndex((candidate) => candidate.id === item.id) + 1 || index + 1}
-                  answer={answers[item.id]}
-                  onAnswer={answer}
-                  onEvidence={() => setEvidenceItem(item)}
-                  onNc={() => setNcItem(item)}
-                />
-              ))}
-            </section>
-          ))}
         </div>
-      </div>
-      <EvidenceModal item={evidenceItem} onClose={() => setEvidenceItem(null)} />
-      <NcModal item={ncItem} onClose={() => setNcItem(null)} />
-    </div>
-  )
-}
-
-export function TechnicianNonConformitiesPage() {
-  const inspection = useInspection()
-  const [rows, setRows] = useState(technicianNonConformities.filter((nc) => nc.inspectionId === inspection.id))
-  const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [severity, setSeverity] = useState<Severity>(Severity.MEDIUM)
-  function add() {
-    setRows((current) => [
-      {
-        id: `nc-${Date.now()}`,
-        title: title || 'Nova nao conformidade',
-        inspectionId: inspection.id,
-        item: 'Item selecionado no checklist',
-        clientId: inspection.clientId,
-        severity,
-        status: 'Aberta',
-        date: new Date().toISOString().slice(0, 10),
-      },
-      ...current,
-    ])
-    setOpen(false)
-    setTitle('')
-  }
-  return (
-    <div className="space-y-6">
-      <BackLink to={`/technician/inspections/${inspection.id}/checklist`} label="Checklist" />
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Nao conformidades</h1>
-          <p className="text-sm text-muted">{inspection.title}</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus size={17} />
-          Adicionar NC
-        </Button>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        {rows.map((nc) => (
-          <Card key={nc.id} className="p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{nc.title}</p>
-                <p className="mt-1 text-sm text-muted">{nc.item}</p>
-              </div>
-              <SeverityBadge severity={nc.severity} />
-            </div>
-            <p className="mt-3 text-sm text-muted">Status: {nc.status}</p>
-          </Card>
-        ))}
-      </div>
-      <Modal
-        open={open}
-        title="Adicionar nao conformidade"
-        onClose={() => setOpen(false)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={add}>Salvar NC</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input label="Titulo" id="nc-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-          <Select
-            label="Criticidade"
-            id="nc-severity"
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value as Severity)}
-          >
-            {Object.values(Severity).map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </Select>
-          <Textarea label="Descricao" id="nc-desc" placeholder="Descricao mockada" />
-        </div>
-      </Modal>
-    </div>
+      )}
+    </>
   )
 }
 
 export function TechnicianSummaryPage() {
-  const inspection = useInspection()
-  const template = inspectionTemplate(inspection)
-  const [confirm, setConfirm] = useState(false)
-  const total = template.sections.reduce((sum, section) => sum + section.items.length, 0)
-  const answered = Object.keys(technicianAnswers).length
-  const conformes = Object.values(technicianAnswers).filter(
-    (answer) => answer.value === 'CONFORME' || answer.value === true,
-  ).length
-  const naoConformes = Object.values(technicianAnswers).filter((answer) => answer.value === 'NAO_CONFORME').length
-  const ncs = technicianNonConformities.filter((nc) => nc.inspectionId === inspection.id).length
+  const { state, reload, id } = useInspection()
   return (
     <div className="space-y-6">
-      <BackLink to={`/technician/inspections/${inspection.id}/checklist`} label="Checklist" />
-      <h1 className="text-2xl font-semibold">Resumo / Conclusao</h1>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TechStat label="Total de itens" value={total} tone="primary" />
-        <TechStat label="Respondidos" value={answered} tone="success" />
-        <TechStat label="Conformes" value={conformes} tone="success" />
-        <TechStat label="Nao conformes" value={naoConformes} tone="danger" />
-      </section>
-      <Card className="p-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Info label="Evidencias" value={String(technicianEvidences.length)} />
-          <Info label="NCs" value={String(ncs)} />
-          <Info label="Duracao" value="50 min" />
-          <Info label="Status apos concluir" value="Pendente de sincronizacao" />
-        </div>
-      </Card>
-      <div className="flex justify-end">
-        <Button onClick={() => setConfirm(true)}>
-          <CheckCircle2 size={17} />
-          Concluir inspecao
-        </Button>
-      </div>
-      <Modal
-        open={confirm}
-        title="Concluir inspecao?"
-        onClose={() => setConfirm(false)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirm(false)}>
-              Cancelar
-            </Button>
-            <Link to="/technician/sync">
-              <Button>Concluir</Button>
-            </Link>
-          </>
-        }
-      >
-        <p className="text-sm text-muted">
-          A inspecao sera marcada como enviada no prototipo e ficara pendente de sincronizacao mockada.
-        </p>
-      </Modal>
+      <BackLink to={`/technician/inspections/${id}/checklist`} label="Checklist" />
+      <h1 className="text-2xl font-semibold">Resumo</h1>
+      <InspectionAsync state={state} reload={reload} id={id}>
+        {(inspection) => <SummaryContent inspection={inspection} />}
+      </InspectionAsync>
     </div>
   )
 }
 
-export function TechnicianSyncPage() {
-  const [syncing, setSyncing] = useState(false)
-  const hasPending = technicianSyncOperations.some(
-    (operation) => operation.status === 'Pendente' || operation.status === 'Erro',
-  )
-  function sync() {
-    setSyncing(true)
-    setTimeout(() => setSyncing(false), 700)
-  }
+function SummaryContent({ inspection }: { inspection: TechnicianInspection }) {
+  const template = inspection.template
+  const total = template.sections.reduce((sum, section) => sum + section.items.length, 0)
+  const required = template.sections
+    .flatMap((section) => section.items)
+    .filter((item) => item.required).length
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Sincronizacao</h1>
+    <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <TechStat label="Total de itens" value={total} tone="primary" />
+        <TechStat label="Obrigatorios" value={required} tone="warning" />
+        <TechStat label="Secoes" value={template.sections.length} tone="success" />
+        <TechStat label="Progresso" value={inspection.progress} tone="primary" />
+      </section>
       <Card className="p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm text-muted">Status</p>
-            <p className="text-xl font-semibold">{hasPending ? 'Pendencias locais' : 'Sincronizado'}</p>
-            <p className="mt-1 text-sm text-muted">Ultima sync: hoje, 11:20</p>
-          </div>
-          <Button onClick={sync} disabled={syncing}>
-            <RefreshCw size={17} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar agora'}
-          </Button>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Info label="Cliente" value={inspection.clientName} />
+          <Info label="Equipamento" value={inspection.equipmentName} />
+          <Info label="Modelo" value={template.title} />
+          <Info label="Status" value={inspection.status} />
         </div>
       </Card>
-      <section className="grid gap-4 xl:grid-cols-2">
-        {technicianSyncOperations.map((operation) => (
-          <Card key={operation.id} className="flex items-center justify-between gap-4 p-4">
-            <div>
-              <p className="font-semibold">{operation.title}</p>
-              <p className="text-sm text-muted">{operation.status}</p>
-            </div>
-            <SyncBadge
-              status={operation.status === 'Erro' ? 'error' : operation.status === 'Pendente' ? 'pending' : 'synced'}
-            />
-          </Card>
-        ))}
-      </section>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-5">
-          <h2 className="text-base font-semibold">Download</h2>
-          <p className="mt-2 text-sm text-muted">Inspecoes atualizadas: 3</p>
-        </Card>
-        <Card className="p-5">
-          <h2 className="text-base font-semibold">Dispositivo</h2>
-          <div className="mt-3 grid gap-2">
-            <Info label="Espaco usado" value="128 MB" />
-            <Info label="Fotos pendentes" value="5" />
-            <Info label="Modo" value="Online" />
-          </div>
-        </Card>
-      </div>
-    </div>
+      <Card className="flex items-start gap-3 border-primary-light/60 p-4">
+        <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
+          <InfoIcon size={18} />
+        </span>
+        <p className="text-sm text-muted">
+          A conclusao e a sincronizacao da inspeção acontecem no aplicativo mobile. Este resumo e somente para
+          acompanhamento.
+        </p>
+      </Card>
+    </>
   )
 }
 
@@ -601,7 +506,7 @@ export function TechnicianProfilePage() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
-  const initials = (user?.name ?? technicianUser.name)
+  const initials = (user?.name ?? 'Tecnico')
     .split(' ')
     .map((part) => part[0])
     .slice(0, 2)
@@ -617,9 +522,9 @@ export function TechnicianProfilePage() {
         <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">
           {initials}
         </div>
-        <h1 className="mt-4 text-2xl font-semibold">{user?.name ?? technicianUser.name}</h1>
+        <h1 className="mt-4 text-2xl font-semibold">{user?.name ?? 'Tecnico'}</h1>
         <p className="text-primary">{user?.role ?? 'TECHNICIAN'}</p>
-        <p className="text-sm text-muted">{user?.email ?? technicianUser.email}</p>
+        <p className="text-sm text-muted">{user?.email ?? ''}</p>
       </Card>
       <Card className="p-5">
         <Info label="Versao" value="1.0.0" />
@@ -628,10 +533,6 @@ export function TechnicianProfilePage() {
         </div>
       </Card>
       <div className="flex justify-end gap-3">
-        <Button variant="secondary">
-          <RefreshCw size={17} />
-          Forcar sincronizacao
-        </Button>
         <Button variant="danger" onClick={logout}>
           Logout
         </Button>
@@ -640,7 +541,50 @@ export function TechnicianProfilePage() {
   )
 }
 
-function TechnicianInspectionCard({ inspection }: { inspection: Inspection }) {
+function InspectionsAsync({
+  state,
+  reload,
+  emptyDescription,
+  children,
+}: {
+  state: ReturnType<typeof useTechnicianInspections>['state']
+  reload: () => void
+  emptyDescription: string
+  children: (inspections: TechnicianInspection[]) => React.ReactNode
+}) {
+  if (state.type === 'loading') return <LoadingState label="Carregando inspecoes..." />
+  if (state.type === 'error') return <ErrorState message={state.message} onRetry={reload} />
+  if (state.inspections.length === 0)
+    return <EmptyState icon={ClipboardCheck} title="Nenhuma inspecao" description={emptyDescription} />
+  return <>{children(state.inspections)}</>
+}
+
+function InspectionAsync({
+  state,
+  reload,
+  id,
+  children,
+}: {
+  state: ReturnType<typeof useTechnicianInspections>['state']
+  reload: () => void
+  id: string
+  children: (inspection: TechnicianInspection) => React.ReactNode
+}) {
+  if (state.type === 'loading') return <LoadingState label="Carregando inspecao..." />
+  if (state.type === 'error') return <ErrorState message={state.message} onRetry={reload} />
+  const inspection = state.inspections.find((item) => item.id === id)
+  if (!inspection)
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title="Inspecao nao encontrada"
+        description="A inspecao solicitada nao esta entre as suas atribuicoes."
+      />
+    )
+  return <>{children(inspection)}</>
+}
+
+function TechnicianInspectionCard({ inspection }: { inspection: TechnicianInspection }) {
   const action =
     inspection.status === InspectionStatus.IN_PROGRESS
       ? 'Continuar'
@@ -668,9 +612,9 @@ function TechnicianInspectionCard({ inspection }: { inspection: Inspection }) {
         <Progress value={inspection.progress} />
         <div className="mt-2 flex items-center justify-between text-xs text-muted">
           <span>
-            {inspection.dueDate} {inspection.dueTime}
+            {formatDate(inspection.dueDate)} {inspection.dueTime ?? ''}
           </span>
-          <SyncBadge status={inspection.syncStatus} />
+          {inspection.overdue && <Badge tone="danger">Atrasada</Badge>}
         </div>
       </div>
       <div className="mt-4 flex justify-end">
@@ -682,22 +626,7 @@ function TechnicianInspectionCard({ inspection }: { inspection: Inspection }) {
   )
 }
 
-function ChecklistItem({
-  item,
-  index,
-  answer,
-  onAnswer,
-  onEvidence,
-  onNc,
-}: {
-  item: TemplateItem
-  index: number
-  answer?: ChecklistAnswer
-  onAnswer: (itemId: string, value: ChecklistValue, observation?: string) => void
-  onEvidence: () => void
-  onNc: () => void
-}) {
-  const [observation, setObservation] = useState(answer?.observation ?? '')
+function ChecklistItem({ item, index }: { item: TemplateItem; index: number }) {
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -706,188 +635,43 @@ function ChecklistItem({
             {index}. {item.question}
             {item.required && ' *'}
           </p>
+          {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
-            <Badge tone="primary">{item.responseType}</Badge>
+            <Badge tone="primary">{responseTypeLabel(item.responseType)}</Badge>
+            {item.required && <Badge tone="neutral">Obrigatorio</Badge>}
             {item.requireObservationOnFailure && <Badge tone="warning">Obs. na falha</Badge>}
             {item.requireEvidenceOnFailure && <Badge tone="danger">Evidencia na falha</Badge>}
           </div>
+          {item.options && item.options.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.options.map((option) => (
+                <span key={option} className="rounded-md border border-border px-2.5 py-1 text-xs text-muted">
+                  {option}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" className="h-8 px-2" onClick={onEvidence}>
-            <Camera size={16} />
-            Evidencia
-          </Button>
-          <Button variant="ghost" className="h-8 px-2" onClick={onNc}>
-            <AlertTriangle size={16} />
-            NC
-          </Button>
-        </div>
-      </div>
-      <div className="mt-4">
-        {responseControl(item, answer?.value, (value) => onAnswer(item.id, value, observation))}
-      </div>
-      <Textarea
-        label="Observacao"
-        id={`obs-${item.id}`}
-        value={observation}
-        onChange={(event) => setObservation(event.target.value)}
-      />
-      <div className="mt-3 flex justify-end">
-        <Button variant="secondary" onClick={() => onAnswer(item.id, answer?.value ?? '', observation)}>
-          Salvar resposta
-        </Button>
+        <span className="rounded-fieldops bg-app-bg p-2 text-muted dark:bg-muted-surface">
+          <Camera size={18} aria-hidden />
+        </span>
       </div>
     </Card>
   )
 }
 
-function responseControl(
-  item: TemplateItem,
-  value: ChecklistValue | undefined,
-  onChange: (value: ChecklistValue) => void,
-) {
-  if (item.responseType === ResponseType.CONFORMITY)
-    return (
-      <div className="flex flex-wrap gap-2">
-        {[
-          ['CONFORME', 'Conforme'],
-          ['NAO_CONFORME', 'Nao conforme'],
-          ['NA', 'N/A'],
-        ].map(([option, label]) => (
-          <Button
-            key={option}
-            variant={value === option ? 'primary' : 'secondary'}
-            onClick={() => onChange(option as ChecklistValue)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-    )
-  if (item.responseType === ResponseType.BOOLEAN)
-    return (
-      <div className="flex gap-2">
-        <Button variant={value === true ? 'primary' : 'secondary'} onClick={() => onChange(true)}>
-          Sim
-        </Button>
-        <Button variant={value === false ? 'primary' : 'secondary'} onClick={() => onChange(false)}>
-          Nao
-        </Button>
-      </div>
-    )
-  if (item.responseType === ResponseType.SINGLE_CHOICE)
-    return (
-      <Select
-        label="Resposta"
-        id={`choice-${item.id}`}
-        value={String(value ?? '')}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">Selecione</option>
-        {(item.options ?? []).map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </Select>
-    )
-  if (item.responseType === ResponseType.NUMBER)
-    return (
-      <Input
-        label="Resposta numerica"
-        id={`number-${item.id}`}
-        type="number"
-        value={String(value ?? '')}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    )
-  if (item.responseType === ResponseType.DATE)
-    return (
-      <Input
-        label="Data"
-        id={`date-${item.id}`}
-        type="date"
-        value={String(value ?? '')}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
-  if (item.responseType === ResponseType.TEXT_LONG)
-    return (
-      <Textarea
-        label="Resposta"
-        id={`text-${item.id}`}
-        value={String(value ?? '')}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    )
-  return (
-    <Input
-      label="Resposta"
-      id={`short-${item.id}`}
-      value={String(value ?? '')}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  )
+const responseTypeLabels: Record<ResponseType, string> = {
+  [ResponseType.TEXT_SHORT]: 'Texto curto',
+  [ResponseType.TEXT_LONG]: 'Texto longo',
+  [ResponseType.NUMBER]: 'Numero',
+  [ResponseType.BOOLEAN]: 'Sim / Nao',
+  [ResponseType.CONFORMITY]: 'Conformidade',
+  [ResponseType.SINGLE_CHOICE]: 'Selecao unica',
+  [ResponseType.DATE]: 'Data',
 }
 
-function EvidenceModal({ item, onClose }: { item: TemplateItem | null; onClose: () => void }) {
-  return (
-    <Modal
-      open={Boolean(item)}
-      title="Adicionar evidencia mockada"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={onClose}>
-            <Upload size={17} />
-            Adicionar
-          </Button>
-        </>
-      }
-    >
-      {item && (
-        <div className="space-y-4">
-          <p className="font-medium">{item.question}</p>
-          <div className="grid h-48 place-items-center rounded-card border border-dashed border-border bg-slate-50 text-muted">
-            <Camera size={40} />
-          </div>
-          <Textarea label="Descricao" id="evidence-desc" placeholder="Descricao da evidencia simulada" />
-        </div>
-      )}
-    </Modal>
-  )
-}
-
-function NcModal({ item, onClose }: { item: TemplateItem | null; onClose: () => void }) {
-  return (
-    <Modal
-      open={Boolean(item)}
-      title="Criar nao conformidade mockada"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={onClose}>Criar NC</Button>
-        </>
-      }
-    >
-      {item && (
-        <div className="space-y-4">
-          <p className="font-medium">{item.question}</p>
-          <Input label="Titulo" id="quick-nc-title" defaultValue="Nao conformidade identificada" />
-          <Select label="Criticidade" id="quick-nc-severity" defaultValue={Severity.MEDIUM}>
-            {Object.values(Severity).map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </Select>
-          <Textarea label="Descricao" id="quick-nc-desc" />
-        </div>
-      )}
-    </Modal>
-  )
+function responseTypeLabel(type: ResponseType): string {
+  return responseTypeLabels[type] ?? type
 }
 
 function TechStat({
@@ -900,9 +684,9 @@ function TechStat({
   tone: 'primary' | 'danger' | 'warning' | 'success'
 }) {
   const toneClass = {
-    primary: 'text-primary-dark bg-primary-light/45',
+    primary: 'text-primary-dark bg-primary-light/45 dark:text-primary-light dark:bg-primary/25',
     danger: 'text-danger-dark bg-danger-light/20',
-    warning: 'text-warning-dark bg-amber-100',
+    warning: 'text-warning-dark bg-amber-100 dark:bg-warning-light/60',
     success: 'text-success-dark bg-success-light/30',
   }[tone]
   return (
@@ -918,12 +702,12 @@ function InfoCard({ label, value, icon: Icon }: { label: string; value?: string;
   return (
     <Card className="p-5">
       <div className="flex items-center gap-3">
-        <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark">
+        <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
           <Icon size={19} />
         </span>
         <div>
           <p className="text-xs font-medium text-muted">{label}</p>
-          <p className="text-sm font-semibold">{value}</p>
+          <p className="text-sm font-semibold">{value || '-'}</p>
         </div>
       </div>
     </Card>
@@ -942,25 +726,10 @@ function Info({ label, value }: { label: string; value?: string }) {
 function Progress({ value }: { value: number }) {
   return (
     <div>
-      <div className="h-2 rounded-full bg-slate-100">
+      <div className="h-2 rounded-full bg-app-bg dark:bg-muted-surface">
         <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, value)}%` }} />
       </div>
       <p className="mt-1 text-xs text-muted">{value}% concluido</p>
-    </div>
-  )
-}
-
-function SyncBadge({ status }: { status?: 'synced' | 'pending' | 'error' }) {
-  const label = status === 'error' ? 'Erro sync' : status === 'pending' ? 'Pendente sync' : 'Sincronizado'
-  const tone = status === 'error' ? 'danger' : status === 'pending' ? 'warning' : 'success'
-  return <Badge tone={tone}>{label}</Badge>
-}
-
-function Permission({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-t border-border pt-3">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm font-semibold text-success-dark">{value}</span>
     </div>
   )
 }
@@ -975,15 +744,7 @@ function BackLink({ to, label }: { to: string; label: string }) {
 }
 
 function useInspection() {
-  const { id = 'ins-compressor' } = useParams()
-  const technicianInspections = useTechnicianInspections()
-  return technicianInspections.find((inspection) => inspection.id === id) ?? technicianInspections[0]
-}
-
-function useTechnicianInspections() {
-  return useSyncExternalStore(
-    inspectionStore.subscribe,
-    inspectionStore.technicianSnapshot,
-    inspectionStore.technicianSnapshot,
-  )
+  const { id = '' } = useParams()
+  const { state, reload } = useTechnicianInspections()
+  return { state, reload, id }
 }

@@ -18,7 +18,7 @@ export function Modal({
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4" role="dialog" aria-modal="true">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-card border border-border bg-white shadow-fieldops">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-card border border-border bg-surface shadow-fieldops">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold">{title}</h2>
           <button
@@ -30,7 +30,7 @@ export function Modal({
           </button>
         </div>
         <div className="max-h-[68vh] overflow-y-auto p-5">{children}</div>
-        {footer && <div className="flex justify-end gap-3 border-t border-border bg-slate-50 px-5 py-4">{footer}</div>}
+        {footer && <div className="flex justify-end gap-3 border-t border-border bg-app-bg px-5 py-4">{footer}</div>}
       </div>
     </div>
   )
@@ -42,6 +42,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   variant = 'primary',
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }: {
@@ -50,6 +51,7 @@ export function ConfirmDialog({
   description: string
   confirmLabel: string
   variant?: 'primary' | 'danger'
+  confirmDisabled?: boolean
   onCancel: () => void
   onConfirm: () => void
 }) {
@@ -63,7 +65,7 @@ export function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button variant={variant} onClick={onConfirm}>
+          <Button variant={variant} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

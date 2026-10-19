@@ -2,5 +2,7 @@ export { InspectionRepository } from './InspectionRepository';
 export { AnswerRepository } from './AnswerRepository';
 export { EvidenceRepository } from './EvidenceRepository';
 export { NonConformityRepository } from './NonConformityRepository';
+export { ReviewCommentRepository } from './ReviewCommentRepository';
 export { SyncQueueRepository } from './SyncQueueRepository';
 export type { SyncQueueEntry, OperationType, EntityType, SyncOperationStatus } from './SyncQueueRepository';
+export { SyncMetadataRepository, SyncMetadataKeys } from './SyncMetadataRepository';

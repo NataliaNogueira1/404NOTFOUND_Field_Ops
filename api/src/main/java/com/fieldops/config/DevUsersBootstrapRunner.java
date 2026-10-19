@@ -2,6 +2,7 @@ package com.fieldops.config;
 
 import com.fieldops.user.model.Role;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.UserStatus;
 import com.fieldops.user.repository.UserRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -46,14 +47,14 @@ public class DevUsersBootstrapRunner implements ApplicationRunner {
     }
 
     private void createIfMissing(DevUserProperties account, Role role) {
-        if (userRepository.existsByEmail(account.email())) {
-            return;
-        }
-        User user = new User();
+        User user = userRepository.findByEmail(account.email()).orElseGet(User::new);
         user.setName(account.name());
         user.setEmail(account.email());
-        user.setPassword(passwordEncoder.encode(account.password()));
         user.setRole(role);
+        user.setStatus(UserStatus.ACTIVE);
+        if (user.getPassword() == null || !passwordEncoder.matches(account.password(), user.getPassword())) {
+            user.setPassword(passwordEncoder.encode(account.password()));
+        }
         userRepository.save(user);
     }
 }

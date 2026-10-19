@@ -16,6 +16,10 @@ public class Inspection {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(nullable = false, length = 300)
     private String title;
 
@@ -35,6 +39,11 @@ public class Inspection {
 
     @Column(name = "equipment_name", length = 200)
     private String equipmentName;
+
+    /** QR Code of the equipment at the time of scheduling — used by the mobile
+     *  app to confirm equipment identity offline (PBI-041 / RN-064). */
+    @Column(name = "equipment_qr_code", length = 200)
+    private String equipmentQrCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "technician_id", nullable = false)
@@ -113,6 +122,7 @@ public class Inspection {
 
     // Getters and Setters
     public Long getId() { return id; }
+    public Long getVersion() { return version; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public InspectionTemplate getTemplate() { return template; }
@@ -125,6 +135,8 @@ public class Inspection {
     public void setSiteName(String siteName) { this.siteName = siteName; }
     public String getEquipmentName() { return equipmentName; }
     public void setEquipmentName(String equipmentName) { this.equipmentName = equipmentName; }
+    public String getEquipmentQrCode() { return equipmentQrCode; }
+    public void setEquipmentQrCode(String equipmentQrCode) { this.equipmentQrCode = equipmentQrCode; }
     public User getTechnician() { return technician; }
     public void setTechnician(User technician) { this.technician = technician; }
     public User getSupervisor() { return supervisor; }

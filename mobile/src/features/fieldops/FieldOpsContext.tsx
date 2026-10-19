@@ -8,6 +8,7 @@ import {
   AnswerRepository,
   EvidenceRepository,
   NonConformityRepository,
+  ReviewCommentRepository,
   SyncQueueRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '@/infrastructure/sync';
@@ -20,6 +21,7 @@ import {
   type Evidence,
   type Inspection,
   type NonConformity,
+  type ReviewComment,
   type SyncOperation,
 } from './types';
 
@@ -31,6 +33,7 @@ interface FieldOpsContextValue {
   answers: Record<string, ChecklistAnswer>;
   evidences: Evidence[];
   nonConformities: NonConformity[];
+  reviewComments: ReviewComment[];
   syncOperations: SyncOperation[];
   startInspection: (
     inspectionId: string,
@@ -39,10 +42,12 @@ interface FieldOpsContextValue {
       location?: { latitude: number; longitude: number; accuracy?: number } | null;
     },
   ) => void;
-  answerItem: (itemId: string, value: ChecklistValue, observation?: string) => void;
+  answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
+  retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
+  reopenForCorrection: (inspectionId: string) => void;
   syncNow: () => void;
   resetSession: () => void;
   isSyncing: boolean;
@@ -60,6 +65,23 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
     console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
   } catch (apiError) {
     console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
+  }
+}
+
+// Friendly label for a queued operation shown on the sync screen. Photos get a
+// distinct label so a failed upload reads like "Foto: <id>" (PBI-044).
+function describeOperation(entityType: string, entityId: string): string {
+  switch (entityType) {
+    case 'evidence':
+      return `Foto: ${entityId}`;
+    case 'answer':
+      return `Resposta: ${entityId}`;
+    case 'inspection':
+      return `Inspeção: ${entityId}`;
+    case 'non_conformity':
+      return `Não conformidade: ${entityId}`;
+    default:
+      return `${entityType}: ${entityId}`;
   }
 }
 
@@ -83,6 +105,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
   const [evidences, setEvidences] = useState<Evidence[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
+  const [reviewComments, setReviewComments] = useState<ReviewComment[]>([]);
   const [syncOperations, setSyncOperations] = useState<SyncOperation[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
@@ -100,6 +123,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const ansRepo = new AnswerRepository(db);
     const evRepo = new EvidenceRepository(db);
     const ncRepo = new NonConformityRepository(db);
+    const commentRepo = new ReviewCommentRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
     const dbInspections = await inspRepo.getAll();
@@ -126,12 +150,17 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
     setNonConformities(allNCs);
 
+    const allComments: ReviewComment[] = [];
+    for (const insp of dbInspections) allComments.push(...await commentRepo.getByInspection(insp.id));
+    setReviewComments(allComments);
+
     const queue = await sqRepo.getAll();
     setSyncOperations(queue.map((entry) => ({
       id: entry.id,
-      title: `${entry.entityType}: ${entry.entityId}`,
+      title: describeOperation(entry.entityType, entry.entityId),
       status: entry.status === 'sent' ? 'Enviada' as const :
               entry.status === 'error' ? 'Erro' as const : 'Pendente' as const,
+      error: entry.lastError ?? undefined,
     })));
 
     console.log('[FieldOps] DB loaded:', dbInspections.length, 'inspections,', Object.keys(allAnswers).length, 'answers');
@@ -243,14 +272,20 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     [getRepos, getSyncService],
   );
 
-  const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string) => {
+  const answerItem = useCallback((itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => {
+    // Prefer the explicit inspection id passed by the checklist screen; fall back
+    // to the active (IN_PROGRESS) inspection, then the first one, for callers that
+    // don't provide it.
+    const resolveTargetId = () =>
+      inspectionId
+      ?? inspectionsRef.current.find((i) => i.status === InspectionStatus.IN_PROGRESS)?.id
+      ?? inspectionsRef.current[0]?.id;
+
     setAnswers((current) => {
       const next = { ...current, [itemId]: { itemId, value, observation, savedAt: new Date().toISOString() } };
 
-      // Update progress — count answered vs total items for the active inspection
-      const activeId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      // Update progress — count answered vs total items for the target inspection
+      const activeId = resolveTargetId();
 
       if (activeId) {
         // Get total items count asynchronously, update progress
@@ -274,9 +309,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       // Persist to DB
       const repos2 = getRepos();
       const sync = getSyncService();
-      const persistId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      const persistId = resolveTargetId();
       if (repos2 && sync && persistId) {
         repos2.answer.save(persistId, itemId, value, observation).catch(console.warn);
         sync.enqueueAnswer(persistId, itemId, value, observation).catch(console.warn);
@@ -287,9 +320,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-create non-conformity for NAO_CONFORME
     if (value === 'NAO_CONFORME') {
-      const activeId = inspectionsRef.current.find(
-        (i) => i.status === InspectionStatus.IN_PROGRESS,
-      )?.id ?? inspectionsRef.current[0]?.id;
+      const activeId = resolveTargetId();
 
       setNonConformities((current) => {
         if (!activeId || current.some((nc) => nc.inspectionId === activeId && nc.itemId === itemId)) return current;
@@ -314,14 +345,20 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   }, [getRepos, getSyncService]);
 
   const addEvidence = useCallback((inspectionId: string, itemId: string, description: string, uri?: string) => {
+    const evidenceId = `ev-${itemId}-${Date.now()}`;
     const evidence: Evidence = {
-      id: `ev-${itemId}-${Date.now()}`,
+      id: evidenceId,
       inspectionId,
       itemId,
       description,
       uri,
       capturedAt: new Date().toISOString(),
       syncStatus: 'pending',
+      operationId: InspectionSyncService.evidenceOperationId(evidenceId),
+      // The photo upload depends on the answer operation of the same item, so it
+      // waits for the answer to be synced before running (RN-069).
+      responseId: InspectionSyncService.answerOperationId(inspectionId, itemId),
+      retryCount: 0,
     };
     setEvidences((current) => [...current, evidence]);
     setNonConformities((current) =>
@@ -348,6 +385,23 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     return evidence;
   }, [getRepos, getSyncService]);
 
+  // Retry a failed photo upload. Reuses the existing file and outbox op (no new
+  // capture, no duplicate evidence — PBI-044) and flips the UI back to pending.
+  const retryEvidenceUpload = useCallback((evidenceId: string) => {
+    setEvidences((current) =>
+      current.map((ev) =>
+        ev.id === evidenceId
+          ? { ...ev, syncStatus: 'pending' as const, lastError: undefined, retryCount: (ev.retryCount ?? 0) + 1 }
+          : ev,
+      ),
+    );
+    const target = evidences.find((ev) => ev.id === evidenceId);
+    const sync = getSyncService();
+    if (sync && target) {
+      sync.retryEvidenceUpload(target).catch(console.warn);
+    }
+  }, [evidences, getSyncService]);
+
   const addNonConformity = useCallback((input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => {
     const nc: NonConformity = { ...input, id: `nc-manual-${Date.now()}`, evidenceCount: input.evidenceCount ?? 0 };
     setNonConformities((current) => [...current, nc]);
@@ -372,6 +426,30 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     if (repos && sync) {
       repos.inspection.markSubmitted(inspectionId).catch(console.warn);
       sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
+    }
+  }, [getRepos, getSyncService]);
+
+  // Reopen a REJECTED inspection so the technician can correct it (PBI-062).
+  // Moves it back to IN_PROGRESS, making answers writable again, and queues the
+  // transition so the server learns the inspection is being reworked.
+  const reopenForCorrection = useCallback((inspectionId: string) => {
+    setInspections((current) =>
+      current.map((insp) =>
+        insp.id === inspectionId
+          ? {
+              ...insp,
+              status: InspectionStatus.IN_PROGRESS,
+              syncStatus: 'pending' as const,
+              pendingSyncCount: Math.max(insp.pendingSyncCount, 1),
+            }
+          : insp,
+      ),
+    );
+    const repos = getRepos();
+    const sync = getSyncService();
+    if (repos && sync) {
+      repos.inspection.updateStatus(inspectionId, 'IN_PROGRESS').catch(console.warn);
+      sync.enqueueStatusChange(inspectionId, 'IN_PROGRESS').catch(console.warn);
     }
   }, [getRepos, getSyncService]);
 
@@ -415,6 +493,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     setAnswers({});
     setEvidences([]);
     setNonConformities([]);
+    setReviewComments([]);
     setSyncOperations([]);
 
     // Reset DB
@@ -423,6 +502,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         await db.execAsync(`
           DELETE FROM sync_queue;
           DELETE FROM non_conformities;
+          DELETE FROM review_comments;
           DELETE FROM evidences;
           DELETE FROM answers;
           DELETE FROM inspection_items;
@@ -446,21 +526,24 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       answers,
       evidences,
       nonConformities,
+      reviewComments,
       syncOperations,
       startInspection,
       answerItem,
       addEvidence,
+      retryEvidenceUpload,
       addNonConformity,
       concludeInspection,
+      reopenForCorrection,
       syncNow,
       resetSession,
       isSyncing,
       lastSyncError,
     }),
     [
-      inspections, isLoading, answers, evidences, nonConformities, syncOperations,
-      startInspection, answerItem, addEvidence, addNonConformity,
-      concludeInspection, syncNow, resetSession, isSyncing, lastSyncError,
+      inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
+      startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
+      concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );
 

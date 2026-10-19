@@ -2,6 +2,8 @@ import { Ban, Download, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { type AdminInspectionSummary, adminCatalogApi } from '@/api/adminCatalog'
+import { ClientStatus, clientsApi, type ManagedClient } from '@/api/clients'
+import { usersApi } from '@/api/users'
 import { authSession } from '@/auth/session'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
@@ -13,9 +15,8 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
-import { byId, clients, equipment, users } from '@/mocks/domain'
-import { inspectionStore } from '@/state/mockStores'
-import { InspectionStatus, Priority, UserRole, type Inspection } from '@/types/domain'
+import { InspectionStatus, Priority, UserRole, UserStatus } from '@/types/domain'
+import { formatDate } from '@/utils/formatDate'
 
 const cancelable = [
   InspectionStatus.DRAFT,
@@ -30,11 +31,6 @@ export function InspectionsPage() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const isAdmin = session.user?.role === UserRole.ADMIN
-  const source = useSyncExternalStore(
-    inspectionStore.subscribe,
-    inspectionStore.adminSnapshot,
-    inspectionStore.adminSnapshot,
-  )
   const list = useListQuery('dueDate,asc')
   const query = list.value('name')
   const debouncedQuery = useDebouncedValue(query)
@@ -45,19 +41,48 @@ export function InspectionsPage() {
   const dueDate = list.value('dueDate')
   const overdue = list.value('overdue') === 'true'
   const review = list.value('review') === 'true'
+
+  // ── Lista principal ─────────────────────────────────────────────────────────
   const [rows, setRows] = useState<AdminInspectionSummary[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
+
+  // ── Exportação CSV ──────────────────────────────────────────────────────────
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+
+  // ── Dados para os filtros ───────────────────────────────────────────────────
+  const [technicianNames, setTechnicianNames] = useState<string[]>([])
+  // Guarda os clientes completos (id + nome) para popular o filtro por nome e
+  // resolver nome → id na exportação CSV, que exige clientId numérico.
+  const [clients, setClients] = useState<ManagedClient[]>([])
+
+  // ── Cancelamento ────────────────────────────────────────────────────────────
   const [canceling, setCanceling] = useState<AdminInspectionSummary | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [toast, setToast] = useState(false)
+
   const hasFilters = filterNames.some((name) => Boolean(list.value(name)))
 
+  // ── Carrega técnicos e clientes para os filtros ─────────────────────────────
+  useEffect(() => {
+    usersApi
+      .list({ name: '', role: UserRole.TECHNICIAN, status: UserStatus.ACTIVE, page: 0, size: 200, sort: 'name,asc' })
+      .then((result) => setTechnicianNames(result.content.map((u) => u.name)))
+      .catch(() => { /* silently ignore — filters degrade gracefully */ })
+  }, [])
+
+  useEffect(() => {
+    clientsApi
+      .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 200 })
+      .then((result) => setClients(result.content))
+      .catch(() => { /* silently ignore */ })
+  }, [])
+
+  // ── Carrega inspeções ───────────────────────────────────────────────────────
   const loadInspections = useCallback(async () => {
     setLoading(true)
     try {
@@ -78,14 +103,9 @@ export function InspectionsPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch {
-      const fallback = localInspections(
-        source,
-        { name: debouncedQuery, status, technicianName, clientName, priority, dueDate, overdue, review },
-        list.sort,
-      )
-      setRows(fallback.slice(list.page * list.size, (list.page + 1) * list.size))
-      setTotalElements(fallback.length)
-      setTotalPages(Math.max(Math.ceil(fallback.length / list.size), 1))
+      setRows([])
+      setTotalElements(0)
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }
@@ -99,7 +119,6 @@ export function InspectionsPage() {
     overdue,
     priority,
     review,
-    source,
     status,
     technicianName,
   ])
@@ -109,6 +128,7 @@ export function InspectionsPage() {
     return () => window.clearTimeout(pendingLoad)
   }, [loadInspections])
 
+  // ── Cancelamento ────────────────────────────────────────────────────────────
   function openCancelModal(item: AdminInspectionSummary) {
     setCanceling(item)
     setCancelReason('')
@@ -146,21 +166,20 @@ export function InspectionsPage() {
     }
   }
 
+  // ── Exportação CSV ──────────────────────────────────────────────────────────
   async function handleExport() {
     setExporting(true)
     setExportError('')
     try {
-      // Resolve clientName → clientId: the backend export endpoint accepts clientId
-      // (numeric), not clientName. Look up in the locally-available clients list.
-      const matchedClient = clientName
-        ? clients.find((c) => c.name === clientName)
-        : undefined
+      // Resolve clientName → clientId: o endpoint de exportação aceita clientId
+      // (numérico), não clientName. Busca na lista real de clientes já carregada.
+      const matchedClient = clientName ? clients.find((c) => c.name === clientName) : undefined
 
       await adminCatalogApi.exportCsv({
         status,
-        from: dueDate,   // "Período" field maps to the from filter
-        to: '',
-        clientId: matchedClient?.id ? Number(matchedClient.id) : undefined,
+        from: dueDate, // o filtro "Período" mapeia para ambos os extremos
+        to: dueDate,
+        clientId: matchedClient ? Number(matchedClient.id) : undefined,
       })
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Erro ao exportar CSV.')
@@ -189,7 +208,7 @@ export function InspectionsPage() {
     {
       header: 'Data prevista',
       sortKey: 'dueDate',
-      cell: (item) => <span className={item.overdue ? 'font-semibold text-danger' : ''}>{item.dueDate}</span>,
+      cell: (item) => <span className={item.overdue ? 'font-semibold text-danger' : ''}>{formatDate(item.dueDate)}</span>,
     },
     { header: 'Estado', sortKey: 'status', cell: (item) => <StatusBadge status={item.status} /> },
     {
@@ -197,7 +216,7 @@ export function InspectionsPage() {
       sortKey: 'progress',
       cell: (item) => (
         <div className="w-28">
-          <div className="h-2 rounded-full bg-slate-100">
+          <div className="h-2 rounded-full bg-app-bg">
             <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
           </div>
           <span className="text-xs text-muted">{item.progress}%</span>
@@ -241,13 +260,13 @@ export function InspectionsPage() {
                 onClick={() => void handleExport()}
                 title="Exportar inspeções filtradas como CSV"
               >
-                <Download size={17} />
+                <Download size={17} aria-hidden="true" />
                 {exporting ? 'Exportando...' : 'Exportar CSV'}
               </Button>
             )}
             <Link to="/app/inspections/new">
               <Button>
-                <Plus size={17} />
+                <Plus size={17} aria-hidden="true" />
                 Nova inspecao
               </Button>
             </Link>
@@ -280,9 +299,9 @@ export function InspectionsPage() {
           onChange={(event) => list.update('technicianName', event.target.value)}
         >
           <option value="">Todos</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.name}>
-              {user.name}
+          {technicianNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </Select>
@@ -397,58 +416,4 @@ export function InspectionsPage() {
       <Toast show={toast} message="Inspecao cancelada com sucesso" />
     </div>
   )
-}
-
-interface LocalFilters {
-  name: string
-  status: InspectionStatus | ''
-  technicianName: string
-  clientName: string
-  priority: Priority | ''
-  dueDate: string
-  overdue: boolean
-  review: boolean
-}
-
-function localInspections(source: Inspection[], filters: LocalFilters, sort: string) {
-  const query = filters.name.toLowerCase()
-  const rows = source
-    .map((item) => inspectionSummary(item))
-    .filter((item) => {
-      const haystack = `${item.title} ${item.clientName} ${item.equipmentName}`.toLowerCase()
-      return (
-        haystack.includes(query) &&
-        (!filters.status || item.status === filters.status) &&
-        (!filters.technicianName || item.technicianName === filters.technicianName) &&
-        (!filters.clientName || item.clientName === filters.clientName) &&
-        (!filters.priority || item.priority === filters.priority) &&
-        (!filters.dueDate || item.dueDate === filters.dueDate) &&
-        (!filters.overdue || item.overdue) &&
-        (!filters.review || [InspectionStatus.SUBMITTED, InspectionStatus.UNDER_REVIEW].includes(item.status))
-      )
-    })
-  const [key, direction] = sort.split(',')
-  return rows.sort(
-    (left, right) =>
-      String(left[key as keyof AdminInspectionSummary] ?? '').localeCompare(
-        String(right[key as keyof AdminInspectionSummary] ?? ''),
-      ) * (direction === 'desc' ? -1 : 1),
-  )
-}
-
-function inspectionSummary(item: Inspection): AdminInspectionSummary {
-  return {
-    id: item.id,
-    title: item.title,
-    clientName: byId(clients, item.clientId)?.name ?? '',
-    siteName: item.siteName ?? '',
-    equipmentName: byId(equipment, item.equipmentId)?.name ?? '',
-    technicianId: item.technicianId,
-    technicianName: byId(users, item.technicianId)?.name ?? '',
-    priority: item.priority,
-    dueDate: item.dueDate,
-    status: item.status,
-    progress: item.progress,
-    overdue: Boolean(item.overdue),
-  }
 }

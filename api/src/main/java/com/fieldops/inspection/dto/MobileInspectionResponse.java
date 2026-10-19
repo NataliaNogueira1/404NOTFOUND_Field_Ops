@@ -18,6 +18,8 @@ public record MobileInspectionResponse(
         String siteName,
         String equipmentId,
         String equipmentName,
+        /** QR Code of the equipment snapshot — used by the mobile app for offline confirmation (PBI-041). */
+        String equipmentQrCode,
         String technicianId,
         String supervisorId,
         String supervisorName,
@@ -29,7 +31,12 @@ public record MobileInspectionResponse(
         String startedAt,
         Integer progress,
         String supervisorInstructions,
-        TemplateDto template
+        String rejectionReason,
+        String rejectedBy,
+        String rejectedAt,
+        Long version,
+        TemplateDto template,
+        List<ReviewCommentDto> reviewComments
 ) {
 
     public record TemplateDto(
@@ -56,4 +63,7 @@ public record MobileInspectionResponse(
             boolean requireEvidenceOnFailure,
             List<String> options
     ) {}
+
+    /** Read-only reviewer guidance delivered with the technician's offline pull. */
+    public record ReviewCommentDto(String id, String itemId, String comment, String createdBy, String createdAt) {}
 }

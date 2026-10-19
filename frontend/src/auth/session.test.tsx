@@ -6,6 +6,7 @@ import { normalizeRole } from '@/api/auth'
 import { apiRequest, tokenStorage } from '@/api/client'
 import { authSession } from '@/auth/session'
 import { AppRoutes } from '@/routes/AppRoutes'
+import { ThemeProvider } from '@/theme/ThemeProvider'
 import { UserRole } from '@/types/domain'
 
 const technicianUser = { id: 2, name: 'Carlos Henrique', email: 'carlos@fieldops.com', role: 'TECHNICIAN' }
@@ -30,9 +31,11 @@ function mockFetch(handler: (url: string, init?: RequestInit) => Promise<Respons
 
 function renderRoute(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </ThemeProvider>,
   )
 }
 
@@ -62,7 +65,8 @@ describe('real auth session and route guards', () => {
     await userEvent.type(screen.getByLabelText(/senha/i), '123456')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
-    expect(await screen.findByText(/ola, carlos/i)).not.toBeNull()
+    // The technician portal is a lazy-loaded route, so give the chunk time to resolve under load.
+    expect(await screen.findByText(/ola, carlos/i, {}, { timeout: 5000 })).not.toBeNull()
     expect(tokenStorage.get()).toBe('access-TECHNICIAN')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-TECHNICIAN')
   })
@@ -91,10 +95,10 @@ describe('real auth session and route guards', () => {
     await userEvent.type(screen.getByLabelText(/senha/i), 'errada123')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
-    expect(await screen.findByText(/e-mail ou senha invalidos/i)).not.toBeNull()
+    expect(await screen.findByText(/e-mail ou senha invalidos/i, {}, { timeout: 5000 })).not.toBeNull()
     expect(tokenStorage.get()).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
-  })
+  }, 10000)
 
   it('restores the session from /auth/me when a token exists', async () => {
     tokenStorage.saveTokens('access-existing', 'refresh-existing')

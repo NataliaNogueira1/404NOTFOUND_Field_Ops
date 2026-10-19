@@ -1,5 +1,6 @@
-﻿import {
+import {
   ArrowRight,
+  BarChart3,
   CalendarClock,
   ClipboardCheck,
   ClipboardPlus,
@@ -9,12 +10,17 @@
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react'
+import { useSyncExternalStore } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
+import { authSession } from '@/auth/session'
 import { Badge } from '@/components/badges/Badge'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { useReviewCount } from '@/hooks/useReviewCount'
+import { useTheme } from '@/theme'
 import {
   dashboardStats,
   inspections,
@@ -24,68 +30,128 @@ import {
   clients,
   equipment,
 } from '@/mocks/domain'
+
+/**
+ * Recharts renders SVG and cannot consume Tailwind classes, so chart colors
+ * must be passed as explicit values. These mirror the semantic design tokens
+ * declared in `index.css` (`@theme` for light, `.dark` for dark) so the chart
+ * stays legible on both themes (PBI-091 #173) without a flash on first paint.
+ * Keep these values in sync with the corresponding CSS variables:
+ *   grid   -> --color-border    tick    -> --color-muted
+ *   cursor -> --color-app-bg    surface -> --color-surface
+ *   bar    -> --color-primary
+ */
+const CHART_COLORS = {
+  light: { grid: '#c1cddd', tick: '#64748b', cursor: '#f2f7ff', surface: '#ffffff', bar: '#2563eb' },
+  dark: { grid: '#2a3852', tick: '#94a3b8', cursor: '#0b1220', surface: '#111a2e', bar: '#2563eb' },
+} as const
+
 export function DashboardPage() {
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  const reviewCount = useReviewCount()
+  const { effectiveTheme } = useTheme()
+  const chart = CHART_COLORS[effectiveTheme]
+  const hasStatusData = inspectionsByStatus.length > 0
+
+  const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
+  const pendingLabel =
+    reviewCount === null
+      ? 'aguardando revisão'
+      : reviewCount === 1
+        ? '1 aguardando revisão'
+        : `${reviewCount} aguardando revisão`
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Ola, Marina" description="Aqui esta um resumo das operacoes de hoje." />
+      <PageHeader title={`Olá, ${firstName}`} description="Aqui está um resumo das operações de hoje." />
+
+      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total de inspecoes" value={dashboardStats.total} icon={ClipboardCheck} tone="blue" />
-        <StatCard title="Revisoes pendentes" value={dashboardStats.pending} icon={CalendarClock} tone="amber" />
-        <StatCard title="Inspecoes atrasadas" value={dashboardStats.overdue} icon={ClockAlert} tone="red" />
-        <StatCard title="NCs criticas" value={dashboardStats.critical} icon={ShieldAlert} tone="green" />
+        <StatCard title="Total de inspeções" value={dashboardStats.total} icon={ClipboardCheck} tone="blue" />
+        <Link to="/app/inspections/review" className="focus-ring rounded-card">
+          <StatCard
+            title="Revisões pendentes"
+            value={reviewCount ?? dashboardStats.pending}
+            icon={CalendarClock}
+            tone="amber"
+          />
+        </Link>
+        <StatCard title="Inspeções atrasadas" value={dashboardStats.overdue} icon={ClockAlert} tone="red" />
+        <StatCard title="NCs críticas" value={dashboardStats.critical} icon={ShieldAlert} tone="green" />
       </section>
+
+      {/* ── Charts + quick actions ─────────────────────────────────────────── */}
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <Card className="p-5 lg:p-6">
           <div className="mb-6">
-            <h2 className="text-base font-semibold">Inspecoes por estado</h2>
-            <p className="text-sm text-muted">Distribuicao das inspecoes ativas</p>
+            <h2 className="text-base font-semibold">Inspeções por estado</h2>
+            <p className="text-sm text-muted">Distribuição das inspeções ativas</p>
           </div>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={inspectionsByStatus} margin={{ left: -20, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C1CDDD" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
-                <YAxis
-                  allowDecimals={false}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748B', fontSize: 12 }}
-                />
-                <Tooltip cursor={{ fill: '#F2F7FF' }} contentStyle={{ borderRadius: 10, borderColor: '#C1CDDD' }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {hasStatusData ? (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={inspectionsByStatus} margin={{ left: -20, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: chart.tick, fontSize: 12 }} />
+                  <YAxis
+                    allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: chart.tick, fontSize: 12 }}
+                  />
+                  <Tooltip
+                    cursor={{ fill: chart.cursor }}
+                    contentStyle={{
+                      borderRadius: 10,
+                      borderColor: chart.grid,
+                      backgroundColor: chart.surface,
+                      color: chart.tick,
+                    }}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56} fill={chart.bar} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <EmptyState
+              icon={BarChart3}
+              title="Sem inspeções para exibir"
+              description="Assim que houver inspeções registradas, a distribuição por estado aparecerá aqui."
+            />
+          )}
         </Card>
+
         <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="text-base font-semibold">Acoes rapidas</h2>
+            <h2 className="text-base font-semibold">Ações rápidas</h2>
             <p className="mb-4 text-sm text-muted">Atalhos para tarefas frequentes</p>
             <div className="space-y-3">
               <QuickAction
                 to="/app/inspections/new"
                 icon={ClipboardPlus}
-                title="Nova inspecao"
+                title="Nova inspeção"
                 description="Agendar atividade"
               />
               <QuickAction
-                to="/app/inspection-templates/tpl-compressor/edit"
+                to="/app/inspection-templates/new"
                 icon={FilePlus2}
                 title="Criar modelo"
                 description="Abrir construtor"
               />
+              {/* Deep-link direto para a fila de revisão, com contagem dinâmica */}
               <QuickAction
-                to="/app/inspections"
+                to="/app/inspections/review"
                 icon={Eye}
                 title="Revisar pendentes"
-                description="3 aguardando revisao"
+                description={pendingLabel}
               />
             </div>
           </Card>
+
           <Card className="p-5">
             <div className="mb-4 flex items-center gap-2">
               <TriangleAlert className="text-warning" size={20} />
-              <h2 className="text-base font-semibold">Nao conformidades por criticidade</h2>
+              <h2 className="text-base font-semibold">Não conformidades por criticidade</h2>
             </div>
             <div className="space-y-3">
               {nonConformitiesBySeverity.map((item) => (
@@ -98,11 +164,13 @@ export function DashboardPage() {
           </Card>
         </div>
       </section>
+
+      {/* ── Recent inspections ─────────────────────────────────────────────── */}
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">Inspecoes recentes</h2>
-            <p className="text-sm text-muted">Ultimos registros movimentados</p>
+            <h2 className="text-base font-semibold">Inspeções recentes</h2>
+            <p className="text-sm text-muted">Últimos registros movimentados</p>
           </div>
           <Link className="text-sm font-semibold text-primary" to="/app/inspections">
             Ver todas
@@ -129,6 +197,7 @@ export function DashboardPage() {
     </div>
   )
 }
+
 function QuickAction({
   to,
   icon: Icon,
@@ -145,7 +214,7 @@ function QuickAction({
       to={to}
       className="focus-ring group flex items-center gap-3 rounded-fieldops border border-border p-3 transition-colors hover:border-primary-light hover:bg-primary-light/30"
     >
-      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark">
+      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
         <Icon size={19} />
       </span>
       <span className="min-w-0 flex-1">

@@ -11,6 +11,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -109,6 +111,30 @@ public class GlobalExceptionHandler {
             BusinessException ex, HttpServletRequest request) {
 
         return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+
+        // A required multipart part is absent (e.g. the evidence 'file'); report 400 with the
+        // offending part name rather than letting the catch-all turn it into a 500.
+        String message = "Required multipart part '" + ex.getRequestPartName() + "' is missing.";
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request, List.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+        // A path/query parameter could not be converted to its declared type
+        // (e.g. a non-numeric value where a Long id is expected). Report 400 with
+        // the offending parameter and value, never a 500 from the catch-all below.
+        Class<?> requiredType = ex.getRequiredType();
+        String expected = requiredType != null ? requiredType.getSimpleName() : "the expected type";
+        String message = "Parameter '" + ex.getName() + "' has an invalid value '" + ex.getValue()
+                + "'; expected " + expected + ".";
+        return build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message, request, List.of());
     }
 
     @ExceptionHandler(Exception.class)

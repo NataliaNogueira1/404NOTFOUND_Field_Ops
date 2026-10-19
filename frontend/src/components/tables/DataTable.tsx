@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, ChevronLeft, ChevronRight } from 'l
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { LoadingState } from '@/components/ui/LoadingState'
 
 export interface Column<T> {
   header: string
@@ -53,7 +54,7 @@ export function DataTable<T>({
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-muted">
+          <thead className="bg-app-bg text-xs font-semibold uppercase tracking-wide text-muted">
             <tr>
               {columns.map((column) => (
                 <th
@@ -79,7 +80,7 @@ export function DataTable<T>({
           {!loading && (
             <tbody className="divide-y divide-border">
               {visible.map((row, index) => (
-                <tr key={index} className="bg-white hover:bg-primary-light/10">
+                <tr key={index} className="bg-surface hover:bg-primary-light/10">
                   {columns.map((column) => (
                     <td key={column.header} className={`px-4 py-3 align-middle ${column.className ?? ''}`}>
                       {column.cell(row)}
@@ -92,8 +93,8 @@ export function DataTable<T>({
         </table>
       </div>
       {loading && (
-        <div role="status" className="p-8 text-center text-sm text-muted">
-          {loadingLabel}
+        <div className="p-4">
+          <LoadingState label={loadingLabel} />
         </div>
       )}
       {!loading && rows.length === 0 && <div className="p-8 text-center text-sm text-muted">{empty}</div>}
@@ -108,7 +109,7 @@ export function DataTable<T>({
                 Por pagina
                 <select
                   aria-label="Itens por pagina"
-                  className="focus-ring rounded-fieldops border border-border bg-white px-2 py-1"
+                  className="focus-ring rounded-fieldops border border-border bg-surface px-2 py-1"
                   value={size}
                   onChange={(event) => onPageSizeChange(Number(event.target.value))}
                 >

@@ -47,6 +47,8 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  equipment_qr_code: string | null;
+  server_version: number;
 }
 
 interface SectionRow {
@@ -106,13 +108,66 @@ export class InspectionRepository {
     equipmentName: string;
     supervisorName: string;
   }): Promise<void> {
+    // IMPORTANT: use a real UPSERT (ON CONFLICT DO UPDATE), never INSERT OR REPLACE.
+    // REPLACE deletes the existing inspection row before re-inserting it, which
+    // triggers ON DELETE CASCADE on answers/evidences/non_conformities — wiping
+    // the technician's local work (and captured photos) on every pull. An UPSERT
+    // keeps the same row, so child records and their files survive (RN-047/RN-066).
+    //
+    // We generally DO NOT overwrite locally-owned execution fields (status, progress,
+    // started_at, sync_status, pending_sync_count) here so a re-pull cannot revert an
+    // in-progress inspection. Those transition to the server via the outbox.
+    //
+    // EXCEPTION — server-authoritative decisions: when the server sends a terminal
+    // state the server is the authority, not the device, so we DO apply the incoming
+    // status (and rejection fields). Two cases:
+    //  • supervisor review (PBI-062 / #80): REJECTED/APPROVED — so a rejected inspection
+    //    shows up as "Reprovada" (with its reason) for the technician to correct;
+    //  • administrative CANCELLATION (PBI-053): CANCELED — the inspection was cancelled
+    //    on the server and must reflect that locally.
+    // The CASE guards keep every OTHER state (ASSIGNED/IN_PROGRESS/SUBMITTED) owned by
+    // the device, preserving the "never revert in-progress work" rule. Crucially this
+    // is still a real UPSERT (ON CONFLICT DO UPDATE, never REPLACE), so the child rows
+    // — the technician's pending answers/evidences — are NOT deleted when a cancellation
+    // arrives (RN-047/RN-066/RN-077): the server state changes, the local work survives.
+    const isServerAuthoritative =
+      inspection.status === 'REJECTED' ||
+      inspection.status === 'APPROVED' ||
+      inspection.status === 'CANCELED';
+
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO inspections (
+      `INSERT INTO inspections (
         id, title, template_id, client_id, client_name, site_id, site_name,
-        equipment_id, equipment_name, technician_id, supervisor_id, supervisor_name,
+        equipment_id, equipment_name, equipment_qr_code, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
-        progress, supervisor_instructions, sync_status, pending_sync_count, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        progress, supervisor_instructions, rejection_reason, rejected_by, rejected_at,
+        sync_status, pending_sync_count, server_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        template_id = excluded.template_id,
+        client_id = excluded.client_id,
+        client_name = excluded.client_name,
+        site_id = excluded.site_id,
+        site_name = excluded.site_name,
+        equipment_id = excluded.equipment_id,
+        equipment_name = excluded.equipment_name,
+        equipment_qr_code = excluded.equipment_qr_code,
+        technician_id = excluded.technician_id,
+        supervisor_id = excluded.supervisor_id,
+        supervisor_name = excluded.supervisor_name,
+        priority = excluded.priority,
+        due_date = excluded.due_date,
+        due_time = excluded.due_time,
+        supervisor_instructions = excluded.supervisor_instructions,
+        -- Only a server-authoritative decision (REJECTED/APPROVED/CANCELED) may
+        -- change the local status and rejection fields; otherwise keep the device's.
+        status = CASE WHEN ? THEN excluded.status ELSE inspections.status END,
+        rejection_reason = CASE WHEN ? THEN excluded.rejection_reason ELSE inspections.rejection_reason END,
+        rejected_by = CASE WHEN ? THEN excluded.rejected_by ELSE inspections.rejected_by END,
+        rejected_at = CASE WHEN ? THEN excluded.rejected_at ELSE inspections.rejected_at END,
+        server_version = excluded.server_version,
+        updated_at = datetime('now')`,
       inspection.id,
       inspection.title,
       inspection.templateId,
@@ -122,6 +177,7 @@ export class InspectionRepository {
       inspection.siteName,
       inspection.equipmentId,
       inspection.equipmentName,
+      inspection.equipmentQrCode ?? null,
       inspection.technicianId,
       inspection.supervisorId,
       inspection.supervisorName,
@@ -134,9 +190,34 @@ export class InspectionRepository {
       null, // completed_at
       inspection.progress,
       inspection.supervisorInstructions ?? null,
+      // PBI-062: persist the rejection metadata pulled from the server so the
+      // RejectionBanner and the "Corrigir" action have the reason offline.
+      inspection.rejectionReason ?? null,
+      inspection.rejectedBy ?? null,
+      inspection.rejectedAt ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
+      inspection.serverVersion ?? 0,
+      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0).
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
     );
+  }
+
+  /**
+   * Whether a template snapshot already exists locally for this inspection.
+   * Used by the pull to avoid rewriting an existing snapshot (which would cascade
+   * -delete the technician's evidences), honouring the immutable-snapshot rule
+   * (RN-021).
+   */
+  async hasSnapshot(inspectionId: string): Promise<boolean> {
+    const row = await this.db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM inspection_items WHERE inspection_id = ?',
+      inspectionId,
+    );
+    return (row?.count ?? 0) > 0;
   }
 
   async updateStatus(id: string, status: string): Promise<void> {
@@ -320,6 +401,7 @@ export class InspectionRepository {
     siteName: row.site_name,
     equipmentId: row.equipment_id,
     equipmentName: row.equipment_name,
+    equipmentQrCode: row.equipment_qr_code ?? undefined,
     technicianId: row.technician_id,
     supervisorId: row.supervisor_id,
     supervisorName: row.supervisor_name,
@@ -341,6 +423,7 @@ export class InspectionRepository {
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
+    serverVersion: row.server_version,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

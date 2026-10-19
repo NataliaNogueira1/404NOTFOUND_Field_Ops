@@ -12,6 +12,8 @@ RUN mvn -B -q clean package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /workspace/target/*-SNAPSHOT.jar app.jar
+COPY docker-entrypoint.sh /usr/local/bin/fieldops-entrypoint
+RUN chmod +x /usr/local/bin/fieldops-entrypoint
 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/usr/local/bin/fieldops-entrypoint"]

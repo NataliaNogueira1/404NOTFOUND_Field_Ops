@@ -1,6 +1,7 @@
 package com.fieldops.shared.security;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
+import com.fieldops.device.repository.DeviceTokenRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
 import com.fieldops.user.model.Role;
@@ -48,7 +49,8 @@ class RoleAuthorizationTest {
             "/api/v1/sites",
             "/api/v1/equipment",
             "/api/v1/inspection-templates",
-            "/api/v1/inspections");
+            "/api/v1/inspections",
+            "/api/v1/dashboard/summary");
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,6 +60,9 @@ class RoleAuthorizationTest {
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private DeviceTokenRepository deviceTokenRepository;
 
     @Autowired
     private InspectionRepository inspectionRepository;
@@ -73,6 +78,7 @@ class RoleAuthorizationTest {
         // The shared in-memory DB may carry rows from a previous test class. Clear children
         // before users, respecting FK order: inspections and templates reference users, and
         // refresh tokens reference users too.
+        deviceTokenRepository.deleteAll();
         inspectionRepository.deleteAll();
         templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
@@ -157,6 +163,16 @@ class RoleAuthorizationTest {
                                 + "\"password\":\"pass1234\",\"role\":\"TECHNICIAN\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void allowsAnAuthenticatedTechnicianToRegisterAPushToken() throws Exception {
+        mockMvc.perform(post("/api/v1/devices/register")
+                        .header("Authorization", bearer("tech@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pushToken\":\"ExponentPushToken[test-device]\",\"platform\":\"ANDROID\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.platform").value("ANDROID"));
     }
 
     /**

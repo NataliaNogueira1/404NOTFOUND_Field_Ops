@@ -8,10 +8,12 @@ import com.fieldops.client.repository.ClientRepository;
 import com.fieldops.equipment.model.Equipment;
 import com.fieldops.equipment.model.EquipmentStatus;
 import com.fieldops.equipment.repository.EquipmentRepository;
+import com.fieldops.device.service.PushNotificationService;
 import com.fieldops.inspection.dto.CancelInspectionResponse;
 import com.fieldops.inspection.dto.CreateInspectionRequest;
 import com.fieldops.inspection.dto.InspectionResponse;
 import com.fieldops.inspection.dto.ReviewDecisionResponse;
+import com.fieldops.inspection.dto.ReviewStartResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
@@ -52,11 +54,12 @@ public class InspectionService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final PushNotificationService pushNotificationService;
 
     public InspectionService(InspectionRepository inspectionRepository,
             InspectionTemplateVersionRepository versionRepository, ClientRepository clientRepository,
             InspectionSiteRepository siteRepository, EquipmentRepository equipmentRepository,
-            UserRepository userRepository, AuditService auditService) {
+            UserRepository userRepository, AuditService auditService, PushNotificationService pushNotificationService) {
         this.inspectionRepository = inspectionRepository;
         this.versionRepository = versionRepository;
         this.clientRepository = clientRepository;
@@ -64,6 +67,7 @@ public class InspectionService {
         this.equipmentRepository = equipmentRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     /** Creates an assigned inspection and freezes every checklist item from the selected version. */
@@ -85,6 +89,7 @@ public class InspectionService {
         auditService.recordInspection(supervisorId, AuditAction.INSPECTION_CREATED, saved.getId(), null);
         auditService.recordInspection(supervisorId, AuditAction.INSPECTION_ASSIGNED, saved.getId(),
                 "technicianId=" + technician.getId());
+        pushNotificationService.notifyInspectionAssigned(technician.getId(), saved.getId(), saved.getTitle());
 
         return toResponse(saved);
     }
@@ -132,6 +137,24 @@ public class InspectionService {
 
         return new ReviewDecisionResponse(saved.getId(), saved.getStatus(), saved.getReviewedAt(),
                 reviewer.getId(), null, saved.getRejectionReason());
+    }
+
+    /**
+     * Starts the formal review workflow for a submitted inspection (PBI-059).
+     * A review can only begin once, after the technician submits the inspection.
+     */
+    @Transactional
+    public ReviewStartResponse beginReview(Long inspectionId, Long reviewerId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (inspection.getStatus() != InspectionStatus.SUBMITTED) {
+            throw new BusinessException("Inspection must be submitted to begin review, but was "
+                    + inspection.getStatus());
+        }
+        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
+        Inspection saved = inspectionRepository.save(inspection);
+        auditService.recordInspection(reviewerId, AuditAction.INSPECTION_REVIEW_STARTED, saved.getId(), null);
+        return new ReviewStartResponse(saved.getId(), saved.getStatus());
     }
 
     /** Loads an inspection and enforces that it is currently UNDER_REVIEW (RN state machine). */
@@ -192,6 +215,7 @@ public class InspectionService {
         inspection.setClientName(client.getName());
         inspection.setSiteName(site.getName());
         inspection.setEquipmentName(equipment == null ? null : equipment.getName());
+        inspection.setEquipmentQrCode(equipment == null ? null : equipment.getQrCode());
         inspection.setTechnician(technician);
         inspection.setSupervisor(supervisor);
         inspection.setStatus(InspectionStatus.ASSIGNED);

@@ -42,8 +42,14 @@ const InspectionsPage = lazy(() =>
 const NewInspectionPage = lazy(() =>
   import('@/pages/inspections/NewInspectionPage').then((module) => ({ default: module.NewInspectionPage })),
 )
+const ReviewQueuePage = lazy(() =>
+  import('@/pages/inspections/ReviewQueuePage').then((module) => ({ default: module.ReviewQueuePage })),
+)
 const InspectionReviewPage = lazy(() =>
   import('@/pages/inspections/InspectionReviewPage').then((module) => ({ default: module.InspectionReviewPage })),
+)
+const InspectionReportPage = lazy(() =>
+  import('@/pages/inspections/InspectionReportPage').then((module) => ({ default: module.InspectionReportPage })),
 )
 const NonConformitiesPage = lazy(() =>
   import('@/pages/nonConformities/NonConformitiesPage').then((module) => ({ default: module.NonConformitiesPage })),
@@ -64,14 +70,8 @@ const TechnicianStartInspectionPage = lazy(() =>
 const TechnicianChecklistPage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianChecklistPage })),
 )
-const TechnicianNonConformitiesPage = lazy(() =>
-  import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianNonConformitiesPage })),
-)
 const TechnicianSummaryPage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianSummaryPage })),
-)
-const TechnicianSyncPage = lazy(() =>
-  import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianSyncPage })),
 )
 const TechnicianProfilePage = lazy(() =>
   import('@/pages/technician/TechnicianPages').then((module) => ({ default: module.TechnicianProfilePage })),
@@ -79,7 +79,7 @@ const TechnicianProfilePage = lazy(() =>
 
 function LoadingRoute() {
   return (
-    <div className="rounded-card border border-border bg-white p-6 text-sm text-muted shadow-fieldops">
+    <div className="rounded-card border border-border bg-surface p-6 text-sm text-muted shadow-fieldops">
       Carregando tela...
     </div>
   )
@@ -242,10 +242,26 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="inspections/review"
+            element={
+              <LazyPage>
+                <ReviewQueuePage />
+              </LazyPage>
+            }
+          />
+          <Route
             path="inspections/:id/review"
             element={
               <LazyPage>
                 <InspectionReviewPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="inspections/:id/report"
+            element={
+              <LazyPage>
+                <InspectionReportPage />
               </LazyPage>
             }
           />
@@ -311,26 +327,10 @@ export function AppRoutes() {
             }
           />
           <Route
-            path="inspections/:id/non-conformities"
-            element={
-              <LazyPage>
-                <TechnicianNonConformitiesPage />
-              </LazyPage>
-            }
-          />
-          <Route
             path="inspections/:id/summary"
             element={
               <LazyPage>
                 <TechnicianSummaryPage />
-              </LazyPage>
-            }
-          />
-          <Route
-            path="sync"
-            element={
-              <LazyPage>
-                <TechnicianSyncPage />
               </LazyPage>
             }
           />

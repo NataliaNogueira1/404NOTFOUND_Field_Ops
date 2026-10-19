@@ -68,6 +68,23 @@ npm run lint       # ESLint (flat config, TypeScript + react-hooks)
 npm run lint:fix   # ESLint corrigindo o que for automático
 ```
 
+### Public demo APK
+
+The `preview` EAS profile is bound to the EAS `preview` environment. After the API Blueprint in
+[`render.yaml`](../render.yaml) is live, set its HTTPS base URL in EAS before building the APK:
+
+```sh
+npx eas env:set --name EXPO_PUBLIC_API_URL \
+  --value https://<render-service>.onrender.com \
+  --environment preview --visibility plaintext
+npx eas env:list --environment preview
+npx eas build --platform android --profile preview
+```
+
+`EXPO_PUBLIC_API_URL` is intentionally a public build-time setting, not a secret. Changing it
+requires a new preview build. Verify `/actuator/health`, Swagger, and mobile login/inspection pull
+against the public URL before distributing the APK.
+
 ---
 
 ## Estrutura do projeto
@@ -118,6 +135,46 @@ import { Colors } from '@/config/theme';
 - Todas as telas leem do **SQLite**, então funcionam sem rede após o primeiro download.
 - Alterações locais (respostas, evidências, transições de estado) são enfileiradas em uma **outbox** (`sync_queue`) e enviadas quando há conexão.
 - Um banner de "modo offline" é exibido quando o dispositivo está sem rede.
+
+---
+
+## Build Android (APK) para demonstração
+
+O APK de demonstração é gerado com o **EAS Build**, conforme a [documentação oficial do Expo](https://docs.expo.dev/build-reference/apk/). Os perfis ficam em `eas.json`:
+
+| Perfil | Formato | Uso |
+|--------|---------|-----|
+| `development` | APK (dev client) | Desenvolvimento com dev client |
+| `preview` | APK (`buildType: apk`) | **Demonstração / instalação direta** no emulador ou dispositivo |
+| `production` | AAB (`app-bundle`) | Publicação na Google Play |
+
+### Pré-requisitos
+
+- **EAS CLI**: use via `npx eas-cli` (não precisa instalar global).
+- Conta **Expo** (`npx eas-cli login`) para builds na nuvem.
+- Para build **local**, é preciso ter o toolchain Android (JDK 17 + Android SDK).
+
+### Gerar o APK (nuvem)
+
+```sh
+npm run build:apk        # eas build --platform android --profile preview
+```
+
+Ao final, o EAS fornece um link para baixar o `.apk`. Envie o link ao dispositivo ou instale via `adb install caminho/do/arquivo.apk`.
+
+### Gerar o APK localmente (sem nuvem)
+
+```sh
+npm run build:apk:local  # eas build ... --profile preview --local
+```
+
+### Instalar a última build no emulador/dispositivo
+
+```sh
+npm run build:install    # eas build:run --platform android --latest
+```
+
+> O Application ID do Android é `com.fieldops.mobile` (definido em `app.json` → `android.package`).
 
 ---
 

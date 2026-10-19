@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+
+FROM maven:3.9-eclipse-temurin-21 AS build
+
+WORKDIR /workspace
+
+COPY pom.xml .
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -q dependency:go-offline
+
+COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -q clean package -DskipTests
+
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+RUN groupadd --system fieldops \
+    && useradd --system --gid fieldops --home-dir /app fieldops
+
+COPY --from=build --chown=fieldops:fieldops \
+    /workspace/target/fieldops-api-*.jar /app/app.jar
+
+USER fieldops
+
+ENV SPRING_PROFILES_ACTIVE=prod
+
+# Vercel injects PORT at runtime and expects the HTTP server to listen on it.
+CMD ["sh", "-c", "exec java -jar /app/app.jar --server.port=${PORT:-80}"]

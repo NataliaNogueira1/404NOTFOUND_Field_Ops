@@ -11,7 +11,6 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { clients, equipment, sites, users } from '@/mocks/domain'
 import { Priority, UserRole, UserStatus } from '@/types/domain'
 
 function formatVersionLabel(v: InspectionTemplateVersion): string {
@@ -31,9 +30,7 @@ export function NewInspectionPage() {
   const [versionsLoading, setVersionsLoading] = useState(false)
 
   // ── Location ───────────────────────────────────────────────────────────────
-  const [selectableClients, setSelectableClients] = useState(
-    clients.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name })),
-  )
+  const [selectableClients, setSelectableClients] = useState<{ id: string; name: string }[]>([])
   const [clientId, setClientId] = useState('')
   const [availableSites, setAvailableSites] = useState<{ id: string; clientId: string; name: string }[]>([])
   const [siteId, setSiteId] = useState('')
@@ -45,9 +42,7 @@ export function NewInspectionPage() {
   const [equipmentLoading, setEquipmentLoading] = useState(false)
 
   // ── Assignment ─────────────────────────────────────────────────────────────
-  const [technicians, setTechnicians] = useState(
-    users.filter((u) => u.role === UserRole.TECHNICIAN && u.active).map((u) => ({ id: String(u.id), name: u.name })),
-  )
+  const [technicians, setTechnicians] = useState<{ id: string; name: string }[]>([])
   const [techniciansLoading, setTechniciansLoading] = useState(true)
   const [technicianId, setTechnicianId] = useState('')
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM)
@@ -77,28 +72,40 @@ export function NewInspectionPage() {
 
   // ── Load versions when template changes ────────────────────────────────────
   useEffect(() => {
-    // Reset synchronously outside the effect body (via the loader) to avoid cascading
-    // renders flagged by react-hooks/set-state-in-effect.
-    async function loadVersions() {
-      if (!templateId) {
+    let active = true
+
+    // No template selected: clear the version state. Done inside an async
+    // callback (not synchronously in the effect body) to satisfy
+    // react-hooks/set-state-in-effect.
+    if (!templateId) {
+      void Promise.resolve().then(() => {
+        if (!active) return
         setAvailableVersions([])
         setSelectedVersion(null)
-        return
-      }
+        setVersionsLoading(false)
+      })
+      return () => { active = false }
+    }
+
+    async function loadVersions(id: string) {
       setVersionsLoading(true)
       try {
-        const versions = await adminCatalogApi.listTemplateVersions(templateId)
+        const versions = await adminCatalogApi.listTemplateVersions(id)
+        if (!active) return
         setAvailableVersions(versions)
         // Default to the latest (only) published version
         setSelectedVersion(versions.length > 0 ? versions[versions.length - 1] : null)
       } catch {
+        if (!active) return
         setAvailableVersions([])
         setSelectedVersion(null)
       } finally {
-        setVersionsLoading(false)
+        if (active) setVersionsLoading(false)
       }
     }
-    void loadVersions()
+
+    void loadVersions(templateId)
+    return () => { active = false }
   }, [templateId])
 
   // ── Load active clients on mount ───────────────────────────────────────────
@@ -122,13 +129,7 @@ export function NewInspectionPage() {
       .then((result) =>
         setAvailableSites(result.content.map((s) => ({ id: s.id, clientId: s.clientId, name: s.name }))),
       )
-      .catch(() =>
-        setAvailableSites(
-          sites
-            .filter((s) => s.active && s.clientId === clientId)
-            .map((s) => ({ id: s.id, clientId: s.clientId, name: s.name })),
-        ),
-      )
+      .catch(() => setAvailableSites([]))
       .finally(() => setSitesLoading(false))
   }, [clientId])
 
@@ -142,13 +143,7 @@ export function NewInspectionPage() {
       .then((result) =>
         setAvailableEquipment(result.content.map((e) => ({ id: e.id, siteId: e.siteId, name: e.name }))),
       )
-      .catch(() =>
-        setAvailableEquipment(
-          equipment
-            .filter((e) => e.active && e.siteId === siteId)
-            .map((e) => ({ id: e.id, siteId: e.siteId, name: e.name })),
-        ),
-      )
+      .catch(() => setAvailableEquipment([]))
       .finally(() => setEquipmentLoading(false))
   }, [siteId])
 

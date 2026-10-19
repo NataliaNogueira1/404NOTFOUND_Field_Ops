@@ -4,10 +4,84 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { InspectionsPage } from '@/pages/inspections/InspectionsPage'
 
-describe('InspectionsPage filters', () => {
-  afterEach(cleanup)
+/** Retorna uma resposta paginada vazia */
+function emptyPage() {
+  return Promise.resolve(
+    new Response(
+      JSON.stringify({
+        content: [],
+        totalElements: 0,
+        totalPages: 1,
+        number: 0,
+        size: 10,
+        first: true,
+        last: true,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ),
+  )
+}
 
-  it('searches inspections by related equipment name', async () => {
+/** Retorna uma página com uma inspeção de exemplo */
+function pageWith(inspection: Record<string, unknown>) {
+  return Promise.resolve(
+    new Response(
+      JSON.stringify({
+        content: [inspection],
+        totalElements: 1,
+        totalPages: 1,
+        number: 0,
+        size: 10,
+        first: true,
+        last: true,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ),
+  )
+}
+
+const apiInspection = {
+  id: 9,
+  title: 'Inspecao API',
+  clientName: 'Industria Modelo',
+  siteName: 'Matriz',
+  equipmentName: 'Compressor',
+  technicianId: 3,
+  technicianName: 'Carlos Henrique',
+  priority: 'HIGH',
+  dueDate: '2026-09-04',
+  status: 'ASSIGNED',
+  progress: 0,
+  overdue: false,
+}
+
+describe('InspectionsPage', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('exibe tabela vazia quando a API retorna lista vazia', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => emptyPage()),
+    )
+    render(
+      <MemoryRouter>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    // Aguarda carregamento terminar
+    await waitFor(() => {
+      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+    })
+
+    // Sem dados na tabela
+    expect(screen.queryByRole('button', { name: /abrir|revisar/i })).toBeNull()
+  })
+
+  it('exibe tabela vazia quando a API está indisponível (sem fallback mock)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.reject(new Error('offline'))),
@@ -18,46 +92,16 @@ describe('InspectionsPage filters', () => {
       </MemoryRouter>,
     )
 
-    await userEvent.type(screen.getByLabelText(/busca/i), 'Gerador Diesel')
-
     await waitFor(() => {
-      expect(screen.getByText(/inspecao gerador diesel/i)).not.toBeNull()
-      expect(screen.queryByText(/inspecao extintor p12/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
     })
+
+    // Com API offline, a tabela deve ficar vazia (sem fallback mock)
+    expect(screen.queryByRole('button', { name: /abrir|revisar/i })).toBeNull()
   })
 
-  it('loads filtered and sorted inspections from the paginated API', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            content: [
-              {
-                id: 9,
-                title: 'Inspecao API',
-                clientName: 'Industria Modelo',
-                siteName: 'Matriz',
-                equipmentName: 'Compressor',
-                technicianId: 3,
-                technicianName: 'Carlos Henrique',
-                priority: 'HIGH',
-                dueDate: '2026-09-04',
-                status: 'ASSIGNED',
-                progress: 0,
-                overdue: false,
-              },
-            ],
-            totalElements: 42,
-            totalPages: 5,
-            number: 0,
-            size: 10,
-            first: true,
-            last: false,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ),
-    )
+  it('carrega inspeções paginadas da API com filtros corretos', async () => {
+    const fetchMock = vi.fn(() => pageWith(apiInspection))
     vi.stubGlobal('fetch', fetchMock)
     render(
       <MemoryRouter initialEntries={['/app/inspections?status=ASSIGNED&sort=dueDate%2Cdesc']}>
@@ -66,14 +110,14 @@ describe('InspectionsPage filters', () => {
     )
 
     expect(await screen.findByText('Inspecao API')).not.toBeNull()
-    expect(screen.getByText('Mostrando 1-10 de 42')).not.toBeNull()
+    expect(screen.getByText('Mostrando 1-1 de 1')).not.toBeNull()
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringMatching(/inspections\?.*sort=dueDate%2Cdesc.*status=ASSIGNED/),
       expect.anything(),
     )
   })
 
-  it('cancels an inspection through the API with the informed reason and refetches the list', async () => {
+  it('cancela uma inspeção via API com o motivo informado e recarrega a lista', async () => {
     let cancelBody: Record<string, unknown> | undefined
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
@@ -92,35 +136,7 @@ describe('InspectionsPage filters', () => {
           ),
         )
       }
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            content: [
-              {
-                id: 9,
-                title: 'Inspecao API',
-                clientName: 'Industria Modelo',
-                siteName: 'Matriz',
-                equipmentName: 'Compressor',
-                technicianId: 3,
-                technicianName: 'Carlos Henrique',
-                priority: 'HIGH',
-                dueDate: '2026-09-04',
-                status: 'ASSIGNED',
-                progress: 0,
-                overdue: false,
-              },
-            ],
-            totalElements: 1,
-            totalPages: 1,
-            number: 0,
-            size: 10,
-            first: true,
-            last: false,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
+      return pageWith(apiInspection)
     })
     vi.stubGlobal('fetch', fetchMock)
     render(
@@ -137,5 +153,93 @@ describe('InspectionsPage filters', () => {
     await waitFor(() => expect(cancelBody).toEqual({ reason: 'Cliente solicitou reagendamento' }))
     expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/v1/inspections?'))).toHaveLength(2)
     expect(await screen.findByText(/inspecao cancelada com sucesso/i)).not.toBeNull()
+  })
+
+  it('exibe erro de validação ao tentar cancelar com motivo menor que 10 caracteres', async () => {
+    const fetchMock = vi.fn(() => pageWith(apiInspection))
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <MemoryRouter>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('Inspecao API')
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+    await userEvent.type(screen.getByLabelText(/motivo/i), 'Curto')
+    await userEvent.click(screen.getByRole('button', { name: /confirmar cancelamento/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/pelo menos 10 caracteres/i)
+  })
+
+  it('carrega nomes de técnicos e clientes da API para os selects de filtro', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/v1/users?')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              content: [
+                { id: 3, name: 'Carlos Henrique', email: 'carlos@example.com', role: 'TECHNICIAN', status: 'ACTIVE', phone: null, version: 1 },
+              ],
+              totalElements: 1,
+              totalPages: 1,
+              number: 0,
+              size: 200,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (url.includes('/api/v1/clients?')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              content: [
+                { id: 1, name: 'Industria Modelo', legalName: null, document: null, email: null, phone: null, status: 'ACTIVE', activeSitesCount: 2, version: 1 },
+              ],
+              totalElements: 1,
+              totalPages: 1,
+              number: 0,
+              size: 200,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return emptyPage()
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <MemoryRouter>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    // Aguarda os nomes aparecerem nos selects
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Carlos Henrique' })).toBeInTheDocument()
+    })
+    expect(screen.getByRole('option', { name: 'Industria Modelo' })).toBeInTheDocument()
+  })
+
+  it('renderiza filtros sem dados quando a API de usuários/clientes falha', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('network error'))),
+    )
+    render(
+      <MemoryRouter>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+    })
+
+    // Os selects de técnico e cliente devem existir mas sem opções além de "Todos"
+    expect(screen.getByLabelText(/tecnico/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
   })
 })
