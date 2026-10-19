@@ -31,12 +31,12 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-pressed={effectiveTheme === 'dark'}
       title={`Tema: ${LABEL[theme]}`}
       className={cn(
-        'focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-fieldops border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-primary-light/30',
+        'focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-fieldops border border-border bg-surface px-2.5 text-sm font-medium text-text transition-colors hover:bg-primary-light/30 sm:px-3',
         className,
       )}
     >
       <Icon size={18} aria-hidden="true" />
-      <span>{LABEL[theme]}</span>
+      <span className="hidden sm:inline">{LABEL[theme]}</span>
     </button>
   )
 }
