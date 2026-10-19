@@ -90,7 +90,7 @@ export function TechnicianLayout() {
         </div>
       </aside>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-border bg-surface/90 px-4 backdrop-blur lg:px-8">
           <button
             className="focus-ring rounded-fieldops p-2 text-muted hover:bg-primary-light/30 lg:hidden"
             onClick={() => setOpen(true)}
@@ -98,11 +98,11 @@ export function TechnicianLayout() {
           >
             <Menu />
           </button>
-          <div>
-            <p className="text-sm font-semibold text-text">Portal do Tecnico</p>
-            <p className="text-xs text-muted">Operacao de campo web</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-text">Portal do Tecnico</p>
+            <p className="hidden text-xs text-muted sm:block">Operacao de campo web</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <button
               className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
