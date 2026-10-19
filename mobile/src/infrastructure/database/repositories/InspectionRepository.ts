@@ -44,6 +44,9 @@ interface InspectionRow {
   start_latitude: number | null;
   start_longitude: number | null;
   start_accuracy: number | null;
+  completion_latitude: number | null;
+  completion_longitude: number | null;
+  completion_accuracy: number | null;
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
@@ -313,6 +316,24 @@ export class InspectionRepository {
     );
   }
 
+  /** Persist the device completion timestamp and optional foreground GPS reading. */
+  async markSubmittedWithDevice(
+    id: string,
+    completedAtDevice: string,
+    location: { latitude: number; longitude: number; accuracy?: number } | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET status = 'SUBMITTED', completed_at = ?,
+       completion_latitude = ?, completion_longitude = ?, completion_accuracy = ?,
+       progress = 100, sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
+      completedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
+      id,
+    );
+  }
+
   // ─── Sections & Items (template snapshot) ──────────────────────────────────
 
   async saveTemplate(inspectionId: string, template: InspectionTemplate): Promise<void> {
@@ -452,6 +473,9 @@ export class InspectionRepository {
     startLatitude: row.start_latitude ?? undefined,
     startLongitude: row.start_longitude ?? undefined,
     startAccuracy: row.start_accuracy ?? undefined,
+    completionLatitude: row.completion_latitude ?? undefined,
+    completionLongitude: row.completion_longitude ?? undefined,
+    completionAccuracy: row.completion_accuracy ?? undefined,
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,

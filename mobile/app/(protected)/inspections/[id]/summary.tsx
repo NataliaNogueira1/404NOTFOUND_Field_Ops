@@ -19,6 +19,7 @@ import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
+import { useLocation } from '@/infrastructure/location';
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +27,7 @@ export default function SummaryScreen() {
   const c = useThemeColors();
   const { answers, evidences, nonConformities, inspections, concludeInspection, saveSignature } =
     useFieldOps();
+  const location = useLocation();
   const { template } = useInspectionTemplate(id);
 
   const [confirm, setConfirm] = useState(false);
@@ -113,8 +115,9 @@ export default function SummaryScreen() {
     setConfirm(true);
   }
 
-  function conclude() {
-    concludeInspection(id);
+  async function conclude() {
+    const captured = await location.capture();
+    concludeInspection(id, { completedAtDevice: new Date().toISOString(), location: captured });
     setConfirm(false);
     router.replace('/(protected)/(tabs)/sync');
   }

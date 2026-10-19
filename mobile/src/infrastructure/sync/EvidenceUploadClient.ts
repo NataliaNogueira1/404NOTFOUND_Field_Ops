@@ -3,31 +3,19 @@ import { Platform } from 'react-native';
 /**
  * Isolated client for uploading an evidence file to the server (PBI-044, RN-078).
  *
- * ⚠️ Contract status: the backend does **not** expose an evidence upload endpoint
- * yet (only `POST /api/v1/mobile/sync/push` with type `INSPECTION_STATUS` is
- * implemented — see `SyncOperationType.java`). The multipart contract below
- * (`POST /api/v1/inspections/{id}/evidence`) mirrors what `mobile-spec.md`
- * documents, but until the server ships it, uploads must stay PENDING/FAILED and
- * never be faked as "sent".
- *
- * To avoid inventing a live contract, the upload is **disabled by default** and
- * throws a descriptive error (which the outbox records as `last_error`, keeping
- * the photo pending). When the endpoint exists, flip `EXPO_PUBLIC_EVIDENCE_UPLOAD`
- * to `"enabled"` and the same code path performs the real multipart upload —
- * confirmation is then based on the actual HTTP response, not on the request
- * merely being started.
+ * The server endpoint persists the binary and metadata idempotently. The outbox
+ * supplies a stable UUID so retries remain safe after connectivity failures.
  */
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
-const UPLOAD_ENABLED = process.env.EXPO_PUBLIC_EVIDENCE_UPLOAD === 'enabled';
-
 export interface EvidenceUploadInput {
   inspectionId: string;
   itemId: string;
-  responseId?: string;
   localUri: string;
   description?: string;
   mimeType?: string;
+  capturedAtDevice: string;
+  operationId: string;
 }
 
 export interface EvidenceUploadResult {
@@ -46,18 +34,12 @@ export class EvidenceUploadClient {
       throw new Error('Evidence has no local file to upload.');
     }
 
-    if (!UPLOAD_ENABLED) {
-      // No server contract available yet — do NOT fake success (PBI-044 rule).
-      throw new Error(
-        'Upload de evidência indisponível: o endpoint de upload ainda não existe no backend.',
-      );
-    }
-
     const form = new FormData();
-    form.append('inspectionId', input.inspectionId);
     form.append('itemId', input.itemId);
-    if (input.responseId) form.append('responseId', input.responseId);
     if (input.description) form.append('description', input.description);
+    if (input.mimeType) form.append('mimeType', input.mimeType);
+    form.append('capturedAtDevice', input.capturedAtDevice);
+    form.append('operationId', input.operationId);
     // React Native FormData file shape.
     form.append('file', {
       uri: input.localUri,
@@ -83,8 +65,8 @@ export class EvidenceUploadClient {
       throw new Error(`Upload falhou (API ${response.status}): ${message}`);
     }
 
-    const data = (await response.json().catch(() => ({}))) as { storageKey?: string };
-    return { status: 'APPLIED', storageKey: data.storageKey };
+    const data = (await response.json().catch(() => ({}))) as { id?: number; checksum?: string };
+    return { status: 'APPLIED', storageKey: data.checksum ?? String(data.id ?? '') };
   }
 }
 

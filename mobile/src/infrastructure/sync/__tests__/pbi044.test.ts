@@ -209,6 +209,13 @@ describe('PBI-044 — photo pending on upload failure', () => {
     const result = await service.pushPendingOperations(TOKEN);
 
     expect(result.sent).toBe(1);
+    expect(mockUpload).toHaveBeenCalledWith(TOKEN, expect.objectContaining({
+      inspectionId: INSPECTION_ID,
+      itemId: ITEM_ID,
+      capturedAtDevice: evidence.capturedAt,
+      operationId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab]/i),
+    }));
+    expect(mockUpload.mock.calls[0][1]).not.toHaveProperty('responseId');
     const stored = await evidenceRepo.getById(evidence.id);
     expect(stored?.syncStatus).toBe('synced');
     expect(stored?.lastError).toBeUndefined();

@@ -471,6 +471,8 @@ export class InspectionSyncService {
       responseId?: string;
       uri?: string;
       description?: string;
+      capturedAt: string;
+      operationId: string;
     },
   ): Promise<void> {
     // Prefer the freshest URI from the DB (retry reuses the persisted file).
@@ -483,9 +485,10 @@ export class InspectionSyncService {
     await evidenceUploadClient.upload(token, {
       inspectionId: payload.inspectionId,
       itemId: payload.itemId,
-      responseId: payload.responseId,
       localUri,
       description: payload.description,
+      capturedAtDevice: payload.capturedAt,
+      operationId: payload.operationId,
     });
   }
 
@@ -753,6 +756,7 @@ export class InspectionSyncService {
         uri: evidence.uri,
         description: evidence.description,
         capturedAt: evidence.capturedAt,
+        operationId: randomUuidV4(),
       },
       dependencyIds,
     );
