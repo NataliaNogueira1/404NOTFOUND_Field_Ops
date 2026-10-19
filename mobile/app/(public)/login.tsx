@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
   brandMark: { width: 64, height: 64, borderRadius: 18, alignSelf: 'center', marginBottom: Spacing.md },
   title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, textAlign: 'center' },
-  subtitle: { marginTop: Spacing.sm, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.xl },
+  subtitle: { marginTop: Spacing.sm, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.lg },
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
