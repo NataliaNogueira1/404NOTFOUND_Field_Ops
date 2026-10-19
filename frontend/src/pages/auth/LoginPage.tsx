@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +9,7 @@ import { authSession, roleHome } from '@/auth/session'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import fieldOpsLogo from '@/assets/fieldops-logo.png'
 
 const loginSchema = z.object({
   email: z.email('Informe um e-mail valido'),
@@ -48,15 +49,20 @@ export function LoginPage() {
     setValue('password', '123456', { shouldValidate: true })
   }
   return (
-    <Card className="mx-auto w-full max-w-md p-7 sm:p-9">
+    <Card className="mx-auto w-full max-w-md px-7 py-10 sm:px-9 sm:py-14">
       <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-card bg-primary text-white shadow-fieldops">
-          <ShieldCheck size={29} />
-        </div>
+        <img
+          src={fieldOpsLogo}
+          alt="FieldOps"
+          className="mx-auto mb-4 h-14 w-14 rounded-card shadow-fieldops"
+        />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mt-1 text-sm text-muted">Acesso web integrado a API</p>
+        <p className="mt-3 text-sm text-muted">Transforme inspecoes de campo em decisoes confiaveis</p>
       </div>
-      <div className="mb-6 grid gap-2 sm:grid-cols-2">
+      <div className="mb-6 grid gap-2 sm:grid-cols-3">
+        <Button variant="secondary" onClick={() => fillProfile('ana@fieldops.com')}>
+          Admin
+        </Button>
         <Button variant="secondary" onClick={() => fillProfile('marina@fieldops.com')}>
           Supervisor
         </Button>
@@ -95,10 +101,6 @@ export function LoginPage() {
           {isSubmitting ? 'Entrando...' : 'Entrar'} <ArrowRight size={17} />
         </Button>
       </form>
-      <div className="mt-7 rounded-fieldops border border-border bg-app-bg p-3 text-xs text-muted">
-        <p>Use credenciais cadastradas no backend.</p>
-        <p>O perfil e o redirecionamento vêm da API.</p>
-      </div>
     </Card>
   )
 }
