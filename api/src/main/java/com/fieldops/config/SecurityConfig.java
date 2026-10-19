@@ -65,6 +65,11 @@ public class SecurityConfig {
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR")
                         .requestMatchers("/api/v1/users/**").hasAuthority("ADMINISTRATOR")
                         .requestMatchers("/api/v1/mobile/**").hasAuthority("TECHNICIAN")
+                        // Technician-owned multipart evidence upload (PBI-221): the owning technician
+                        // uploads a photo for an inspection item. Must precede the supervisor-scoped
+                        // /api/v1/inspections/** rule so ownership (not a path role) governs access.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/inspections/*/evidence")
+                        .hasAuthority("TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/inspections/*/review-comments")
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers("/api/v1/equipment/by-qr/**")
