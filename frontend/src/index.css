@@ -83,3 +83,23 @@
     box-shadow: var(--shadow-soft);
   }
 }
+
+/* Native date/time inputs: in dark mode the browser's calendar-picker icon
+   renders dark-on-dark and becomes invisible. `color-scheme: dark` makes the
+   UA style the control (and its indicator) for a dark background, and the
+   explicit invert keeps the WebKit indicator legible across engines. */
+.dark input[type='date'],
+.dark input[type='time'],
+.dark input[type='datetime-local'],
+.dark input[type='month'],
+.dark input[type='week'] {
+  color-scheme: dark;
+}
+
+.dark input[type='date']::-webkit-calendar-picker-indicator,
+.dark input[type='time']::-webkit-calendar-picker-indicator,
+.dark input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.dark input[type='month']::-webkit-calendar-picker-indicator,
+.dark input[type='week']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
