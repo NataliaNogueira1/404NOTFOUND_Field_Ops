@@ -404,16 +404,19 @@ export class InspectionSyncService {
     inspectionId: string,
     payload: { operationId?: string; status: string; baseVersion?: number },
   ): Promise<void> {
-    if (payload.baseVersion === undefined) {
-      throw new Error('Operation is missing its base server version.');
-    }
+    // Tolerate a missing baseVersion instead of throwing. Legacy outbox rows
+    // enqueued before PBI-055 (server version tracking) have no baseVersion;
+    // rejecting them would wedge the operation as a permanent error that never
+    // drains. Default to 0 — the same `?? 0` fallback the enqueue path uses —
+    // which matches a never-bumped inspection (version 0). Any real divergence
+    // still comes back as CONFLICT below and is preserved, never lost.
     const operationId = payload.operationId ?? randomUuidV4();
     const body: SyncPushBody = {
       operations: [
         {
           operationId,
           type: 'INSPECTION_STATUS',
-          baseVersion: payload.baseVersion,
+          baseVersion: payload.baseVersion ?? 0,
           dependencyIds: [],
           payload: { inspectionId, status: payload.status },
         },

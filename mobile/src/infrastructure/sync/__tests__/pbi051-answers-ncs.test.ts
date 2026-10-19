@@ -280,4 +280,31 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     expect(await queueRepo.countPending()).toBe(0);
     expect(mockPost).toHaveBeenCalledTimes(2);
   });
+
+  // ── Robustness: a legacy status op without baseVersion must not wedge sync ──
+
+  it('sends a legacy inspection-status op that has no baseVersion instead of failing it', async () => {
+    // Simulate an outbox row enqueued before PBI-055 (no baseVersion in the
+    // payload). This used to throw "missing its base server version", flag the
+    // op as a permanent error and keep it stuck in the queue forever.
+    await queueRepo.enqueue('status-legacy', 'TRANSITION', 'inspection', INSPECTION_ID, {
+      status: 'IN_PROGRESS',
+      // no baseVersion / no operationId on purpose
+    });
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    const result = await service.pushPendingOperations(TOKEN);
+
+    // It is now sent and drains from the queue — not left as an error.
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(await queueRepo.countPending()).toBe(0);
+
+    // The request defaults baseVersion to 0 (a never-bumped inspection).
+    const [, body] = mockPost.mock.calls[0];
+    const op = body.operations[0];
+    expect(op.type).toBe('INSPECTION_STATUS');
+    expect(op.baseVersion).toBe(0);
+    expect(op.payload).toMatchObject({ inspectionId: INSPECTION_ID, status: 'IN_PROGRESS' });
+  });
 });
