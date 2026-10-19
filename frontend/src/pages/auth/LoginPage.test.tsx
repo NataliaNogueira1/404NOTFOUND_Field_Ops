@@ -72,13 +72,13 @@ describe('LoginPage — dark theme (issue #172)', () => {
 
   it('tagline does not use hardcoded slate text colors', () => {
     renderLoginPage()
-    const tagline = screen.getByText(/suas inspecoes de campo/i)
+    const tagline = screen.getByText(/transforme inspecoes de campo/i)
     expect(tagline.className).not.toMatch(/text-slate-\d/)
   })
 
   it('tagline uses a semantic token class that adapts to dark mode', () => {
     renderLoginPage()
-    const tagline = screen.getByText(/suas inspecoes de campo/i)
+    const tagline = screen.getByText(/transforme inspecoes de campo/i)
     // text-muted is redefined under .dark in index.css
     expect(tagline.className).toMatch(/text-muted/)
   })
