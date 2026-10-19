@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fieldops.inspection.dto.MobileInspectionResponse;
 import com.fieldops.inspection.dto.MobileInspectionResponse.ItemDto;
+import com.fieldops.inspection.dto.MobileInspectionResponse.ReviewCommentDto;
 import com.fieldops.inspection.dto.MobileInspectionResponse.SectionDto;
 import com.fieldops.inspection.dto.MobileInspectionResponse.TemplateDto;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateVersion;
+import com.fieldops.reviewcomment.repository.ReviewCommentRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -34,9 +36,12 @@ import java.util.Map;
 public class MobileInspectionResponseMapper {
 
     private final ObjectMapper objectMapper;
+    private final ReviewCommentRepository reviewCommentRepository;
 
-    public MobileInspectionResponseMapper(ObjectMapper objectMapper) {
+    public MobileInspectionResponseMapper(ObjectMapper objectMapper,
+            ReviewCommentRepository reviewCommentRepository) {
         this.objectMapper = objectMapper;
+        this.reviewCommentRepository = reviewCommentRepository;
     }
 
     public MobileInspectionResponse toResponse(Inspection inspection) {
@@ -76,7 +81,20 @@ public class MobileInspectionResponseMapper {
                 inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
                 inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
                 inspection.getVersion(),
-                templateDto);
+                templateDto,
+                toReviewComments(inspection.getId()));
+    }
+
+    /** Reviewer guidance delivered with the technician's offline pull, ordered by section/item/time. */
+    private List<ReviewCommentDto> toReviewComments(Long inspectionId) {
+        return reviewCommentRepository.findByInspectionIdOrdered(inspectionId).stream()
+                .map(comment -> new ReviewCommentDto(
+                        String.valueOf(comment.getId()),
+                        String.valueOf(comment.getItemSnapshot().getSourceTemplateItemId()),
+                        comment.getComment(),
+                        comment.getCreatedBy().getName(),
+                        comment.getCreatedAt().toString()))
+                .toList();
     }
 
     private List<SectionDto> toSectionDtos(List<InspectionItemSnapshot> snapshots) {

@@ -5,24 +5,12 @@ import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button, Card } from '@/design-system';
 import { useThemeColors } from '@/features/theme';
 import {
+  buildSyncScreenViewModel,
   formatLastSync,
   useSyncStatus,
-  type SyncOperationDisplayStatus,
+  SYNC_STATUS_META,
   type SyncOperationView,
 } from '@/features/synchronization';
-
-// Maps each real outbox display status to the acceptance-criteria icon + copy.
-// colorKey points to a theme token so the status color follows light/dark.
-const STATUS_META: Record<
-  SyncOperationDisplayStatus,
-  { icon: string; label: string; colorKey: 'success' | 'warningDark' | 'danger' }
-> = {
-  synced: { icon: '✓', label: 'Sincronizada', colorKey: 'success' },
-  pending: { icon: '⏳', label: 'Pendente', colorKey: 'warningDark' },
-  error: { icon: '❌', label: 'Falha', colorKey: 'danger' },
-  waiting: { icon: '⚠️', label: 'Aguardando', colorKey: 'warningDark' },
-  conflict: { icon: '⚠️', label: 'Conflito de versão', colorKey: 'danger' },
-};
 
 export default function SyncScreen() {
   const c = useThemeColors();
@@ -31,20 +19,13 @@ export default function SyncScreen() {
     operations, lastSyncError, triggerSync,
   } = useSyncStatus();
 
-  const statusText = isSyncing ? 'Sincronizando…' : pendingCount > 0 ? 'Pendências locais' : 'Sincronizado';
-  const pendingLabel = pendingCount === 1 ? '1 operação pendente' : `${pendingCount} operações pendentes`;
-  const syncButtonLabel = isSyncing ? 'Sincronizando…' : isOnline ? 'Sincronizar agora' : 'Sincronizar agora (offline)';
-  const failedPhotos = operations.filter((op) => op.entityType === 'evidence' && op.displayStatus === 'error').length;
-  const hasFailedOperations = operations.some((op) => op.displayStatus === 'error');
-  const conflictCount = operations.filter((op) => op.displayStatus === 'conflict').length;
+  const view = buildSyncScreenViewModel({ isOnline, isSyncing, pendingCount, operations });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
-      {!isOnline ? (
+      {view.offlineBanner ? (
         <View style={[styles.offlineBanner, { backgroundColor: c.gray800 }]} accessibilityRole="alert">
-          <Text style={styles.offlineText}>
-            ⚠️ Você está offline. As alterações serão sincronizadas quando a conexão voltar.
-          </Text>
+          <Text style={styles.offlineText}>{`⚠️ ${view.offlineBanner}`}</Text>
         </View>
       ) : null}
       <ScrollView contentContainerStyle={styles.container}>
@@ -56,38 +37,36 @@ export default function SyncScreen() {
           </View>
           <Text style={[styles.label, { color: c.textSecondary }]}>Última sincronização</Text>
           <Text style={[styles.date, { color: c.text }]}>{formatLastSync(lastSuccessfulSyncAt)}</Text>
-          <Text style={[styles.value, { color: c.text }]}>{statusText}</Text>
-          <Text style={[styles.muted, { color: c.textSecondary }]}>{pendingLabel}</Text>
-          <Button label={syncButtonLabel} onPress={triggerSync} loading={isSyncing} disabled={!isOnline || isSyncing} fullWidth />
+          <Text style={[styles.value, { color: c.text }]}>{view.statusText}</Text>
+          <Text style={[styles.muted, { color: c.textSecondary }]}>{view.pendingLabel}</Text>
+          <Button label={view.syncButtonLabel} onPress={triggerSync} loading={isSyncing} disabled={view.syncDisabled} fullWidth />
           {lastSyncError ? (
             <Text style={styles.errorText} numberOfLines={3}>{`❌ ${lastSyncError}`}</Text>
           ) : null}
         </Card>
         <Text style={[styles.section, { color: c.text }]}>Operações</Text>
 
-        {conflictCount > 0 ? (
+        {view.conflictBanner ? (
           <View style={[styles.conflictBanner, { backgroundColor: c.dangerLight }]} accessibilityRole="alert">
-            <Text style={[styles.conflictText, { color: c.danger }]}>
-              ⚠️ {conflictCount === 1 ? '1 conflito de versão preservado no dispositivo.' : `${conflictCount} conflitos de versão preservados no dispositivo.`}
-            </Text>
+            <Text style={[styles.conflictText, { color: c.danger }]}>{`⚠️ ${view.conflictBanner}`}</Text>
           </View>
         ) : null}
 
-        {operations.length === 0 ? (
+        {view.emptyStateText ? (
           <Card style={styles.card}>
-            <Text style={[styles.muted, { color: c.textSecondary }]}>Nenhuma operação na fila de sincronização.</Text>
+            <Text style={[styles.muted, { color: c.textSecondary }]}>{view.emptyStateText}</Text>
           </Card>
         ) : (
           operations.map((operation) => (
             <OperationRow key={operation.id} operation={operation} />
           ))
         )}
-        {hasFailedOperations ? (
-          <Button label="Tentar novamente" onPress={triggerSync} variant="secondary" disabled={!isOnline || isSyncing} fullWidth />
+        {view.hasFailedOperations ? (
+          <Button label="Tentar novamente" onPress={triggerSync} variant="secondary" disabled={view.syncDisabled} fullWidth />
         ) : null}
         <Card style={styles.card}>
           <Text style={[styles.section, { color: c.text }]}>Dispositivo</Text>
-          <Row label="Fotos com falha" value={String(failedPhotos)} />
+          <Row label="Fotos com falha" value={String(view.failedPhotos)} />
         </Card>
       </ScrollView>
     </SafeAreaView>
@@ -96,7 +75,7 @@ export default function SyncScreen() {
 
 function OperationRow({ operation }: { operation: SyncOperationView }) {
   const c = useThemeColors();
-  const meta = STATUS_META[operation.displayStatus];
+  const meta = SYNC_STATUS_META[operation.displayStatus];
   const color = c[meta.colorKey];
   return (
     <Card style={styles.operation}>

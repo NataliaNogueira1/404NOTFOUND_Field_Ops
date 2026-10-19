@@ -9,6 +9,7 @@ import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.shared.exception.ResourceConflictException;
 import com.fieldops.sync.service.IdempotencyService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,5 +99,21 @@ public class MobileInspectionService {
                 technicianId, mobileStatuses);
 
         return inspections.stream().map(responseMapper::toResponse).toList();
+    }
+
+    /**
+     * Fetches one inspection detail for its assigned technician (issue #222).
+     *
+     * <p>Use this after a list sync when the device needs to refresh one local inspection;
+     * ownership is verified before the snapshot is exposed.</p>
+     */
+    @Transactional(readOnly = true)
+    public MobileInspectionResponse getInspectionForTechnician(Long inspectionId, Long technicianId) {
+        Inspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
+        if (!inspection.getTechnician().getId().equals(technicianId)) {
+            throw new AccessDeniedException("Inspection is not assigned to this technician");
+        }
+        return responseMapper.toResponse(inspection);
     }
 }

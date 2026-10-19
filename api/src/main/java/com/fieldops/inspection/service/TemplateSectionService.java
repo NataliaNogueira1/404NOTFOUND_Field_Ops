@@ -6,6 +6,7 @@ import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.InspectionTemplateStatus;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import java.util.Comparator;
@@ -17,10 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemplateSectionService {
 
     private final InspectionTemplateRepository templateRepository;
+    private final TemplateSectionRepository sectionRepository;
     private final TemplateItemService itemService;
 
-    public TemplateSectionService(InspectionTemplateRepository templateRepository, TemplateItemService itemService) {
+    public TemplateSectionService(InspectionTemplateRepository templateRepository,
+            TemplateSectionRepository sectionRepository, TemplateItemService itemService) {
         this.templateRepository = templateRepository;
+        this.sectionRepository = sectionRepository;
         this.itemService = itemService;
     }
 
@@ -35,9 +39,15 @@ public class TemplateSectionService {
         TemplateSection section = new TemplateSection();
         section.setTemplate(template);
         apply(section, request);
-        template.getSections().add(section);
+        // Persist the section through its own repository first so the generated IDENTITY id and
+        // the @PrePersist createdAt are populated on the returned instance (relying on the
+        // template cascade alone left the response id null, #237). It already has an id when added
+        // to the collection below, so the template flush treats it as managed and does not insert
+        // a duplicate row.
+        TemplateSection saved = sectionRepository.saveAndFlush(section);
+        template.getSections().add(saved);
         templateRepository.saveAndFlush(template);
-        return toResponse(section);
+        return toResponse(saved);
     }
 
     /** Updates section metadata and moves it to the requested one-based position. */

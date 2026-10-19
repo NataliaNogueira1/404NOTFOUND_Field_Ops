@@ -251,14 +251,24 @@ public class DemoSeedRunner implements ApplicationRunner {
                         "Agendamento duplicado; sera cancelado para demonstracao."),
                 new SeedInspection("Inspecao Reprovada - Compressor de Ar XPTO 500",
                         Priority.HIGH, 5,
-                        "Enviada com evidencia insuficiente; sera reprovada para correcao."));
+                        "Enviada com evidencia insuficiente; sera reprovada para correcao."),
+                new SeedInspection("Inspecao Enviada - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 3,
+                        "Concluida pelo tecnico; aguardando o supervisor iniciar a revisao."),
+                new SeedInspection("Inspecao Em Revisao - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 3,
+                        "Em revisao pelo supervisor; pronta para aprovar/reprovar e comentar por item."));
 
-        int canceledIndex = plan.size() - 2;
-        int rejectedIndex = plan.size() - 1;
+        int canceledIndex = plan.size() - 4;
+        int rejectedIndex = plan.size() - 3;
+        int submittedIndex = plan.size() - 2;
+        int underReviewIndex = plan.size() - 1;
 
         Long firstInspectionId = null;
         Long canceledId = null;
         Long rejectedId = null;
+        Long submittedId = null;
+        Long underReviewId = null;
         for (int index = 0; index < plan.size(); index++) {
             SeedInspection seed = plan.get(index);
             Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
@@ -274,6 +284,12 @@ public class DemoSeedRunner implements ApplicationRunner {
             if (index == rejectedIndex) {
                 rejectedId = inspectionId;
             }
+            if (index == submittedIndex) {
+                submittedId = inspectionId;
+            }
+            if (index == underReviewIndex) {
+                underReviewId = inspectionId;
+            }
         }
 
         // Cancel one to showcase a terminal state in the admin listing.
@@ -285,6 +301,16 @@ public class DemoSeedRunner implements ApplicationRunner {
         // Reject one so the technician has a rejected inspection to correct (PBI-062 / #80).
         if (rejectedId != null) {
             rejectInspection(rejectedId, supervisorId);
+        }
+
+        // Leave one in SUBMITTED so the supervisor can exercise "Iniciar revisao" (#237),
+        // and one already in UNDER_REVIEW so approve/reject and per-item review comments (#151)
+        // can be tested without any manual setup.
+        if (submittedId != null) {
+            advanceStatus(submittedId, InspectionStatus.SUBMITTED);
+        }
+        if (underReviewId != null) {
+            advanceStatus(underReviewId, InspectionStatus.UNDER_REVIEW);
         }
 
         return new SeededInspections(plan.size(), firstInspectionId);
@@ -311,6 +337,19 @@ public class DemoSeedRunner implements ApplicationRunner {
         inspectionService.reject(inspectionId,
                 "Evidencia fotografica do item de carcaca esta ilegivel; refazer a foto e reenviar.",
                 supervisorId);
+    }
+
+    /**
+     * Advances a freshly created ASSIGNED inspection to the given review-stage status on the
+     * persisted entity, scoped to the demo seed. The mobile submit and the "begin review"
+     * transition are driven by separate flows in production; here the status is set directly so
+     * the demo dataset ships an inspection ready for the supervisor to review (SUBMITTED to test
+     * "Iniciar revisao", UNDER_REVIEW to test approve/reject and per-item review comments).
+     */
+    private void advanceStatus(Long inspectionId, InspectionStatus status) {
+        Inspection inspection = inspectionRepository.findById(inspectionId).orElseThrow();
+        inspection.setStatus(status);
+        inspectionRepository.save(inspection);
     }
 
     /** Builds a small but coherent compressor checklist as a draft and publishes it. */
