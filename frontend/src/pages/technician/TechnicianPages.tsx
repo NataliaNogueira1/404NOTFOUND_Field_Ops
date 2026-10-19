@@ -111,6 +111,7 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [period, setPeriod] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const { today, weekEnd } = useMemo(() => {
     const current = new Date()
     const end = new Date(current)
@@ -125,25 +126,28 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
           !period ||
           (period === 'today' && inspection.dueDate === today) ||
           (period === 'week' && inspection.dueDate >= today && inspection.dueDate <= weekEnd)
+        const matchesDueDate = !dueDate || inspection.dueDate === dueDate
         return (
           haystack.includes(query.toLowerCase()) &&
           (!status || inspection.status === status) &&
           (!priority || inspection.priority === priority) &&
-          matchesPeriod
+          matchesPeriod &&
+          matchesDueDate
         )
       }),
-    [inspections, period, priority, query, status, today, weekEnd],
+    [inspections, dueDate, period, priority, query, status, today, weekEnd],
   )
-  const hasFilters = Boolean(query || status || priority || period)
+  const hasFilters = Boolean(query || status || priority || period || dueDate)
   function clearFilters() {
     setQuery('')
     setStatus('')
     setPriority('')
     setPeriod('')
+    setDueDate('')
   }
   return (
     <>
-      <Card className="grid gap-4 p-4 lg:grid-cols-4">
+      <Card className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Input
           label="Buscar"
           id="tech-search"
@@ -179,8 +183,15 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
           <option value="today">Hoje</option>
           <option value="week">Esta semana</option>
         </Select>
+        <Input
+          label="Data"
+          id="tech-due-date"
+          type="date"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+        />
         {hasFilters && (
-          <div className="lg:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
             <Button variant="ghost" onClick={clearFilters}>
               Limpar filtros
             </Button>
