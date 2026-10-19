@@ -89,12 +89,22 @@ interface SyncPullResponse { inspections: ApiInspection[]; nextCursor: string }
 
 // ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
 
+/** Operation types accepted by the backend sync applicators (PBI-051, #223). */
+type SyncPushType = 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
+
+/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.). */
+type SyncPushPayload =
+  | { inspectionId: string; status: string }
+  | { inspectionId: string; itemId: string; value: string; observation?: string }
+  | { inspectionId: string; itemId: string; title: string; description: string; severity: string };
+
+/** One operation in a sync batch. */
 interface SyncPushOperation {
   operationId: string;
-  type: 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
+  type: SyncPushType;
   baseVersion: number;
   dependencyIds: string[];
-  payload: Record<string, unknown>;
+  payload: SyncPushPayload;
 }
 
 interface SyncPushBody {
@@ -333,32 +343,20 @@ export class InspectionSyncService {
         // the upload endpoint is unavailable it throws, keeping the photo FAILED.
         await this.uploadEvidence(token, operation.entityId, payload);
         break;
+      // Checklist answer → ANSWER_UPSERT (PBI-051, backend #223). Marks the local
+      // answer row SYNCED only after the server confirms APPLIED/ALREADY_APPLIED.
       case 'answer':
-        await this.pushContentOperation(token, operation, 'ANSWER_UPSERT', payload);
+        await this.pushAnswer(token, payload);
+        await this.answerRepo.markSynced([operation.entityId]);
         break;
+      // Non-conformity → NON_CONFORMITY_CREATE (PBI-051, backend #223). Same rule:
+      // the local NC row is flipped SYNCED only on a confirmed result.
       case 'non_conformity':
-        await this.pushContentOperation(token, operation, 'NON_CONFORMITY_CREATE', payload);
+        await this.pushNonConformity(token, payload);
+        await this.ncRepo.markSynced([operation.entityId]);
         break;
       default:
         throw new Error(`Unknown entity type: ${operation.entityType}`);
-    }
-  }
-
-  private async pushContentOperation(
-    token: string,
-    operation: { id: string; entityType: string; entityId: string; dependencyIds: string[] },
-    type: 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE',
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    const inspectionId = String(payload.inspectionId ?? '');
-    const inspection = await this.requireInspection(inspectionId);
-    const operationId = typeof payload.operationId === 'string' ? payload.operationId : randomUuidV4();
-    const response = await apiClient.post<SyncPushResult>('/api/v1/mobile/sync/push', {
-      operations: [{ operationId, type, baseVersion: inspection.serverVersion ?? 0, dependencyIds: [], payload }],
-    } satisfies SyncPushBody, token);
-    const result = response.results?.[0];
-    if (!result || !['APPLIED', 'ALREADY_APPLIED'].includes(result.status)) {
-      throw new Error(result?.detail ?? `Sync failed for ${operation.entityType}:${operation.entityId}`);
     }
   }
 
@@ -406,16 +404,19 @@ export class InspectionSyncService {
     inspectionId: string,
     payload: { operationId?: string; status: string; baseVersion?: number },
   ): Promise<void> {
-    if (payload.baseVersion === undefined) {
-      throw new Error('Operation is missing its base server version.');
-    }
+    // Tolerate a missing baseVersion instead of throwing. Legacy outbox rows
+    // enqueued before PBI-055 (server version tracking) have no baseVersion;
+    // rejecting them would wedge the operation as a permanent error that never
+    // drains. Default to 0 — the same `?? 0` fallback the enqueue path uses —
+    // which matches a never-bumped inspection (version 0). Any real divergence
+    // still comes back as CONFLICT below and is preserved, never lost.
     const operationId = payload.operationId ?? randomUuidV4();
     const body: SyncPushBody = {
       operations: [
         {
           operationId,
           type: 'INSPECTION_STATUS',
-          baseVersion: payload.baseVersion,
+          baseVersion: payload.baseVersion ?? 0,
           dependencyIds: [],
           payload: { inspectionId, status: payload.status },
         },
@@ -435,6 +436,103 @@ export class InspectionSyncService {
     if (result && result.status === 'FAILED') {
       throw new Error(result.detail ?? `Inspection status transition failed for ${inspectionId}`);
     }
+  }
+
+  /**
+   * Push a single checklist answer through the batch endpoint as ANSWER_UPSERT
+   * (PBI-051, backend applicator #223). The server is idempotent on
+   * {@code operationId}, so a resend of the same queued row returns
+   * ALREADY_APPLIED instead of duplicating the answer (RN-068). The stable
+   * {@code operationId}/{@code baseVersion} come from the enqueued payload.
+   */
+  private async pushAnswer(
+    token: string,
+    payload: { operationId?: string; inspectionId: string; itemId: string; value: ChecklistValue; observation?: string; baseVersion?: number },
+  ): Promise<void> {
+    await this.pushContentOperation(token, {
+      operationId: payload.operationId,
+      baseVersion: payload.baseVersion,
+      type: 'ANSWER_UPSERT',
+      payload: {
+        inspectionId: payload.inspectionId,
+        itemId: payload.itemId,
+        value: serializeAnswerValue(payload.value),
+        observation: payload.observation,
+      },
+      failureMessage: `Answer upsert failed for item ${payload.itemId}`,
+    });
+  }
+
+  /**
+   * Push a single non-conformity through the batch endpoint as
+   * NON_CONFORMITY_CREATE (PBI-051, backend applicator #223). Idempotent on
+   * {@code operationId} so a resend never creates a duplicate NC (RN-068).
+   */
+  private async pushNonConformity(
+    token: string,
+    payload: { operationId?: string; inspectionId: string; itemId: string; title: string; description: string; severity: string; baseVersion?: number },
+  ): Promise<void> {
+    await this.pushContentOperation(token, {
+      operationId: payload.operationId,
+      baseVersion: payload.baseVersion,
+      type: 'NON_CONFORMITY_CREATE',
+      payload: {
+        inspectionId: payload.inspectionId,
+        itemId: payload.itemId,
+        title: payload.title,
+        description: payload.description,
+        severity: payload.severity,
+      },
+      failureMessage: `Non-conformity create failed for item ${payload.itemId}`,
+    });
+  }
+
+  /**
+   * Shared sender for content operations (answers, non-conformities) through
+   * {@code POST /api/v1/mobile/sync/push}. A single operation per call keeps the
+   * dependency ordering simple: the server already applied earlier operations in
+   * previous calls and recognises resends by {@code operationId}. CONFLICT is
+   * surfaced as a {@link VersionConflictError}; FAILED as a plain error so the
+   * outbox flags it instead of silently dropping the operation.
+   */
+  private async pushContentOperation(
+    token: string,
+    input: {
+      operationId?: string;
+      baseVersion?: number;
+      type: SyncPushType;
+      payload: SyncPushPayload;
+      failureMessage: string;
+    },
+  ): Promise<void> {
+    const body: SyncPushBody = {
+      operations: [
+        {
+          operationId: input.operationId ?? randomUuidV4(),
+          type: input.type,
+          baseVersion: input.baseVersion ?? 0,
+          dependencyIds: [],
+          payload: input.payload,
+        },
+      ],
+    };
+
+    const response = await apiClient.post<SyncPushResult>(
+      '/api/v1/mobile/sync/push',
+      body,
+      token,
+    );
+
+    const result = response.results?.[0];
+    if (result && result.status === 'CONFLICT') {
+      throw new VersionConflictError(result.detail ?? input.failureMessage);
+    }
+    if (result && result.status === 'FAILED') {
+      throw new Error(result.detail ?? input.failureMessage);
+    }
+    // APPLIED / ALREADY_APPLIED → success. DEFERRED is not expected for a
+    // single-operation batch with no dependencyIds; treat it like success-wait
+    // by leaving the row for the next cycle (no throw, no mark).
   }
 
   // ─── Full sync (pull + push) ─────────────────────────────────────────────
@@ -506,12 +604,19 @@ export class InspectionSyncService {
     observation?: string,
   ): Promise<void> {
     const id = InspectionSyncService.answerOperationId(inspectionId, itemId);
+    // operationId is the server-side idempotency key (RN-068): a stable UUID kept
+    // in the payload so a resend of this same outbox row returns ALREADY_APPLIED
+    // instead of duplicating. baseVersion carries the last known server version
+    // so the batch endpoint can detect a version conflict (PBI-055).
+    const inspection = await this.inspectionRepo.getById(inspectionId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'answer', `${inspectionId}-${itemId}`, {
       operationId: randomUuidV4(),
       inspectionId,
-      itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(itemId),
       value,
       observation,
+      baseVersion: inspection?.serverVersion ?? 0,
     });
   }
 
@@ -531,7 +636,10 @@ export class InspectionSyncService {
       evidence.id,
       {
         inspectionId: evidence.inspectionId,
-        itemId: evidence.itemId,
+        // Send the original (unscoped) item id the backend expects as a Long.
+        // responseId stays scoped: it is an internal outbox dependency key, not
+        // sent to the server, and must keep matching the answer operation id.
+        itemId: unscopeItemId(evidence.itemId),
         responseId: evidence.responseId,
         uri: evidence.uri,
         description: evidence.description,
@@ -559,13 +667,18 @@ export class InspectionSyncService {
    */
   async enqueueNonConformity(nc: NonConformity): Promise<void> {
     const id = `nc-${nc.id}`;
+    // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
+    // conflict detection (PBI-055), mirroring enqueueAnswer.
+    const inspection = await this.inspectionRepo.getById(nc.inspectionId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
-      itemId: nc.itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(nc.itemId),
       title: nc.title,
       description: nc.description,
       severity: nc.severity,
+      baseVersion: inspection?.serverVersion ?? 0,
     });
   }
 
@@ -617,3 +730,26 @@ export class InspectionSyncService {
 
 /** A terminal sync outcome: preserve the local operation for technician review. */
 class VersionConflictError extends Error {}
+
+/**
+ * The backend {@code AnswerUpsertPayload.value} is a String, while a local
+ * {@link ChecklistValue} may be a boolean or number (BOOLEAN/NUMBER items).
+ * Serialize everything to the string the server stores — booleans/numbers via
+ * {@code String()}, text/enum values unchanged.
+ */
+function serializeAnswerValue(value: ChecklistValue): string {
+  return typeof value === 'string' ? value : String(value);
+}
+
+/**
+ * Local checklist item ids are stored scoped to their inspection
+ * (`InspectionRepository.scopedId` → `"${inspectionId}::${itemId}"`) because an
+ * item id is only unique inside a template, not across the global SQLite table.
+ * The backend sync payloads (AnswerUpsertPayload/NonConformityCreatePayload)
+ * expect the ORIGINAL item id (a Long), so strip the local scope prefix before
+ * sending. Ids without the `::` scope (legacy/unexpected) pass through unchanged.
+ */
+function unscopeItemId(scopedItemId: string): string {
+  const separator = scopedItemId.indexOf('::');
+  return separator === -1 ? scopedItemId : scopedItemId.slice(separator + 2);
+}
