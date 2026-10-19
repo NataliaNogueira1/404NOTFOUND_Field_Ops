@@ -307,4 +307,64 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     expect(op.baseVersion).toBe(0);
     expect(op.payload).toMatchObject({ inspectionId: INSPECTION_ID, status: 'IN_PROGRESS' });
   });
+
+  // ── Contract: payloads carry the ORIGINAL (unscoped) item id ────────────────
+  // Local item ids are stored scoped as `${inspectionId}::${itemId}` (unique per
+  // template only). The backend DTOs expect a numeric Long itemId, so the scope
+  // prefix must be stripped before sending — otherwise the server rejects it with
+  // "Invalid NON_CONFORMITY_CREATE payload" / "Invalid ANSWER_UPSERT payload".
+
+  // Insert an extra checklist item with a chosen id so answers/NCs can FK into it.
+  async function seedItem(itemId: string): Promise<void> {
+    await db.runAsync(
+      `INSERT INTO inspection_items (id, section_id, inspection_id, question, response_type, required, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      itemId,
+      'sec-1',
+      INSPECTION_ID,
+      'Item?',
+      'CONFORMITY',
+      1,
+      1,
+    );
+  }
+
+  it('strips the inspection scope from the item id in an ANSWER_UPSERT payload', async () => {
+    const scopedItemId = `${INSPECTION_ID}::7`;
+    await seedItem(scopedItemId);
+    await answerRepo.save(INSPECTION_ID, scopedItemId, 'CONFORME');
+    await service.enqueueAnswer(INSPECTION_ID, scopedItemId, 'CONFORME');
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    await service.pushPendingOperations(TOKEN);
+
+    const [, body] = mockPost.mock.calls[0];
+    expect(body.operations[0].payload.itemId).toBe('7');
+  });
+
+  it('strips the inspection scope from the item id in a NON_CONFORMITY_CREATE payload', async () => {
+    const scopedItemId = `${INSPECTION_ID}::7`;
+    await seedItem(scopedItemId);
+    const nc = buildNonConformity({ id: 'nc-1', itemId: scopedItemId });
+    await ncRepo.add(nc);
+    await service.enqueueNonConformity(nc);
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    await service.pushPendingOperations(TOKEN);
+
+    const [, body] = mockPost.mock.calls[0];
+    expect(body.operations[0].payload.itemId).toBe('7');
+  });
+
+  it('leaves a plain numeric item id unchanged (no scope prefix present)', async () => {
+    await seedItem('7');
+    await answerRepo.save(INSPECTION_ID, '7', 'CONFORME');
+    await service.enqueueAnswer(INSPECTION_ID, '7', 'CONFORME');
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    await service.pushPendingOperations(TOKEN);
+
+    const [, body] = mockPost.mock.calls[0];
+    expect(body.operations[0].payload.itemId).toBe('7');
+  });
 });

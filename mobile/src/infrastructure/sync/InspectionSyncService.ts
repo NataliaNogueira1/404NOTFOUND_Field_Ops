@@ -612,7 +612,8 @@ export class InspectionSyncService {
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'answer', `${inspectionId}-${itemId}`, {
       operationId: randomUuidV4(),
       inspectionId,
-      itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(itemId),
       value,
       observation,
       baseVersion: inspection?.serverVersion ?? 0,
@@ -635,7 +636,10 @@ export class InspectionSyncService {
       evidence.id,
       {
         inspectionId: evidence.inspectionId,
-        itemId: evidence.itemId,
+        // Send the original (unscoped) item id the backend expects as a Long.
+        // responseId stays scoped: it is an internal outbox dependency key, not
+        // sent to the server, and must keep matching the answer operation id.
+        itemId: unscopeItemId(evidence.itemId),
         responseId: evidence.responseId,
         uri: evidence.uri,
         description: evidence.description,
@@ -669,7 +673,8 @@ export class InspectionSyncService {
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
-      itemId: nc.itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(nc.itemId),
       title: nc.title,
       description: nc.description,
       severity: nc.severity,
@@ -734,4 +739,17 @@ class VersionConflictError extends Error {}
  */
 function serializeAnswerValue(value: ChecklistValue): string {
   return typeof value === 'string' ? value : String(value);
+}
+
+/**
+ * Local checklist item ids are stored scoped to their inspection
+ * (`InspectionRepository.scopedId` → `"${inspectionId}::${itemId}"`) because an
+ * item id is only unique inside a template, not across the global SQLite table.
+ * The backend sync payloads (AnswerUpsertPayload/NonConformityCreatePayload)
+ * expect the ORIGINAL item id (a Long), so strip the local scope prefix before
+ * sending. Ids without the `::` scope (legacy/unexpected) pass through unchanged.
+ */
+function unscopeItemId(scopedItemId: string): string {
+  const separator = scopedItemId.indexOf('::');
+  return separator === -1 ? scopedItemId : scopedItemId.slice(separator + 2);
 }
