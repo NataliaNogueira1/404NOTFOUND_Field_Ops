@@ -1,9 +1,13 @@
 package com.fieldops.sync.dto;
 
-import com.fieldops.inspection.dto.MobileInspectionResponse;
-import java.time.Instant;
 import java.util.List;
 
-/** Incremental mobile pull payload; the cursor is advanced only after local persistence succeeds. */
-public record SyncPullResponse(List<MobileInspectionResponse> inspections, Instant nextCursor) {
+/**
+ * Response for the incremental pull (PBI-053).
+ *
+ * @param changes    the delta, ordered by (updatedAt ASC, id ASC)
+ * @param nextCursor opaque token to resume from; {@code null} when there is nothing more
+ * @param hasMore    whether another page is available beyond this one
+ */
+public record SyncPullResponse(List<SyncChange> changes, String nextCursor, boolean hasMore) {
 }

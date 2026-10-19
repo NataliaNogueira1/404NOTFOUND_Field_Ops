@@ -195,17 +195,24 @@ class MobileSyncBatchTest {
         Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
         String token = obtainToken();
 
-        mockMvc.perform(get("/api/v1/mobile/sync/pull")
+        // First sync (no cursor): the inspection comes back as a change and the
+        // response carries an opaque nextCursor to resume from (PBI-053).
+        MvcResult firstPull = mockMvc.perform(get("/api/v1/mobile/sync/pull")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.inspections[0].id").value(inspection.getId().toString()))
-                .andExpect(jsonPath("$.nextCursor").isNotEmpty());
+                .andExpect(jsonPath("$.changes[0].inspection.id").value(inspection.getId().toString()))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+                .andReturn();
 
+        String nextCursor = JsonPath.read(firstPull.getResponse().getContentAsString(), "$.nextCursor");
+
+        // Resuming from the returned cursor with no further changes yields an empty delta.
         mockMvc.perform(get("/api/v1/mobile/sync/pull")
-                        .queryParam("cursor", "2999-01-01T00:00:00Z")
+                        .queryParam("cursor", nextCursor)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.inspections").isEmpty());
+                .andExpect(jsonPath("$.changes").isEmpty())
+                .andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test

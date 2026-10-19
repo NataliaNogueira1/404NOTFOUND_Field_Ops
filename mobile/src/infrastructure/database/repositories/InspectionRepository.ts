@@ -118,14 +118,22 @@ export class InspectionRepository {
     // started_at, sync_status, pending_sync_count) here so a re-pull cannot revert an
     // in-progress inspection. Those transition to the server via the outbox.
     //
-    // EXCEPTION — supervisor review decisions (PBI-062 / #80): when the server sends a
-    // terminal review state (REJECTED/APPROVED), the server is the authority, not the
-    // device. In that case we DO apply the incoming status and the rejection fields so
-    // a rejected inspection actually shows up as "Reprovada" (with its reason) for the
-    // technician to correct. The CASE guards keep every other state (ASSIGNED/IN_PROGRESS/
-    // SUBMITTED) owned by the device, preserving the "never revert in-progress work" rule.
-    const isReviewDecision =
-      inspection.status === 'REJECTED' || inspection.status === 'APPROVED';
+    // EXCEPTION — server-authoritative decisions: when the server sends a terminal
+    // state the server is the authority, not the device, so we DO apply the incoming
+    // status (and rejection fields). Two cases:
+    //  • supervisor review (PBI-062 / #80): REJECTED/APPROVED — so a rejected inspection
+    //    shows up as "Reprovada" (with its reason) for the technician to correct;
+    //  • administrative CANCELLATION (PBI-053): CANCELED — the inspection was cancelled
+    //    on the server and must reflect that locally.
+    // The CASE guards keep every OTHER state (ASSIGNED/IN_PROGRESS/SUBMITTED) owned by
+    // the device, preserving the "never revert in-progress work" rule. Crucially this
+    // is still a real UPSERT (ON CONFLICT DO UPDATE, never REPLACE), so the child rows
+    // — the technician's pending answers/evidences — are NOT deleted when a cancellation
+    // arrives (RN-047/RN-066/RN-077): the server state changes, the local work survives.
+    const isServerAuthoritative =
+      inspection.status === 'REJECTED' ||
+      inspection.status === 'APPROVED' ||
+      inspection.status === 'CANCELED';
 
     await this.db.runAsync(
       `INSERT INTO inspections (
@@ -152,8 +160,8 @@ export class InspectionRepository {
         due_date = excluded.due_date,
         due_time = excluded.due_time,
         supervisor_instructions = excluded.supervisor_instructions,
-        -- Only a server review decision (REJECTED/APPROVED) may change the local
-        -- status and rejection fields; otherwise keep whatever the device holds.
+        -- Only a server-authoritative decision (REJECTED/APPROVED/CANCELED) may
+        -- change the local status and rejection fields; otherwise keep the device's.
         status = CASE WHEN ? THEN excluded.status ELSE inspections.status END,
         rejection_reason = CASE WHEN ? THEN excluded.rejection_reason ELSE inspections.rejection_reason END,
         rejected_by = CASE WHEN ? THEN excluded.rejected_by ELSE inspections.rejected_by END,
@@ -191,10 +199,10 @@ export class InspectionRepository {
       inspection.pendingSyncCount,
       inspection.serverVersion ?? 0,
       // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0).
-      isReviewDecision ? 1 : 0,
-      isReviewDecision ? 1 : 0,
-      isReviewDecision ? 1 : 0,
-      isReviewDecision ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
     );
   }
 
