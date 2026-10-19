@@ -386,7 +386,7 @@ function EquipmentModal({
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
         </div>
-        <div className="sm:col-span-2 grid grid-cols-[1fr_auto] items-end gap-2">
+        <div className="grid grid-cols-1 items-end gap-2 min-[380px]:grid-cols-[1fr_auto] sm:col-span-2">
           <Input
             label="QR Code"
             id="equipment-form-qr"
