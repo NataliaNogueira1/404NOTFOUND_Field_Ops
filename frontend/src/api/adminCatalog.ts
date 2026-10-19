@@ -1,5 +1,7 @@
-import { apiRequest } from '@/api/client'
+import { apiRequest, tokenStorage } from '@/api/client'
 import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/types/domain'
+
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export type TemplateListStatus = 'ACTIVE' | 'DRAFT'
 
@@ -318,6 +320,48 @@ export const adminCatalogApi = {
       body: JSON.stringify({ reason }),
     })
     return { ...result, id: String(result.id), canceledBy: String(result.canceledBy) }
+  },
+
+  /**
+   * Downloads the inspections listing as CSV (PBI-092, ADMIN only; backend enforces 403).
+   * Uses fetch directly instead of apiRequest because apiRequest always JSON-parses
+   * the body — the documented no-fetch-in-components exception for file downloads,
+   * kept INSIDE this API module.
+   */
+  async exportCsv(filters: {
+    status: InspectionStatus | ''
+    from: string
+    to: string
+    clientId?: number
+  }): Promise<void> {
+    const params = new URLSearchParams()
+    if (filters.status !== '') params.set('status', filters.status)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.clientId !== undefined) params.set('clientId', String(filters.clientId))
+    const query = params.toString()
+    const url = `${API_URL}/api/v1/inspections/export.csv${query ? `?${query}` : ''}`
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'text/csv',
+        Authorization: `Bearer ${tokenStorage.get() ?? ''}`,
+      },
+    })
+    if (!response.ok) throw new Error('Nao foi possivel exportar o CSV das inspecoes.')
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const match = /filename="?([^";\n]+)"?/.exec(disposition)
+    const filename = match?.[1] ?? 'inspections.csv'
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(objectUrl)
   },
 }
 

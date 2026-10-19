@@ -1,9 +1,10 @@
-import { Ban, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Ban, Download, Plus } from 'lucide-react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { type AdminInspectionSummary, adminCatalogApi } from '@/api/adminCatalog'
-import { ClientStatus, clientsApi } from '@/api/clients'
+import { ClientStatus, type ManagedClient, clientsApi } from '@/api/clients'
 import { usersApi } from '@/api/users'
+import { authSession } from '@/auth/session'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
@@ -28,6 +29,9 @@ const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority
 
 export function InspectionsPage() {
   const navigate = useNavigate()
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  // Hiding the button is a UX cue only; the backend enforces the ADMIN-only 403.
+  const isAdmin = session.user?.role === UserRole.ADMIN
   const list = useListQuery('dueDate,asc')
   const query = list.value('name')
   const debouncedQuery = useDebouncedValue(query)
@@ -47,7 +51,11 @@ export function InspectionsPage() {
 
   // ── Dados para os filtros ───────────────────────────────────────────────────
   const [technicianNames, setTechnicianNames] = useState<string[]>([])
-  const [clientNames, setClientNames] = useState<string[]>([])
+  const [clients, setClients] = useState<ManagedClient[]>([])
+
+  // ── Exportação CSV (PBI-092, apenas ADMIN) ──────────────────────────────────
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   // ── Cancelamento ────────────────────────────────────────────────────────────
   const [canceling, setCanceling] = useState<AdminInspectionSummary | null>(null)
@@ -69,7 +77,7 @@ export function InspectionsPage() {
   useEffect(() => {
     clientsApi
       .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 200 })
-      .then((result) => setClientNames(result.content.map((c) => c.name)))
+      .then((result) => setClients(result.content))
       .catch(() => { /* silently ignore */ })
   }, [])
 
@@ -157,6 +165,23 @@ export function InspectionsPage() {
     }
   }
 
+  // ── Exportação CSV ──────────────────────────────────────────────────────────
+  async function handleExport() {
+    // Resolve o nome do cliente selecionado no filtro para o id numérico esperado pela API.
+    const resolvedId = Number(clients.find((client) => client.name === clientName)?.id)
+    const clientId = Number.isNaN(resolvedId) ? undefined : resolvedId
+    setExporting(true)
+    setExportError('')
+    try {
+      // O filtro de período usa uma única data; mapeamos para from e to.
+      await adminCatalogApi.exportCsv({ status, from: dueDate, to: dueDate, clientId })
+    } catch {
+      setExportError('Nao foi possivel exportar o CSV das inspecoes.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const columns: Column<AdminInspectionSummary>[] = [
     {
       header: 'Inspecao',
@@ -221,14 +246,27 @@ export function InspectionsPage() {
         title="Inspecoes"
         description="Acompanhe e gerencie as inspecoes de campo."
         action={
-          <Link to="/app/inspections/new">
-            <Button>
-              <Plus size={17} />
-              Nova inspecao
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <Button variant="secondary" disabled={exporting} onClick={() => void handleExport()}>
+                <Download size={16} aria-hidden />
+                {exporting ? 'Exportando...' : 'Exportar CSV'}
+              </Button>
+            )}
+            <Link to="/app/inspections/new">
+              <Button>
+                <Plus size={17} />
+                Nova inspecao
+              </Button>
+            </Link>
+          </div>
         }
       />
+      {exportError && (
+        <p role="alert" className="text-sm font-medium text-danger">
+          {exportError}
+        </p>
+      )}
       <Card className="grid gap-4 p-4 xl:grid-cols-4">
         <Input
           label="Busca"
@@ -268,9 +306,9 @@ export function InspectionsPage() {
           onChange={(event) => list.update('clientName', event.target.value)}
         >
           <option value="">Todos</option>
-          {clientNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {clients.map((client) => (
+            <option key={client.id} value={client.name}>
+              {client.name}
             </option>
           ))}
         </Select>
