@@ -57,7 +57,7 @@ export function LoginPage() {
           className="mx-auto mb-4 h-14 w-14 rounded-card shadow-fieldops"
         />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mt-1 text-sm text-muted">Transforme inspecoes de campo em decisoes confiaveis</p>
+        <p className="mt-3 text-sm text-muted">Transforme inspecoes de campo em decisoes confiaveis</p>
       </div>
       <div className="mb-6 grid gap-2 sm:grid-cols-3">
         <Button variant="secondary" onClick={() => fillProfile('ana@fieldops.com')}>
