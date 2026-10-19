@@ -11,6 +11,7 @@ import com.fieldops.inspection.model.ResponseType;
 import com.fieldops.inspection.model.TemplateItem;
 import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateItemRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import java.util.Comparator;
@@ -22,10 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TemplateItemService {
 
     private final InspectionTemplateRepository templateRepository;
+    private final TemplateItemRepository itemRepository;
     private final ObjectMapper objectMapper;
 
-    public TemplateItemService(InspectionTemplateRepository templateRepository, ObjectMapper objectMapper) {
+    public TemplateItemService(InspectionTemplateRepository templateRepository,
+            TemplateItemRepository itemRepository, ObjectMapper objectMapper) {
         this.templateRepository = templateRepository;
+        this.itemRepository = itemRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -40,9 +44,13 @@ public class TemplateItemService {
         TemplateItem item = new TemplateItem();
         item.setSection(section);
         apply(item, request);
-        section.getItems().add(item);
+        // Persist the item through its own repository first so the generated id is populated on the
+        // response (the template cascade alone left it null, #237). It already has an id when added
+        // to the collection, so the template flush does not insert a duplicate row.
+        TemplateItem saved = itemRepository.saveAndFlush(item);
+        section.getItems().add(saved);
         templateRepository.saveAndFlush(section.getTemplate());
-        return toResponse(item);
+        return toResponse(saved);
     }
 
     /** Updates an item and moves it to the requested position within its section. */

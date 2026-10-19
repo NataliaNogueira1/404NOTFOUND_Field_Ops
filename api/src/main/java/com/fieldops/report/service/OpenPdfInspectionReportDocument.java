@@ -51,8 +51,12 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
     }
 
     private void addHeader(Document document, Inspection inspection) throws DocumentException {
-        document.add(new Paragraph("Inspection report", TITLE_FONT));
-        document.add(new Paragraph("Title: " + value(inspection.getTitle())));
+        Paragraph title = new Paragraph("Inspection report", TITLE_FONT);
+        title.setSpacingAfter(8f);
+        document.add(title);
+        Paragraph subtitle = new Paragraph("Title: " + value(inspection.getTitle()));
+        subtitle.setSpacingAfter(10f);
+        document.add(subtitle);
         document.add(metadataTable(inspection));
         document.add(new Paragraph(" "));
     }
@@ -75,7 +79,7 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
     }
 
     private void addDecision(Document document, Inspection inspection) throws DocumentException {
-        document.add(new Paragraph("Decision", SECTION_FONT));
+        document.add(section("Decision"));
         document.add(new Paragraph("Status: " + inspection.getStatus()));
         addOptionalLine(document, "Reviewed at", inspection.getReviewedAt());
         addOptionalLine(document, "Approval comment", inspection.getReviewComment());
@@ -97,7 +101,7 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
 
     private void addChecklist(Document document, List<InspectionItemSnapshot> snapshots)
             throws DocumentException {
-        document.add(new Paragraph("Checklist snapshot", SECTION_FONT));
+        document.add(section("Checklist snapshot"));
         snapshots.stream().sorted(Comparator.comparing(InspectionItemSnapshot::getSectionOrder)
                 .thenComparing(InspectionItemSnapshot::getItemOrder)).forEach(snapshot -> addItem(document, snapshot));
         if (snapshots.isEmpty()) {
@@ -117,7 +121,7 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
 
     private void addNonConformities(Document document, List<NonConformity> nonConformities)
             throws DocumentException {
-        document.add(new Paragraph("Non-conformities", SECTION_FONT));
+        document.add(section("Non-conformities"));
         if (nonConformities.isEmpty()) {
             document.add(new Paragraph("No non-conformities were recorded."));
             return;
@@ -129,7 +133,7 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
     }
 
     private void addAnswers(Document document, List<ReportAnswer> answers) throws DocumentException {
-        document.add(new Paragraph("Recorded answers", SECTION_FONT));
+        document.add(section("Recorded answers"));
         if (answers.isEmpty()) {
             document.add(new Paragraph("No answers were recorded."));
         }
@@ -145,7 +149,7 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
 
     private void addEvidences(Document document, List<InspectionEvidence> evidences)
             throws DocumentException {
-        document.add(new Paragraph("Evidence references", SECTION_FONT));
+        document.add(section("Evidence references"));
         if (evidences.isEmpty()) {
             document.add(new Paragraph("No evidence references were recorded."));
         }
@@ -159,6 +163,13 @@ public class OpenPdfInspectionReportDocument implements InspectionReportDocument
             addOptionalLine(document, "Description", evidence.getDescription());
             addOptionalLine(document, "Captured at", evidence.getCapturedAt());
         }
+    }
+
+    private Paragraph section(String title) {
+        Paragraph heading = new Paragraph(title, SECTION_FONT);
+        heading.setSpacingBefore(12f);
+        heading.setSpacingAfter(6f);
+        return heading;
     }
 
     private PdfPCell cell(String value, int style) {

@@ -15,4 +15,12 @@ export {
   type SyncOperationView,
   type SyncOperationDisplayStatus,
 } from './syncStatusMapping';
+export {
+  SYNC_STATUS_META,
+  buildSyncScreenViewModel,
+  type SyncStatusMeta,
+  type SyncStatusColorKey,
+  type SyncScreenInput,
+  type SyncScreenViewModel,
+} from './syncScreenView';
 export { formatLastSync } from './formatLastSync';

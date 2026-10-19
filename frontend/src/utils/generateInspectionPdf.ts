@@ -11,6 +11,7 @@ const autoTable = (
     : (autoTableImport as { default: typeof autoTableImport }).default
 ) as typeof autoTableImport
 import { Priority, InspectionStatus } from '@/types/domain'
+import { formatDate } from '@/utils/formatDate'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,13 +31,6 @@ const statusLabel: Record<InspectionStatus, string> = {
   APPROVED: 'Aprovada',
   REJECTED: 'Reprovada',
   CANCELED: 'Cancelada',
-}
-
-function formatDate(isoString?: string): string {
-  if (!isoString) return '-'
-  const d = new Date(isoString)
-  if (Number.isNaN(d.getTime())) return isoString
-  return d.toLocaleDateString('pt-BR')
 }
 
 // ─── Colour palette (RGB) ─────────────────────────────────────────────────────

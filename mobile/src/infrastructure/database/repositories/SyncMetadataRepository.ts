@@ -14,6 +14,14 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 export const SyncMetadataKeys = {
   /** ISO timestamp of the last sync that finished with NO errors (RN-072). */
   LAST_SUCCESSFUL_SYNC: 'last_successful_sync',
+  /**
+   * Opaque Base64 URL-safe cursor returned by GET /mobile/sync/pull (PBI-053).
+   * The mobile side NEVER interprets its content — it just stores the last
+   * `nextCursor` and resends it on the next incremental pull. Persisting it
+   * across restarts keeps the pull incremental after reopening the app
+   * (RN-066); the server is authoritative on what each cursor means (RN-073).
+   */
+  LAST_PULL_CURSOR: 'last_pull_cursor',
 } as const;
 
 export class SyncMetadataRepository {
@@ -59,5 +67,21 @@ export class SyncMetadataRepository {
    */
   async setLastSuccessfulSync(isoTimestamp: string = new Date().toISOString()): Promise<void> {
     await this.set(SyncMetadataKeys.LAST_SUCCESSFUL_SYNC, isoTimestamp);
+  }
+
+  /**
+   * The last opaque pull cursor, or `null` when the technician has never synced
+   * incrementally (so the first pull must be issued WITHOUT a cursor param).
+   */
+  async getPullCursor(): Promise<string | null> {
+    return this.get(SyncMetadataKeys.LAST_PULL_CURSOR);
+  }
+
+  /**
+   * Store the opaque cursor returned by the server. Called ONLY after a batch of
+   * changes is committed locally, so a failed pull never advances it (PBI-053).
+   */
+  async setPullCursor(cursor: string): Promise<void> {
+    await this.set(SyncMetadataKeys.LAST_PULL_CURSOR, cursor);
   }
 }

@@ -34,6 +34,7 @@ import { StatCard } from '@/components/layout/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { authSession } from '@/auth/session'
+import { useTheme } from '@/theme'
 import { InspectionStatus, Priority } from '@/types/domain'
 
 // ── Label helpers ─────────────────────────────────────────────────────────────
@@ -102,12 +103,29 @@ function pendingReview(byStatus: Record<string, number>) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/**
+ * Recharts renders SVG and cannot consume Tailwind classes, so chart colors
+ * must be passed as explicit values. These mirror the semantic design tokens
+ * declared in `index.css` (`@theme` for light, `.dark` for dark) so the chart
+ * stays legible on both themes (PBI-091 #173) without a flash on first paint.
+ * Keep these values in sync with the corresponding CSS variables:
+ *   grid   -> --color-border    tick    -> --color-muted
+ *   cursor -> --color-app-bg    surface -> --color-surface
+ *   bar    -> --color-primary
+ */
+const CHART_COLORS = {
+  light: { grid: '#c1cddd', tick: '#64748b', cursor: '#f2f7ff', surface: '#ffffff', bar: '#2563eb' },
+  dark: { grid: '#2a3852', tick: '#94a3b8', cursor: '#0b1220', surface: '#111a2e', bar: '#2563eb' },
+} as const
+
 export function DashboardPage() {
   const session = useSyncExternalStore(
     authSession.subscribe,
     authSession.snapshot,
     authSession.snapshot,
   )
+  const { effectiveTheme } = useTheme()
+  const chart = CHART_COLORS[effectiveTheme]
   const firstName = session.user?.name?.split(' ')[0] ?? 'Supervisor'
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -326,22 +344,27 @@ export function DashboardPage() {
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ left: -20, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#C1CDDD" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#64748B', fontSize: 12 }}
+                    tick={{ fill: chart.tick, fontSize: 12 }}
                   />
                   <YAxis
                     allowDecimals={false}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#64748B', fontSize: 12 }}
+                    tick={{ fill: chart.tick, fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ fill: '#F2F7FF' }}
-                    contentStyle={{ borderRadius: 10, borderColor: '#C1CDDD' }}
+                    cursor={{ fill: chart.cursor }}
+                    contentStyle={{
+                      borderRadius: 10,
+                      borderColor: chart.grid,
+                      backgroundColor: chart.surface,
+                      color: chart.tick,
+                    }}
                   />
                   <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
                     {chartData.map(entry => (
@@ -435,7 +458,7 @@ function QuickAction({
       to={to}
       className="focus-ring group flex items-center gap-3 rounded-fieldops border border-border p-3 transition-colors hover:border-primary-light hover:bg-primary-light/30"
     >
-      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark">
+      <span className="rounded-fieldops bg-primary-light/55 p-2 text-primary-dark dark:bg-primary/25 dark:text-primary-light">
         <Icon size={19} />
       </span>
       <span className="min-w-0 flex-1">

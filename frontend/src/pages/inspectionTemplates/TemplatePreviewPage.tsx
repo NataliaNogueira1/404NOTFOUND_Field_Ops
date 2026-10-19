@@ -1,6 +1,6 @@
 import { ArrowLeft, Camera, MessageSquare } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { adminCatalogApi, type ManagedInspectionTemplate } from '@/api/adminCatalog'
 import { ConfirmDialog } from '@/components/feedback/Modal'
@@ -8,47 +8,37 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { byId, templates } from '@/mocks/domain'
 import { PublicationIssuesDialog } from '@/pages/inspectionTemplates/PublicationIssuesDialog'
-import { inspectionTemplatePendingIssues } from '@/pages/inspectionTemplates/templateValidation'
-import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
 
 export function TemplatePreviewPage() {
   const navigate = useNavigate()
-  const { id = 'tpl-compressor' } = useParams()
-  const localTemplate = templateDraftStore.get(id) ?? byId(templates, id)
-  const persistedTemplate = /^\d+$/.test(id)
-  const [template, setTemplate] = useState<InspectionTemplate | null>(localTemplate ?? null)
-  const [loading, setLoading] = useState(persistedTemplate)
+  const { id = '' } = useParams()
+  const [template, setTemplate] = useState<InspectionTemplate | null>(null)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [confirmPublish, setConfirmPublish] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [showPublicationIssues, setShowPublicationIssues] = useState(false)
-  const publicationIssues = useMemo(
-    () => (template ? inspectionTemplatePendingIssues(template.title, template.category, template.sections) : []),
-    [template],
-  )
+  const [publicationIssues, setPublicationIssues] = useState<string[]>([])
+  const [validForPublication, setValidForPublication] = useState(false)
 
-  useEffect(() => {
-    if (!persistedTemplate) return
-    void adminCatalogApi
-      .getTemplate(id)
-      .then((response) => setTemplate(toInspectionTemplate(response)))
+  const load = useCallback(() => {
+    setLoading(true); setLoadError('')
+    void adminCatalogApi.previewTemplate(id)
+      .then((response) => { setTemplate(toInspectionTemplate(response.template)); setPublicationIssues(response.issues); setValidForPublication(response.validForPublication) })
       .catch(() => setLoadError('Nao foi possivel carregar a previa do modelo.'))
       .finally(() => setLoading(false))
-  }, [id, persistedTemplate])
+  }, [id])
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer) }, [load])
 
   async function publishTemplate() {
-    if (!template || publicationIssues.length > 0 || publishing) return
+    if (!template || !validForPublication || publishing) return
     setPublishing(true)
     setPublishError('')
     try {
-      const versionNumber = persistedTemplate
-        ? (await adminCatalogApi.publishTemplate(id)).versionNumber
-        : template.version + 1
-      templateDraftStore.set({ ...template, status: 'Ativa', version: versionNumber })
+      await adminCatalogApi.publishTemplate(id)
       setConfirmPublish(false)
       navigate('/app/inspection-templates')
     } catch {
@@ -61,9 +51,7 @@ export function TemplatePreviewPage() {
   if (loading) return <Card className="p-8 text-center text-sm text-muted">Carregando previa...</Card>
   if (loadError)
     return (
-      <p role="alert" className="text-sm font-medium text-danger">
-        {loadError}
-      </p>
+      <div role="alert" className="space-y-3 text-sm font-medium text-danger"><p>{loadError}</p><Button variant="secondary" onClick={load}>Tentar novamente</Button></div>
     )
   if (!template)
     return (
@@ -105,7 +93,7 @@ export function TemplatePreviewPage() {
       )}
 
       <div
-        className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-slate-100 p-3 shadow-fieldops"
+        className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-border p-3 shadow-fieldops"
         aria-label="Previa do aplicativo do tecnico"
       >
         <div className="overflow-hidden rounded-[22px] bg-app-bg">
@@ -148,7 +136,7 @@ export function TemplatePreviewPage() {
           </Button>
         </Link>
         <Button
-          disabled={template.status !== 'Rascunho' || publicationIssues.length > 0 || publishing}
+          disabled={template.status !== 'Rascunho' || !validForPublication || publishing}
           onClick={() => setConfirmPublish(true)}
         >
           {publishing ? 'Publicando...' : 'Publicar versao'}

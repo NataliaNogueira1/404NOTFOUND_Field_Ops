@@ -24,4 +24,36 @@ class FileSystemEvidenceStorageTest {
         assertThat(storage.find(root.resolve("inspection-1/photo.jpg").toString())).isEmpty();
         assertThat(storage.find("inspection-1/missing.jpg")).isEmpty();
     }
+
+    @Test
+    void storesBytesUnderRootAndReturnsARelativeReferenceRetrievableByFind() throws Exception {
+        EvidenceStorageProperties properties = new EvidenceStorageProperties();
+        properties.setEvidenceDir(root);
+        FileSystemEvidenceStorage storage = new FileSystemEvidenceStorage(properties);
+        byte[] content = {10, 20, 30, 40};
+
+        String reference = storage.store(content, "jpg");
+
+        assertThat(Path.of(reference).isAbsolute()).isFalse();
+        assertThat(reference).endsWith(".jpg");
+        Path stored = storage.find(reference).orElseThrow();
+        assertThat(stored.startsWith(root)).isTrue();
+        assertThat(Files.readAllBytes(stored)).isEqualTo(content);
+    }
+
+    @Test
+    void normalizesDangerousOrEmptyExtensionsSoTheStoredPathStaysUnderRoot() throws Exception {
+        EvidenceStorageProperties properties = new EvidenceStorageProperties();
+        properties.setEvidenceDir(root);
+        FileSystemEvidenceStorage storage = new FileSystemEvidenceStorage(properties);
+
+        String traversal = storage.store(new byte[] {1}, "../../evil");
+        String dotted = storage.store(new byte[] {1}, ".jpg");
+        String empty = storage.store(new byte[] {1}, "   ");
+
+        assertThat(storage.find(traversal)).isPresent();
+        assertThat(storage.find(traversal).orElseThrow().startsWith(root)).isTrue();
+        assertThat(dotted).endsWith(".jpg");
+        assertThat(empty).endsWith(".bin");
+    }
 }

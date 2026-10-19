@@ -11,8 +11,8 @@ interface StatCardProps {
 }
 
 const tones = {
-  blue: 'bg-primary-light/55 text-primary-dark',
-  amber: 'bg-amber-100 text-warning-dark',
+  blue: 'bg-primary-light/55 text-primary-dark dark:bg-primary/25 dark:text-primary-light',
+  amber: 'bg-warning/15 text-warning-dark',
   red: 'bg-danger-light/25 text-danger-dark',
   green: 'bg-success-light/35 text-success-dark',
 }

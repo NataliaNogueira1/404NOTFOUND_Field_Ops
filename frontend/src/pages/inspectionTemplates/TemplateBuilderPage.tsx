@@ -9,9 +9,7 @@ import { Select, Textarea } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { byId, templates } from '@/mocks/domain'
 import { PublicationIssuesDialog } from '@/pages/inspectionTemplates/PublicationIssuesDialog'
-import { templateDraftStore } from '@/state/mockStores'
 import { ResponseType, type InspectionTemplate, type TemplateItem, type TemplateSection } from '@/types/domain'
 import {
   inspectionTemplatePendingIssues,
@@ -23,8 +21,8 @@ type OptionDraft = { id: string; value: string }
 
 export function TemplateBuilderPage() {
   const navigate = useNavigate()
-  const { id = 'tpl-compressor' } = useParams()
-  const source = templateDraftStore.get(id) ?? byId(templates, id) ?? emptyPersistedDraft(id)
+  const { id = '' } = useParams()
+  const source = emptyPersistedDraft(id)
   const [title, setTitle] = useState(source.title)
   const [category, setCategory] = useState(source.category)
   const [description, setDescription] = useState(source.description)
@@ -43,7 +41,7 @@ export function TemplateBuilderPage() {
     () => inspectionTemplatePendingIssues(title, category, sections),
     [title, category, sections],
   )
-  const persistedTemplate = /^\d+$/.test(id)
+  const persistedTemplate = Boolean(id)
 
   useEffect(() => {
     if (!persistedTemplate) return
@@ -59,20 +57,7 @@ export function TemplateBuilderPage() {
       .catch(() => setSaveError('Nao foi possivel carregar o modelo.'))
   }, [id, persistedTemplate])
 
-  function draft(): InspectionTemplate {
-    return {
-      id,
-      title,
-      category,
-      description,
-      version: source.version,
-      status: isDraft ? 'Rascunho' : 'Ativa',
-      sections,
-    }
-  }
-
   async function saveDraft(showToast = true) {
-    templateDraftStore.set(draft())
     setSaveError('')
     try {
       if (persistedTemplate) {
@@ -208,17 +193,15 @@ export function TemplateBuilderPage() {
     setPublishing(true)
     setSaveError('')
     try {
-      let publishedVersion = source.version + 1
       if (persistedTemplate) {
         await adminCatalogApi.updateTemplate(id, {
           title: title.trim(),
           category: category.trim(),
           description: description.trim(),
         })
-        publishedVersion = (await adminCatalogApi.publishTemplate(id)).versionNumber
+        await adminCatalogApi.publishTemplate(id)
       }
       setIsDraft(false)
-      templateDraftStore.set({ ...draft(), version: publishedVersion, status: 'Ativa' })
       setPublish(false)
       showSuccess()
     } catch {
@@ -463,7 +446,7 @@ function SectionCard({
       </div>
       <div className="space-y-3">
         {section.items.map((item, itemIndex) => (
-          <div key={item.id} className="rounded-fieldops border border-border bg-slate-50 p-4">
+          <div key={item.id} className="rounded-fieldops border border-border bg-app-bg p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="font-medium">{item.question || 'Item sem pergunta'}</p>
@@ -480,7 +463,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Mover ${item.question} para cima`}
-                  disabled={itemIndex === 0}
+                  disabled={!editable || itemIndex === 0}
                   onClick={() => onMoveItem(item.id, -1)}
                 >
                   <ArrowUp size={16} />
@@ -489,7 +472,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Mover ${item.question} para baixo`}
-                  disabled={itemIndex === section.items.length - 1}
+                  disabled={!editable || itemIndex === section.items.length - 1}
                   onClick={() => onMoveItem(item.id, 1)}
                 >
                   <ArrowDown size={16} />
@@ -498,6 +481,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Editar ${item.question}`}
+                  disabled={!editable}
                   onClick={() => onEditItem(item)}
                 >
                   <Pencil size={16} />
@@ -506,6 +490,7 @@ function SectionCard({
                   variant="ghost"
                   className="h-8 px-2"
                   aria-label={`Excluir ${item.question}`}
+                  disabled={!editable}
                   onClick={() => onDeleteItem(item.id)}
                 >
                   <Trash2 size={16} />

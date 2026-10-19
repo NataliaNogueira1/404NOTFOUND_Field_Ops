@@ -1,9 +1,10 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import type { DashboardFilters, DashboardSummary } from '@/api/dashboard'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
+import { ThemeProvider } from '@/theme/ThemeProvider'
 
 const getSummary = vi.hoisted(() => vi.fn())
 
@@ -23,9 +24,11 @@ function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <DashboardPage />
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    </ThemeProvider>,
   )
 }
 
@@ -34,9 +37,27 @@ function lastFilters(): DashboardFilters | undefined {
 }
 
 describe('DashboardPage filters', () => {
+  beforeEach(() => {
+    // jsdom doesn't implement matchMedia, which ThemeProvider reads on mount.
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    )
+  })
+
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('loads the summary without filters and shows indicators on initial render', async () => {

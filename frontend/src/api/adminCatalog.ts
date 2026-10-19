@@ -89,6 +89,11 @@ export interface InspectionTemplateVersion {
   publishedAt: string
   publishedBy: string
 }
+export interface InspectionTemplatePreview {
+  template: ManagedInspectionTemplate
+  validForPublication: boolean
+  issues: string[]
+}
 
 export interface AdminInspectionSummary {
   id: string
@@ -150,6 +155,7 @@ interface BackendTemplateVersion extends Omit<InspectionTemplateVersion, 'id' | 
   id: number
   publishedBy: number
 }
+interface BackendTemplatePreview { template: BackendManagedTemplate; validForPublication: boolean; issues: string[] }
 
 export const adminCatalogApi = {
   async createTemplate(input: InspectionTemplateInput) {
@@ -162,6 +168,16 @@ export const adminCatalogApi = {
 
   async getTemplate(id: string) {
     return managedTemplate(await apiRequest<BackendManagedTemplate>(`/api/v1/inspection-templates/${id}`))
+  },
+
+  async previewTemplate(id: string): Promise<InspectionTemplatePreview> {
+    const result = await apiRequest<BackendTemplatePreview>(`/api/v1/inspection-templates/${id}/preview`)
+    if (result.template) return { template: managedTemplate(result.template), validForPublication: result.validForPublication, issues: result.issues }
+    // Keeps the client tolerant of older API gateways that still return the template DTO.
+    const template = managedTemplate(result as unknown as BackendManagedTemplate)
+    const issues = template.sections.length === 0 || template.sections.some(section => section.items.length === 0)
+      ? ['Todas as secoes precisam de pelo menos um item.'] : []
+    return { template, validForPublication: issues.length === 0, issues }
   },
 
   async updateTemplate(id: string, input: InspectionTemplateInput) {
