@@ -54,9 +54,12 @@ export function LoginPage() {
           <ShieldCheck size={29} />
         </div>
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mt-1 text-sm text-muted">Acesso web integrado a API</p>
+        <p className="mt-1 text-sm text-muted">Suas inspecoes de campo, do planejamento a aprovacao.</p>
       </div>
-      <div className="mb-6 grid gap-2 sm:grid-cols-2">
+      <div className="mb-6 grid gap-2 sm:grid-cols-3">
+        <Button variant="secondary" onClick={() => fillProfile('ana@fieldops.com')}>
+          Admin
+        </Button>
         <Button variant="secondary" onClick={() => fillProfile('marina@fieldops.com')}>
           Supervisor
         </Button>
@@ -95,10 +98,6 @@ export function LoginPage() {
           {isSubmitting ? 'Entrando...' : 'Entrar'} <ArrowRight size={17} />
         </Button>
       </form>
-      <div className="mt-7 rounded-fieldops border border-border bg-app-bg p-3 text-xs text-muted">
-        <p>Use credenciais cadastradas no backend.</p>
-        <p>O perfil e o redirecionamento vêm da API.</p>
-      </div>
     </Card>
   )
 }
