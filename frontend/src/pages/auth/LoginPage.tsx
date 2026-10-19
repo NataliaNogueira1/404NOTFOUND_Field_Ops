@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +9,7 @@ import { authSession, roleHome } from '@/auth/session'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import fieldOpsLogo from '@/assets/fieldops-logo.png'
 
 const loginSchema = z.object({
   email: z.email('Informe um e-mail valido'),
@@ -50,9 +51,11 @@ export function LoginPage() {
   return (
     <Card className="mx-auto w-full max-w-md p-7 sm:p-9">
       <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-card bg-primary text-white shadow-fieldops">
-          <Loader2 size={29} className="animate-spin" aria-hidden />
-        </div>
+        <img
+          src={fieldOpsLogo}
+          alt="FieldOps"
+          className="mx-auto mb-4 h-14 w-14 rounded-card shadow-fieldops"
+        />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
         <p className="mt-1 text-sm text-muted">Transforme inspecoes de campo em decisoes confiaveis</p>
       </div>
