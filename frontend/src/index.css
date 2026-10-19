@@ -96,6 +96,20 @@
   color-scheme: dark;
 }
 
+/* Enlarge the native date/time picker indicator in every theme so it is easier
+   to see and click. Applies to the light (native glyph) and dark (custom SVG)
+   icons alike; the dark SVG scales via background-size below. */
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='time']::-webkit-calendar-picker-indicator,
+input[type='datetime-local']::-webkit-calendar-picker-indicator,
+input[type='month']::-webkit-calendar-picker-indicator,
+input[type='week']::-webkit-calendar-picker-indicator {
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  background-size: 1.25rem 1.25rem;
+}
+
 /* Replace the indicator glyph with a light-colored SVG in dark mode. A CSS
    `filter: invert(...)` is unreliable here because Lightning CSS (Tailwind v4's
    processor) strips the invert() argument during minification, leaving the
