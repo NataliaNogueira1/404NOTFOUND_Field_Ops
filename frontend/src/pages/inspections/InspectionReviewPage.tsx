@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/utils/cn'
+import { formatDate } from '@/utils/formatDate'
 import { AuditTimeline } from '@/components/inspections/AuditTimeline'
 import { AnswerHistoryTab } from './AnswerHistoryTab'
 
@@ -44,7 +45,7 @@ export function InspectionReviewPage() {
 function Content({ review, comments, inspectionId, onCommentsChanged, onOpen }: { review: InspectionReview; comments: ReviewComment[]; inspectionId: string; onCommentsChanged: () => Promise<void>; onOpen: (photos: LightboxPhoto[], index: number) => void }) {
   const counts = useMemo(() => review.sections.flatMap(section => section.items).reduce((value, item) => ({ total: value.total + 1, answered: value.answered + Number(item.answer !== null) }), { total: 0, answered: 0 }), [review]); const allPhotos = review.sections.flatMap(section => section.items.flatMap(item => item.evidences.map(evidence => photo(evidence, item.title))))
   return <>
-    <section className="grid gap-4 md:grid-cols-5"><Summary label="Tecnico" value={review.technicianName} /><Summary label="Cliente" value={review.clientName} /><Summary label="Local" value={review.siteName} /><Summary label="Prazo" value={review.dueDate} /><Summary label="Respostas" value={`${counts.answered}/${counts.total}`} /></section>
+    <section className="grid gap-4 md:grid-cols-5"><Summary label="Tecnico" value={review.technicianName} /><Summary label="Cliente" value={review.clientName} /><Summary label="Local" value={review.siteName} /><Summary label="Prazo" value={formatDate(review.dueDate)} /><Summary label="Respostas" value={`${counts.answered}/${counts.total}`} /></section>
     {review.sections.length > 1 && <nav aria-label="Navegacao por secao" className="flex flex-wrap gap-2"><span className="self-center text-sm font-medium text-muted">Ir para:</span>{review.sections.map(section => <a key={`${section.order}-${section.title}`} href={`#review-section-${section.order}`} className="focus-ring rounded-fieldops border border-border bg-surface px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary-light/20">{section.title}</a>)}</nav>}
     <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]"><div className="space-y-4">
       {review.sections.map(section => <Card key={`${section.order}-${section.title}`} id={`review-section-${section.order}`} className="scroll-mt-24 p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-semibold">{section.title}</h2><span className="text-sm text-muted">{section.items.filter(item => item.answer !== null).length}/{section.items.length}</span></div>

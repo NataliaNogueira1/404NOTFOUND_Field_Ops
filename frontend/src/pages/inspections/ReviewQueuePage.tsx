@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
+import { formatDate } from '@/utils/formatDate'
 
 /**
  * Dedicated queue for inspections awaiting supervisor review.
@@ -88,7 +89,7 @@ export function ReviewQueuePage() {
       sortKey: 'dueDate',
       cell: item => (
         <span className={item.overdue ? 'font-semibold text-danger' : ''}>
-          {item.dueDate}
+          {formatDate(item.dueDate)}
         </span>
       ),
     },

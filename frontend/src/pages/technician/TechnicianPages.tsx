@@ -23,6 +23,7 @@ import { authSession } from '@/auth/session'
 import { type TechnicianInspection } from '@/api/mobileInspections'
 import { useTechnicianInspections } from '@/hooks/useTechnicianInspections'
 import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/types/domain'
+import { formatDate } from '@/utils/formatDate'
 
 export function TechnicianHomePage() {
   const { state, reload } = useTechnicianInspections()
@@ -269,7 +270,7 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
           <Card className="p-5">
             <h2 className="text-base font-semibold">Dados da inspecao</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Info label="Data" value={`${inspection.dueDate} ${inspection.dueTime ?? ''}`.trim()} />
+              <Info label="Data" value={`${formatDate(inspection.dueDate)} ${inspection.dueTime ?? ''}`.trim()} />
               <Info label="Supervisor" value={inspection.supervisorName} />
               <Info label="Modelo" value={template.title} />
               <Info label="Progresso" value={`${inspection.progress}%`} />
@@ -600,7 +601,7 @@ function TechnicianInspectionCard({ inspection }: { inspection: TechnicianInspec
         <Progress value={inspection.progress} />
         <div className="mt-2 flex items-center justify-between text-xs text-muted">
           <span>
-            {inspection.dueDate} {inspection.dueTime ?? ''}
+            {formatDate(inspection.dueDate)} {inspection.dueTime ?? ''}
           </span>
           {inspection.overdue && <Badge tone="danger">Atrasada</Badge>}
         </div>
