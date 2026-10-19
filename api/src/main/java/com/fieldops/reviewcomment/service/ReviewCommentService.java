@@ -10,10 +10,13 @@ import com.fieldops.reviewcomment.dto.ReviewCommentResponse;
 import com.fieldops.reviewcomment.model.ReviewComment;
 import com.fieldops.reviewcomment.repository.ReviewCommentRepository;
 import com.fieldops.shared.exception.ResourceNotFoundException;
+import com.fieldops.shared.security.AuthenticatedUser;
 import com.fieldops.user.model.User;
+import com.fieldops.user.model.Role;
 import com.fieldops.user.repository.UserRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -51,8 +54,12 @@ public class ReviewCommentService {
 
     /** Lists reviewer guidance ordered by the frozen checklist structure and creation time. */
     @Transactional(readOnly = true)
-    public List<ReviewCommentResponse> list(Long inspectionId) {
-        findInspection(inspectionId);
+    public List<ReviewCommentResponse> list(Long inspectionId, AuthenticatedUser requester) {
+        Inspection inspection = findInspection(inspectionId);
+        if (requester.getRole() == Role.TECHNICIAN
+                && !inspection.getTechnician().getId().equals(requester.getId())) {
+            throw new AccessDeniedException("Technician is not assigned to this inspection");
+        }
         return reviewCommentRepository.findByInspectionIdOrdered(inspectionId).stream()
                 .map(this::toResponse)
                 .toList();

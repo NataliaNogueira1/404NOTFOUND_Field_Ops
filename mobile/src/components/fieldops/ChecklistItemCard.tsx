@@ -9,6 +9,7 @@ import { ResponseType, type ChecklistAnswer, type ChecklistValue, type Evidence,
 import { useThemeColors } from '@/features/theme';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { SaveStatusIndicator } from './SaveStatusIndicator';
+import type { ReviewComment } from '@/features/fieldops';
 
 interface ChecklistItemProps {
   item: TemplateItem;
@@ -20,9 +21,10 @@ interface ChecklistItemProps {
   onAnswer: (value: ChecklistValue, observation?: string) => void;
   /** Retry a failed photo upload, reusing the existing file (PBI-044). */
   onRetryEvidence?: (evidenceId: string) => void;
+  reviewComments?: ReviewComment[];
 }
 
-export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence }: ChecklistItemProps) {
+export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence, reviewComments = [] }: ChecklistItemProps) {
   const router = useRouter();
   const c = useThemeColors();
   const [text, setText] = useState(answer?.value?.toString() ?? '');
@@ -76,6 +78,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
         <Text style={[styles.state, { color: isFailure ? c.danger : c.textSecondary }]}>{statusLabel}</Text>
       </View>
       {item.description ? <Text style={[styles.description, { color: c.textSecondary }]}>{item.description}</Text> : null}
+      {reviewComments.length > 0 ? <View style={[styles.reviewBox, { borderColor: c.warning, backgroundColor: c.warningLight }]}><Text style={[styles.failureTitle, { color: c.warningDark }]}>Orientações da revisão</Text>{reviewComments.map((comment) => <View key={comment.id}><Text style={{ color: c.text }}>{comment.comment}</Text><Text style={[styles.commentMeta, { color: c.textSecondary }]}>{comment.createdBy}</Text></View>)}</View> : null}
       <AnswerControl
         item={item}
         value={answer?.value}
@@ -288,6 +291,8 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 92, paddingTop: Spacing.sm, textAlignVertical: 'top' },
   failureBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, padding: Spacing.md },
   observationBox: { gap: Spacing.sm, borderRadius: 10, borderWidth: 1, padding: Spacing.md },
+  reviewBox: { gap: Spacing.xs, borderRadius: 10, borderWidth: 1, padding: Spacing.md },
+  commentMeta: { fontSize: FontSize.xs },
   incompatibleBox: { borderRadius: 10, borderWidth: 1, padding: Spacing.md },
   incompatibleText: { fontSize: FontSize.sm },
   failureTitle: { fontWeight: FontWeight.semibold },

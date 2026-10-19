@@ -39,6 +39,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -187,6 +188,31 @@ class MobileSyncBatchTest {
         assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
                 .isEqualTo(InspectionStatus.ASSIGNED);
         assertThat(processedOperationRepository.count()).isZero();
+    }
+
+    @Test
+    void pullsOnlyInspectionsChangedAfterCursor() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
+        String token = obtainToken();
+
+        // First sync (no cursor): the inspection comes back as a change and the
+        // response carries an opaque nextCursor to resume from (PBI-053).
+        MvcResult firstPull = mockMvc.perform(get("/api/v1/mobile/sync/pull")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes[0].inspection.id").value(inspection.getId().toString()))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+                .andReturn();
+
+        String nextCursor = JsonPath.read(firstPull.getResponse().getContentAsString(), "$.nextCursor");
+
+        // Resuming from the returned cursor with no further changes yields an empty delta.
+        mockMvc.perform(get("/api/v1/mobile/sync/pull")
+                        .queryParam("cursor", nextCursor)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes").isEmpty())
+                .andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test
