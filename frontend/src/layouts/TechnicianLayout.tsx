@@ -1,6 +1,7 @@
-import { Bell, ClipboardList, Home, LogOut, Menu, ShieldCheck, User, X } from 'lucide-react'
+import { Bell, ClipboardList, Home, LogOut, Menu, User, X } from 'lucide-react'
 import { useState, useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import fieldopsLogo from '@/assets/fieldops-logo.png'
 import { authSession } from '@/auth/session'
 import { ThemeToggle } from '@/theme/ThemeToggle'
 import { cn } from '@/utils/cn'
@@ -41,9 +42,12 @@ export function TechnicianLayout() {
       >
         <div className="flex h-18 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-3">
-            <span className="rounded-fieldops bg-primary p-2 text-white">
-              <ShieldCheck size={21} />
-            </span>
+            <img
+              src={fieldopsLogo}
+              alt=""
+              aria-hidden="true"
+              className="h-10 w-10 shrink-0 rounded-fieldops"
+            />
             <div>
               <span className="block text-lg font-semibold text-primary">FieldOps</span>
               <span className="text-xs text-muted">Portal do tecnico</span>
