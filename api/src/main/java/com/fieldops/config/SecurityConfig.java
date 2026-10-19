@@ -70,6 +70,8 @@ public class SecurityConfig {
                         // /api/v1/inspections/** rule so ownership (not a path role) governs access.
                         .requestMatchers(HttpMethod.POST, "/api/v1/inspections/*/evidence")
                         .hasAuthority("TECHNICIAN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/inspections/*/review-comments")
+                        .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers("/api/v1/equipment/by-qr/**")
                         .hasAnyAuthority("ADMINISTRATOR", "SUPERVISOR", "TECHNICIAN")
                         .requestMatchers(SUPERVISOR_SCOPED_PATHS)

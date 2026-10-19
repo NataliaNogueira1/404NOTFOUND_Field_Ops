@@ -14,7 +14,7 @@ export default function ChecklistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const c = useThemeColors();
-  const { inspections, answers, evidences, answerItem, retryEvidenceUpload } = useFieldOps();
+  const { inspections, answers, evidences, reviewComments, answerItem, retryEvidenceUpload } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -108,6 +108,7 @@ export default function ChecklistScreen() {
                 evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
                 onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
                 onRetryEvidence={retryEvidenceUpload}
+                reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
               />
             ))}
           </View>

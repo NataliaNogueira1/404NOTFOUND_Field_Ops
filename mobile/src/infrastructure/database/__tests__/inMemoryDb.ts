@@ -38,6 +38,23 @@ export function createInMemoryDb(): SQLiteDatabase {
       return (row as T) ?? null;
     },
 
+    // Transactional wrapper matching expo-sqlite's `withTransactionAsync`: the
+    // callback's writes run between BEGIN and COMMIT so the whole batch is
+    // atomic; any thrown error triggers a ROLLBACK and is re-thrown so callers
+    // can keep the previous state (e.g. NOT advance the pull cursor on failure).
+    // better-sqlite3 is synchronous, but BEGIN/COMMIT via `db.exec` still frame
+    // the awaited `runAsync` writes done inside the callback.
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      db.exec('BEGIN');
+      try {
+        await task();
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+
     // Not used by the repositories under test, but kept for completeness.
     async closeAsync(): Promise<void> {
       db.close();
