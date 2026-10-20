@@ -816,20 +816,59 @@ export class InspectionSyncService {
   }
 
   /**
+   * Stable outbox id for the IN_PROGRESS transition of a given inspection.
+   * Using a deterministic id (no timestamp) means:
+   *   1. The SUBMITTED operation can declare it as a dependencyId, guaranteeing
+   *      the server processes IN_PROGRESS before SUBMITTED (fixes the
+   *      "Illegal transition from ASSIGNED to SUBMITTED" error).
+   *   2. Retries reuse the same row instead of creating duplicates (RN-068).
+   */
+  static transitionOperationId(inspectionId: string): string {
+    return `transition-${inspectionId}`;
+  }
+
+  /**
    * Enqueue a status change to be synced later.
+   *
+   * When status is SUBMITTED the outbox row declares the IN_PROGRESS transition
+   * as a dependency so the server always receives IN_PROGRESS first (RN-069).
+   * This prevents the "Illegal transition from ASSIGNED to SUBMITTED" error that
+   * occurred when both operations were enqueued together and processed out of
+   * order due to SQLite's second-granularity created_at timestamps.
    */
   async enqueueStatusChange(inspectionId: string, status: string): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
-    const id = `status-${inspectionId}-${Date.now()}`;
-    await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
-      status,
-      baseVersion: inspection.serverVersion ?? 0,
-    });
+    const id = `status-${inspectionId}-${status}`;
+
+    // SUBMITTED must wait for IN_PROGRESS to be confirmed on the server first.
+    // Declare the deterministic transition id as a dependency so getReady()
+    // defers SUBMITTED until the transition row is no longer in the queue.
+    const dependencyIds =
+      status === 'SUBMITTED'
+        ? [InspectionSyncService.transitionOperationId(inspectionId)]
+        : [];
+
+    await this.syncQueueRepo.enqueue(
+      id,
+      'UPDATE',
+      'inspection',
+      inspectionId,
+      {
+        status,
+        baseVersion: inspection.serverVersion ?? 0,
+      },
+      dependencyIds,
+    );
   }
 
   /**
    * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
    * carrying the device timestamp and the optional start location (PBI-034).
+   *
+   * The outbox id is deterministic (`transition-<inspectionId>`) so the SUBMITTED
+   * operation can safely declare it as a dependency (see enqueueStatusChange).
+   * INSERT OR REPLACE semantics in enqueue() mean retries reuse the same row
+   * without creating duplicates (RN-068).
    */
   async enqueueTransition(
     inspectionId: string,
@@ -840,7 +879,8 @@ export class InspectionSyncService {
     },
   ): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
-    const id = `transition-${inspectionId}-${Date.now()}`;
+    // Deterministic id — no timestamp — so the SUBMITTED dependency always resolves.
+    const id = InspectionSyncService.transitionOperationId(inspectionId);
     // operationId is the server-side idempotency key (PBI-052): a stable UUID kept
     // in the payload so a resend of this same outbox row never applies twice.
     // startedAtDevice/location are kept locally for now; the batch endpoint only
