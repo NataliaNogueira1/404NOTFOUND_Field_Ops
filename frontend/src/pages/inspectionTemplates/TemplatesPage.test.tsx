@@ -56,7 +56,7 @@ describe('TemplatesPage', () => {
       ),
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'Titulo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Título' }))
     expect(screen.getByTestId('template-location')).toHaveTextContent('sort=title%2Cdesc')
   })
 })

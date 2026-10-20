@@ -141,7 +141,7 @@ describe('InspectionReportPage — carregamento', () => {
     // fetch nunca resolve, portanto a pagina permanece no estado de loading
     renderPage(vi.fn(() => new Promise(() => {})))
     expect(screen.getByRole('status')).toBeInTheDocument()
-    expect(screen.getByText(/carregando relatorio/i)).toBeInTheDocument()
+    expect(screen.getByText(/carregando relatório/i)).toBeInTheDocument()
   })
 
   it('exibe empty state para 404', async () => {
@@ -156,7 +156,7 @@ describe('InspectionReportPage — carregamento', () => {
         ),
       ),
     )
-    await screen.findByText(/inspecao nao encontrada/i)
+    await screen.findByText(/inspeção não encontrada/i)
   })
 
   it('exibe cartao de erro com botao de retry para falha generica', async () => {
@@ -204,7 +204,7 @@ describe('InspectionReportPage — dados da API (sem mocks)', () => {
     // item respondido como conforme
     expect(screen.getByText('CONFORME')).toBeInTheDocument()
     // item respondido como nao conforme
-    expect(screen.getByText('NAO CONFORME')).toBeInTheDocument()
+    expect(screen.getByText('NÃO CONFORME')).toBeInTheDocument()
     // item sem resposta
     expect(screen.getByText('Pendente')).toBeInTheDocument()
   })
@@ -212,7 +212,7 @@ describe('InspectionReportPage — dados da API (sem mocks)', () => {
   it('renderiza a secao de nao conformidades com dados da API', async () => {
     renderPage(vi.fn(() => Promise.resolve(reviewResponse())))
 
-    await screen.findByText(/nao conformidades/i)
+    await screen.findByText(/não conformidades/i)
     expect(screen.getByText('Acumulo de oleo')).toBeInTheDocument()
     expect(screen.getByText('Residuo de oleo detectado na base.')).toBeInTheDocument()
   })

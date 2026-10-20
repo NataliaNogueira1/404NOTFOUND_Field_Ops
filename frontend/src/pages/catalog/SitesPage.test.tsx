@@ -104,7 +104,7 @@ describe('SitesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo local' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Nova Filial')
-    await userEvent.type(within(dialog).getByLabelText('Descricao (opcional)'), 'Recepcao principal')
+    await userEvent.type(within(dialog).getByLabelText('Descrição (opcional)'), 'Recepcao principal')
     await userEvent.type(within(dialog).getByLabelText('Cidade (opcional)'), 'Campinas')
     await userEvent.selectOptions(within(dialog).getByLabelText('Estado (UF)'), 'SP')
     await userEvent.type(within(dialog).getByLabelText('CEP (opcional)'), '13010-001')
@@ -143,7 +143,7 @@ describe('SitesPage', () => {
     await screen.findByText('Unidade Centro')
 
     await userEvent.click(screen.getByRole('button', { name: 'Inativar Unidade Centro' }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('deixara de aparecer em novas inspecoes')
+    expect(screen.getByRole('dialog')).toHaveTextContent('deixará de aparecer em novas inspeções')
     expect(patchBody).toBeUndefined()
     await userEvent.click(screen.getByRole('button', { name: 'Inativar' }))
 
