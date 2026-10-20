@@ -90,11 +90,12 @@ interface ApiItem {
 /** Operation types accepted by the backend sync applicators (PBI-051, #223). */
 type SyncPushType = 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
 
-/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.). */
+/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.).
+ * inspectionId/itemId for content ops are numbers — matching the Long the backend expects. */
 type SyncPushPayload =
   | { inspectionId: string; status: string }
-  | { inspectionId: string; itemId: string; value: string; observation?: string }
-  | { inspectionId: string; itemId: string; title: string; description: string; severity: string };
+  | { inspectionId: number | string; itemId: number | string; value: string; observation?: string }
+  | { inspectionId: number | string; itemId: number | string; title: string; description: string; severity: string };
 
 /** One operation in a sync batch. */
 interface SyncPushOperation {
@@ -562,8 +563,9 @@ export class InspectionSyncService {
       baseVersion: payload.baseVersion,
       type: 'ANSWER_UPSERT',
       payload: {
-        inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Backend AnswerUpsertPayload expects Long — send as JSON numbers, not strings.
+        inspectionId: toBackendId(payload.inspectionId),
+        itemId: toBackendId(payload.itemId),
         value: serializeAnswerValue(payload.value),
         observation: payload.observation,
       },
@@ -585,8 +587,9 @@ export class InspectionSyncService {
       baseVersion: payload.baseVersion,
       type: 'NON_CONFORMITY_CREATE',
       payload: {
-        inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Backend NonConformityCreatePayload expects Long — send as JSON numbers.
+        inspectionId: toBackendId(payload.inspectionId),
+        itemId: toBackendId(payload.itemId),
         title: payload.title,
         description: payload.description,
         severity: payload.severity,
@@ -882,4 +885,21 @@ function serializeAnswerValue(value: ChecklistValue): string {
 function unscopeItemId(scopedItemId: string): string {
   const separator = scopedItemId.indexOf('::');
   return separator === -1 ? scopedItemId : scopedItemId.slice(separator + 2);
+}
+
+/**
+ * Converts a string id to a JSON number for backend DTOs that expect Long
+ * (AnswerUpsertPayload, NonConformityCreatePayload, EvidenceCreatePayload).
+ * The backend's Jackson deserializer accepts both numeric JSON values and
+ * string-encoded numbers, but sending an actual number is safer and avoids
+ * the 500 that occurs when Jackson tries to coerce a non-numeric string
+ * (e.g. "insp-1") to Long.
+ *
+ * Returns the numeric value when the string is a valid integer, or the
+ * original string as a fallback (so test ids like "insp-1" still work in
+ * unit tests without hitting a real backend).
+ */
+function toBackendId(id: string): number | string {
+  const n = Number(id);
+  return Number.isInteger(n) && n > 0 ? n : id;
 }

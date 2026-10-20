@@ -339,7 +339,8 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     await service.pushPendingOperations(TOKEN);
 
     const [, body] = mockPost.mock.calls[0];
-    expect(body.operations[0].payload.itemId).toBe('7');
+    // Backend expects Long — numeric 7, not string '7'.
+    expect(body.operations[0].payload.itemId).toBe(7);
   });
 
   it('strips the inspection scope from the item id in a NON_CONFORMITY_CREATE payload', async () => {
@@ -353,7 +354,8 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     await service.pushPendingOperations(TOKEN);
 
     const [, body] = mockPost.mock.calls[0];
-    expect(body.operations[0].payload.itemId).toBe('7');
+    // Backend expects Long — numeric 7, not string '7'.
+    expect(body.operations[0].payload.itemId).toBe(7);
   });
 
   it('leaves a plain numeric item id unchanged (no scope prefix present)', async () => {
@@ -365,6 +367,7 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     await service.pushPendingOperations(TOKEN);
 
     const [, body] = mockPost.mock.calls[0];
-    expect(body.operations[0].payload.itemId).toBe('7');
+    // '7' is a valid numeric string → converted to number 7.
+    expect(body.operations[0].payload.itemId).toBe(7);
   });
 });
