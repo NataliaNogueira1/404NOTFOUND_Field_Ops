@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
@@ -80,6 +81,7 @@ function PasswordInput({
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
+  const router = useRouter();
   const c = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -136,7 +138,13 @@ export default function LoginScreen() {
           />
           {!!error && <Text style={styles.error}>{error}</Text>}
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
-          <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
+          <Pressable
+            onPress={() => router.push('/(public)/forgot-password')}
+            accessibilityRole="button"
+            accessibilityLabel="Esqueceu a senha?"
+          >
+            <Text style={styles.link}>Esqueceu a senha?</Text>
+          </Pressable>
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>

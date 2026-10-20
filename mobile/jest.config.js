@@ -45,7 +45,7 @@ const expoModulesCoreDir = path.dirname(
 const componentsProject = {
   displayName: 'components',
   preset: 'jest-expo',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/app'],
   testMatch: ['**/__tests__/**/*.test.tsx'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
