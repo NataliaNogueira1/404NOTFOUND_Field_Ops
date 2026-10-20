@@ -26,10 +26,10 @@ export function Badge({
 }
 const statusLabel: Record<InspectionStatus, string> = {
   DRAFT: 'Rascunho',
-  ASSIGNED: 'Atribuida',
+  ASSIGNED: 'Atribuída',
   IN_PROGRESS: 'Em andamento',
   SUBMITTED: 'Enviada',
-  UNDER_REVIEW: 'Em revisao',
+  UNDER_REVIEW: 'Em revisão',
   APPROVED: 'Aprovada',
   REJECTED: 'Reprovada',
   CANCELED: 'Cancelada',
@@ -44,14 +44,14 @@ const statusTone: Record<InspectionStatus, BadgeTone> = {
   REJECTED: 'danger',
   CANCELED: 'neutral',
 }
-const priorityLabel: Record<Priority, string> = { LOW: 'Baixa', MEDIUM: 'Media', HIGH: 'Alta', CRITICAL: 'Critica' }
+const priorityLabel: Record<Priority, string> = { LOW: 'Baixa', MEDIUM: 'Média', HIGH: 'Alta', CRITICAL: 'Crítica' }
 const priorityTone: Record<Priority, BadgeTone> = {
   LOW: 'success',
   MEDIUM: 'primary',
   HIGH: 'warning',
   CRITICAL: 'danger',
 }
-const severityLabel: Record<Severity, string> = { LOW: 'Baixa', MEDIUM: 'Media', HIGH: 'Alta', CRITICAL: 'Critica' }
+const severityLabel: Record<Severity, string> = { LOW: 'Baixa', MEDIUM: 'Média', HIGH: 'Alta', CRITICAL: 'Crítica' }
 const roleLabel: Record<UserRole, string> = { ADMIN: 'ADMIN', SUPERVISOR: 'SUPERVISOR', TECHNICIAN: 'TECHNICIAN' }
 export function StatusBadge({ status }: { status: InspectionStatus }) {
   return <Badge tone={statusTone[status]}>{statusLabel[status]}</Badge>
