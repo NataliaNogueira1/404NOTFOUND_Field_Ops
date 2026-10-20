@@ -7,7 +7,26 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 interface Migration {
   version: number;
   description: string;
-  sql: string;
+  /** Static SQL to run, or a function for migrations that must inspect the schema. */
+  sql?: string;
+  run?: (db: SQLiteDatabase) => Promise<void>;
+}
+
+/**
+ * Adds a column to a table only when it is not already present. SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`, and a device may already carry the column from a
+ * schema created by an earlier app build, so we guard against the duplicate to
+ * keep the migration idempotent (otherwise init fails with "duplicate column").
+ */
+async function addColumnIfMissing(
+  db: SQLiteDatabase,
+  table: string,
+  column: string,
+  definition: string,
+): Promise<void> {
+  const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  if (columns.some((entry) => entry.name === column)) return;
+  await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
 }
 
 const migrations: Migration[] = [
@@ -203,18 +222,16 @@ const migrations: Migration[] = [
   {
     version: 7,
     description: 'PBI-045: store conclusion GPS location and capture timestamps on inspections',
-    sql: `
-      -- End-of-inspection location (start_* already exist since v2). Captured
-      -- once at conclusion (PBI-040). Nullable: the technician may opt out or be
-      -- denied the permission and still conclude (RN-059).
-      ALTER TABLE inspections ADD COLUMN end_latitude REAL;
-      ALTER TABLE inspections ADD COLUMN end_longitude REAL;
-      ALTER TABLE inspections ADD COLUMN end_accuracy REAL;
-      -- Capture timestamps (RN-062) kept for both moments so the device mirrors
-      -- what is sent to and shown by the server.
-      ALTER TABLE inspections ADD COLUMN start_captured_at TEXT;
-      ALTER TABLE inspections ADD COLUMN end_captured_at TEXT;
-    `,
+    // End-of-inspection location + capture timestamps (PBI-040 / PBI-045 / RN-062).
+    // Added defensively: a device may already carry end_* from an earlier build,
+    // so each column is only added when missing to stay idempotent (RN-059).
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'end_latitude', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'end_longitude', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'end_accuracy', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'start_captured_at', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'end_captured_at', 'TEXT');
+    },
   },
 ];
 
@@ -241,7 +258,11 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   for (const migration of migrations) {
     if (appliedVersions.has(migration.version)) continue;
 
-    await db.execAsync(migration.sql);
+    if (migration.run) {
+      await migration.run(db);
+    } else if (migration.sql) {
+      await db.execAsync(migration.sql);
+    }
     await db.runAsync(
       'INSERT INTO _migrations (version, description) VALUES (?, ?)',
       migration.version,
