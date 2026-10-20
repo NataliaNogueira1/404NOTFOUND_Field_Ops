@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 
+/** Max time to wait for a one-shot GPS fix before giving up and continuing (RN-059). */
+const LOCATION_TIMEOUT_MS = 10000;
+
 /** A single captured GPS reading. */
 export interface CapturedLocation {
   latitude: number;
@@ -68,9 +71,14 @@ export function useLocation() {
       }
       if (status !== 'granted') return null;
 
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      // A high-accuracy fix can hang indefinitely (cold GPS, indoors), which would
+      // freeze the start/conclusion flow. Cap the wait and fall back to null so the
+      // transition always proceeds (RN-059).
+      const position = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+        LOCATION_TIMEOUT_MS,
+      );
+      if (!position) return null;
 
       return {
         latitude: position.coords.latitude,
@@ -91,4 +99,24 @@ function mapStatus(status: Location.PermissionStatus): LocationPermission {
   if (status === 'granted') return 'granted';
   if (status === 'denied') return 'denied';
   return 'undetermined';
+}
+
+/**
+ * Resolves with the promise's value, or `null` when it does not settle within
+ * `timeoutMs`. Used so a stuck GPS fix never blocks the start/conclusion flow.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(null);
+      },
+    );
+  });
 }
