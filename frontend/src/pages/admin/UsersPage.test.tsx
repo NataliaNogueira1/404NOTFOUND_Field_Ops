@@ -98,7 +98,7 @@ describe('UsersPage', () => {
     )
     await screen.findByText('Ana Costa')
 
-    await userEvent.click(screen.getByRole('button', { name: /novo usuario/i }))
+    await userEvent.click(screen.getByRole('button', { name: /novo usuário/i }))
     const dialog = screen.getByRole('dialog')
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Nova Admin')
     await userEvent.type(within(dialog).getByLabelText('E-mail'), 'nova@example.com')
@@ -121,7 +121,7 @@ describe('UsersPage', () => {
         role: 'ADMINISTRATOR',
       }),
     )
-    expect(await screen.findByText('Usuario criado com sucesso.')).not.toBeNull()
+    expect(await screen.findByText('Usuário criado com sucesso.')).not.toBeNull()
   })
 
   it('asks for confirmation before inactivating a user', async () => {
@@ -144,7 +144,7 @@ describe('UsersPage', () => {
     await screen.findByText('Ana Costa')
 
     await userEvent.click(screen.getByRole('button', { name: 'Inativar Ana Costa' }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('perdera o acesso ao sistema')
+    expect(screen.getByRole('dialog')).toHaveTextContent('perderá o acesso ao sistema')
     expect(statusBody).toBeUndefined()
     await userEvent.click(screen.getByRole('button', { name: 'Inativar' }))
 

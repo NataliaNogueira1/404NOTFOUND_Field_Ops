@@ -74,7 +74,7 @@ describe('InspectionsPage', () => {
 
     // Aguarda carregamento terminar
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Sem dados na tabela
@@ -93,7 +93,7 @@ describe('InspectionsPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Com API offline, a tabela deve ficar vazia (sem fallback mock)
@@ -152,7 +152,7 @@ describe('InspectionsPage', () => {
 
     await waitFor(() => expect(cancelBody).toEqual({ reason: 'Cliente solicitou reagendamento' }))
     expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/v1/inspections?'))).toHaveLength(2)
-    expect(await screen.findByText(/inspecao cancelada com sucesso/i)).not.toBeNull()
+    expect(await screen.findByText(/inspeção cancelada com sucesso/i)).not.toBeNull()
   })
 
   it('exibe erro de validação ao tentar cancelar com motivo menor que 10 caracteres', async () => {
@@ -235,11 +235,11 @@ describe('InspectionsPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Os selects de técnico e cliente devem existir mas sem opções além de "Todos"
-    expect(screen.getByLabelText(/tecnico/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/técnico/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
   })
 })
