@@ -116,7 +116,7 @@ export default function LoginScreen() {
         <Image source={fieldOpsLogo} style={styles.brandMark} accessibilityLabel="FieldOps" />
         <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
         <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          Tudo pronto para sua proxima inspecao
+          Tudo pronto para sua próxima inspeção
         </Text>
         <Card style={styles.form} shadow="md">
           <TextInput
