@@ -661,18 +661,28 @@ export class InspectionSyncService {
 
     // Then pull server-side updates incrementally by cursor (PBI-053). With no
     // local cursor this does the initial full pull; with one it only fetches the
-    // delta (new inspections, reviews, cancellations). `pullInspections` is kept
-    // as a recovery fallback: if the incremental pull failed AND we have never
-    // stored a cursor (so there is nothing local to lose), fall back to the plain
-    // full pull so a first-run sync still populates the device.
+    // delta (new inspections, reviews, cancellations).
+    //
+    // `pullInspections` (the legacy full-pull) is the fallback whenever
+    // `pullChanges` produces ANY error — not only on first sync. This covers the
+    // case where the server rejects the stored cursor (422 INVALID_CURSOR) or
+    // when the incremental endpoint is temporarily unavailable. The full-pull
+    // result replaces the incremental errors so the user sees a successful sync
+    // if the fallback succeeds (RN-072).
     const pullResult = await this.pullChanges(token);
-    errors.push(...pullResult.errors);
     let pulled = pullResult.downloaded;
 
-    if (pullResult.errors.length > 0 && (await this.metadataRepo.getPullCursor()) === null) {
+    if (pullResult.errors.length > 0) {
       const fallback = await this.pullInspections(token);
-      errors.push(...fallback.errors);
-      pulled += fallback.downloaded;
+      if (fallback.errors.length === 0) {
+        // Fallback succeeded — discard the incremental errors (RN-072).
+        pulled += fallback.downloaded;
+      } else {
+        // Both failed — report all errors.
+        errors.push(...pullResult.errors);
+        errors.push(...fallback.errors);
+        pulled += fallback.downloaded;
+      }
     }
 
     // Record the timestamp of the last *successful* sync only when the whole
