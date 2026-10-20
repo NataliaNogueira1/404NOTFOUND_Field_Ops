@@ -35,7 +35,7 @@ public class DashboardController {
     public ResponseEntity<DashboardSummaryResponse> summary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(name = "client", required = false) String clientName,
+            @RequestParam(name = "clientName", required = false) String clientName,
             @RequestParam(required = false) Long technicianId) {
         return ResponseEntity.ok(dashboardService.getSummary(from, to, clientName, technicianId));
     }
