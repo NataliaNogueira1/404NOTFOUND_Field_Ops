@@ -1,18 +1,19 @@
-import * as FileSystem from 'expo-file-system';
+import { File, UploadType } from 'expo-file-system';
 
 /**
  * Uploads an evidence photo to the backend using the two-step protocol (issue #229 / RN-078):
  *
- *  Step 1 — Binary upload via FileSystem.uploadAsync (multipart/form-data):
+ *  Step 1 — Binary upload via File.createUploadTask (multipart/form-data):
  *    POST /api/v1/mobile/evidence/upload
  *    ← { fileRef: "abc123.jpg" }
  *
  *  Step 2 — Metadata sync via POST /api/v1/mobile/sync/push (EVIDENCE_CREATE):
  *    ← { results: [{ status: "APPLIED" | "ALREADY_APPLIED" | ... }] }
  *
- * FileSystem.uploadAsync is the correct way to send multipart files in Expo/Hermes.
- * Using fetch() + FormData with { uri, name, type } causes "Unsupported FormDataPart
- * implementation" on the New Architecture / Hermes engine.
+ * expo-file-system v57 removed FileSystemUploadType and the legacy uploadAsync
+ * from the package's main entrypoint (they throw at runtime). The new API is:
+ *   new File(uri).createUploadTask(url, { uploadType: UploadType.MULTIPART, ... })
+ * See: https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
  *
  * Resolves only when the server confirms APPLIED or ALREADY_APPLIED; any other
  * outcome throws so the outbox keeps the photo as FAILED and available for retry
@@ -65,25 +66,29 @@ export class EvidenceUploadClient {
     return { status, fileRef };
   }
 
-  // ─── Step 1: multipart binary upload via FileSystem.uploadAsync ──────────
+  // ─── Step 1: multipart binary upload via File.createUploadTask (Expo v57) ──
 
   private async uploadBinary(token: string, input: EvidenceUploadInput): Promise<string> {
     const uploadUrl = `${BASE_URL}/api/v1/mobile/evidence/upload`;
 
-    // FileSystem.uploadAsync is the Expo-recommended way to send multipart files.
-    // It handles the multipart boundary correctly on both Android and iOS with
-    // Hermes/New Architecture, avoiding "Unsupported FormDataPart implementation".
-    const result = await FileSystem.uploadAsync(uploadUrl, input.localUri, {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    // expo-file-system v57 removed FileSystemUploadType from the main entrypoint
+    // and deprecated FileSystem.uploadAsync (throws at runtime). The replacement
+    // is new File(uri).createUploadTask(url, options).
+    // See: https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
+    const file = new File(input.localUri);
+    const task = file.createUploadTask(uploadUrl, {
+      uploadType: UploadType.MULTIPART,
       fieldName: 'file',
       mimeType: input.mimeType ?? 'image/jpeg',
+      httpMethod: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    if (result.status === 0) {
+    const result = await task.uploadAsync();
+
+    if (!result) {
       throw new Error('Binary upload failed: no response from server (network error).');
     }
     if (result.status < 200 || result.status >= 300) {
