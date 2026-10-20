@@ -471,6 +471,7 @@ export class InspectionSyncService {
       responseId?: string;
       uri?: string;
       description?: string;
+      capturedAt?: string; // vem do enqueueEvidence (evidence.capturedAt)
     },
   ): Promise<void> {
     // Prefer the freshest URI from the DB (retry reuses the persisted file).
@@ -480,12 +481,22 @@ export class InspectionSyncService {
       throw new Error('Evidence has no local file to upload.');
     }
 
+    // Deterministic outbox id — same value used when the operation was enqueued,
+    // so this is the stable idempotency key sent to the server (RN-068).
+    const outboxOperationId = InspectionSyncService.evidenceOperationId(evidenceId);
+
     await evidenceUploadClient.upload(token, {
       inspectionId: payload.inspectionId,
       itemId: payload.itemId,
+      // capturedAt: required by backend — prefer payload, fallback to DB, then now (RN-074).
+      capturedAt: payload.capturedAt ?? evidence?.capturedAt ?? new Date().toISOString(),
+      // operationId: idempotency key (RN-068) — deterministic from the evidence id.
+      operationId: outboxOperationId,
       responseId: payload.responseId,
       localUri,
       description: payload.description,
+      // TODO(#229): Evidence entity does not have latitude/longitude yet.
+      // Pass them here when GPS capture per evidence is implemented (EP-08).
     });
   }
 
