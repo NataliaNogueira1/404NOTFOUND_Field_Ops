@@ -97,16 +97,18 @@ and a private PostgreSQL database. The service builds `api/Dockerfile`, migrates
 Flyway, runs the `demo` profile seed, and uses `/actuator/health` as its health check.
 
 1. In Render, create a Blueprint from this repository and provide `CORS_ALLOWED_ORIGINS` when
-   prompted. Use the exact public web origins that need browser access; native APK traffic does
-   not require a browser CORS origin.
+   prompted. List the exact public web origins that need browser access, comma-separated — never
+   use `*`: CORS runs with `allowCredentials(true)`, which is invalid with a wildcard origin.
+   Native APK traffic does not require a browser CORS origin.
 2. Wait for the health check at `https://<render-service>.onrender.com/actuator/health` and verify
    Swagger at `/swagger-ui`.
 3. Use that HTTPS base URL when configuring the mobile preview build as described in
    [`mobile/README.md`](../mobile/README.md#public-demo-apk).
 
-The Blueprint generates `JWT_SECRET` and references the database connection internally. It never
-commits credentials. Its container entrypoint converts Render's `DATABASE_URL` to the JDBC URL
-used by Spring and honours Render's dynamic `PORT`.
+The Blueprint generates `JWT_SECRET` and injects the managed Postgres credentials as discrete
+`DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` values (not the raw `DATABASE_URL`), so Spring
+builds a clean JDBC URL and the PostgreSQL driver receives the user/password separately. It never
+commits credentials, and the container entrypoint honours Render's dynamic `PORT`.
 
 ## Commands
 
