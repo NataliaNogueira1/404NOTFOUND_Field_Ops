@@ -28,14 +28,14 @@ import { formatDate } from '@/utils/formatDate'
 export function TechnicianHomePage() {
   const { state, reload } = useTechnicianInspections()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
-  const firstName = session.user?.name.split(' ')[0] ?? 'Tecnico'
+  const firstName = session.user?.name.split(' ')[0] ?? 'Técnico'
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Ola, {firstName}</h1>
-        <p className="text-sm text-muted">Suas atividades de campo atribuidas.</p>
+        <h1 className="text-2xl font-semibold">Olá, {firstName}</h1>
+        <p className="text-sm text-muted">Suas atividades de campo atribuídas.</p>
       </div>
-      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspecao atribuida a voce no momento.">
+      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspeção atribuída a você no momento.">
         {(inspections) => <HomeContent inspections={inspections} reload={reload} />}
       </InspectionsAsync>
     </div>
@@ -60,11 +60,11 @@ function HomeContent({
         <TechStat label="Hoje" value={todayCount} tone="primary" />
         <TechStat label="Atrasadas" value={overdue} tone="danger" />
         <TechStat label="Em andamento" value={inProgress} tone="warning" />
-        <TechStat label="Atribuidas" value={assigned} tone="success" />
+        <TechStat label="Atribuídas" value={assigned} tone="success" />
       </section>
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Proximas inspecoes</h2>
+          <h2 className="text-lg font-semibold">Próximas inspeções</h2>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={reload}>
               <RefreshCw size={16} />
@@ -91,15 +91,15 @@ export function TechnicianInspectionsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Minhas Inspecoes</h1>
-          <p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuidas.</p>
+          <h1 className="text-2xl font-semibold">Minhas Inspeções</h1>
+          <p className="text-sm text-muted">Busca, filtros e progresso das atividades atribuídas.</p>
         </div>
         <Button variant="ghost" onClick={reload}>
           <RefreshCw size={16} />
           Atualizar
         </Button>
       </div>
-      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspecao atribuida a voce no momento.">
+      <InspectionsAsync state={state} reload={reload} emptyDescription="Nenhuma inspeção atribuída a você no momento.">
         {(inspections) => <InspectionsList inspections={inspections} />}
       </InspectionsAsync>
     </div>
@@ -153,14 +153,14 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
           id="tech-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Titulo, cliente ou equipamento"
+          placeholder="Título, cliente ou equipamento"
         />
         <Select label="Status" id="tech-status" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">Todos</option>
-          <option value={InspectionStatus.ASSIGNED}>Atribuida</option>
+          <option value={InspectionStatus.ASSIGNED}>Atribuída</option>
           <option value={InspectionStatus.IN_PROGRESS}>Em andamento</option>
           <option value={InspectionStatus.SUBMITTED}>Enviada</option>
-          <option value={InspectionStatus.UNDER_REVIEW}>Em revisao</option>
+          <option value={InspectionStatus.UNDER_REVIEW}>Em revisão</option>
           <option value={InspectionStatus.APPROVED}>Aprovada</option>
           <option value={InspectionStatus.REJECTED}>Reprovada</option>
           <option value={InspectionStatus.CANCELED}>Cancelada</option>
@@ -178,7 +178,7 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
             </option>
           ))}
         </Select>
-        <Select label="Periodo" id="tech-period" value={period} onChange={(event) => setPeriod(event.target.value)}>
+        <Select label="Período" id="tech-period" value={period} onChange={(event) => setPeriod(event.target.value)}>
           <option value="">Todos</option>
           <option value="today">Hoje</option>
           <option value="week">Esta semana</option>
@@ -204,7 +204,7 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
         ))}
       </div>
       {filtered.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted">Nenhuma inspecao encontrada.</Card>
+        <Card className="p-8 text-center text-sm text-muted">Nenhuma inspeção encontrada.</Card>
       )}
     </>
   )
@@ -214,7 +214,7 @@ export function TechnicianInspectionDetailsPage() {
   const { state, reload, id } = useInspection()
   return (
     <div className="space-y-6">
-      <BackLink to="/technician/inspections" label="Minhas inspecoes" />
+      <BackLink to="/technician/inspections" label="Minhas inspeções" />
       <InspectionAsync state={state} reload={reload} id={id}>
         {(inspection) => <DetailsContent inspection={inspection} />}
       </InspectionAsync>
@@ -269,17 +269,17 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
         <div className="space-y-4">
           {isCanceled && (
             <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark">
-              Esta inspecao foi cancelada pelo Admin/Supervisor e nao pode ser iniciada ou continuada.
+              Esta inspeção foi cancelada pelo Admin/Supervisor e não pode ser iniciada ou continuada.
             </Card>
           )}
           {inspection.status === InspectionStatus.REJECTED && inspection.rejectionReason && (
             <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">
-              <p className="font-semibold">Motivo da reprovacao</p>
+              <p className="font-semibold">Motivo da reprovação</p>
               <p className="mt-1">{inspection.rejectionReason}</p>
             </Card>
           )}
           <Card className="p-5">
-            <h2 className="text-base font-semibold">Dados da inspecao</h2>
+            <h2 className="text-base font-semibold">Dados da inspeção</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Info label="Data" value={`${formatDate(inspection.dueDate)} ${inspection.dueTime ?? ''}`.trim()} />
               <Info label="Supervisor" value={inspection.supervisorName} />
@@ -288,16 +288,16 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
             </div>
           </Card>
           <Card className="p-5">
-            <h2 className="text-base font-semibold">Instrucoes</h2>
+            <h2 className="text-base font-semibold">Instruções</h2>
             <p className="mt-2 text-sm text-muted">
-              {inspection.supervisorInstructions || 'Sem instrucoes adicionais.'}
+              {inspection.supervisorInstructions || 'Sem instruções adicionais.'}
             </p>
           </Card>
           <Card className="p-5">
             <h2 className="text-base font-semibold">Progresso</h2>
             <Progress value={inspection.progress} />
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Info label="Secoes" value={String(template.sections.length)} />
+              <Info label="Seções" value={String(template.sections.length)} />
               <Info label="Itens do checklist" value={String(totalItems)} />
             </div>
           </Card>
@@ -305,7 +305,7 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
         <Card className="h-fit p-5">
           <h2 className="text-base font-semibold">Checklist</h2>
           <p className="mt-2 text-sm text-muted">
-            {template.sections.length} secoes e {totalItems} itens neste modelo.
+            {template.sections.length} seções e {totalItems} itens neste modelo.
           </p>
           <Link className="mt-4 block" to={`/technician/inspections/${inspection.id}/checklist`}>
             <Button variant="secondary" className="w-full">
@@ -356,9 +356,9 @@ function StartContent({ inspection }: { inspection: TechnicianInspection }) {
               <InfoIcon size={19} />
             </span>
             <div>
-              <h2 className="text-base font-semibold">Execucao em campo</h2>
+              <h2 className="text-base font-semibold">Execução em campo</h2>
               <p className="mt-1 text-sm text-muted">
-                O preenchimento com fotos, QR Code e localizacao e feito pelo aplicativo mobile. No portal web voce
+                O preenchimento com fotos, QR Code e localização é feito pelo aplicativo mobile. No portal web você
                 acompanha o checklist e o andamento.
               </p>
             </div>
@@ -396,7 +396,7 @@ function ChecklistContent({ inspection }: { inspection: TechnicianInspection }) 
         <div>
           <h1 className="text-2xl font-semibold">{template.title}</h1>
           <p className="text-sm text-muted">
-            {template.sections.length} secoes / {items.length} itens
+            {template.sections.length} seções / {items.length} itens
           </p>
         </div>
         <Link to={`/technician/inspections/${inspection.id}/summary`}>
@@ -408,7 +408,7 @@ function ChecklistContent({ inspection }: { inspection: TechnicianInspection }) 
           <InfoIcon size={18} />
         </span>
         <p className="text-sm text-muted">
-          Visualizacao do checklist atribuido. O preenchimento das respostas, evidencias e nao conformidades e feito
+          Visualização do checklist atribuído. O preenchimento das respostas, evidências e não conformidades é feito
           pelo aplicativo mobile em campo.
         </p>
       </Card>
@@ -416,12 +416,12 @@ function ChecklistContent({ inspection }: { inspection: TechnicianInspection }) 
         <EmptyState
           icon={ClipboardCheck}
           title="Checklist sem itens"
-          description="O modelo desta inspecao nao possui itens para exibir."
+          description="O modelo desta inspeção não possui itens para exibir."
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <Card className="h-fit p-4">
-            <p className="text-sm font-semibold">Secoes</p>
+            <p className="text-sm font-semibold">Seções</p>
             <div className="mt-3 space-y-2">
               {template.sections.map((section) => (
                 <a
@@ -477,8 +477,8 @@ function SummaryContent({ inspection }: { inspection: TechnicianInspection }) {
     <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <TechStat label="Total de itens" value={total} tone="primary" />
-        <TechStat label="Obrigatorios" value={required} tone="warning" />
-        <TechStat label="Secoes" value={template.sections.length} tone="success" />
+        <TechStat label="Obrigatórios" value={required} tone="warning" />
+        <TechStat label="Seções" value={template.sections.length} tone="success" />
         <TechStat label="Progresso" value={inspection.progress} tone="primary" />
       </section>
       <Card className="p-5">
@@ -494,7 +494,7 @@ function SummaryContent({ inspection }: { inspection: TechnicianInspection }) {
           <InfoIcon size={18} />
         </span>
         <p className="text-sm text-muted">
-          A conclusao e a sincronizacao da inspeção acontecem no aplicativo mobile. Este resumo e somente para
+          A conclusão e a sincronização da inspeção acontecem no aplicativo mobile. Este resumo é somente para
           acompanhamento.
         </p>
       </Card>
@@ -506,7 +506,7 @@ export function TechnicianProfilePage() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
-  const initials = (user?.name ?? 'Tecnico')
+  const initials = (user?.name ?? 'Técnico')
     .split(' ')
     .map((part) => part[0])
     .slice(0, 2)
@@ -522,14 +522,14 @@ export function TechnicianProfilePage() {
         <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-primary text-2xl font-semibold text-white">
           {initials}
         </div>
-        <h1 className="mt-4 text-2xl font-semibold">{user?.name ?? 'Tecnico'}</h1>
+        <h1 className="mt-4 text-2xl font-semibold">{user?.name ?? 'Técnico'}</h1>
         <p className="text-primary">{user?.role ?? 'TECHNICIAN'}</p>
         <p className="text-sm text-muted">{user?.email ?? ''}</p>
       </Card>
       <Card className="p-5">
-        <Info label="Versao" value="1.0.0" />
+        <Info label="Versão" value="1.0.0" />
         <div className="mt-3">
-          <Info label="Experiencia" value="Portal web do tecnico" />
+          <Info label="Experiência" value="Portal web do técnico" />
         </div>
       </Card>
       <div className="flex justify-end gap-3">
@@ -552,10 +552,10 @@ function InspectionsAsync({
   emptyDescription: string
   children: (inspections: TechnicianInspection[]) => React.ReactNode
 }) {
-  if (state.type === 'loading') return <LoadingState label="Carregando inspecoes..." />
+  if (state.type === 'loading') return <LoadingState label="Carregando inspeções..." />
   if (state.type === 'error') return <ErrorState message={state.message} onRetry={reload} />
   if (state.inspections.length === 0)
-    return <EmptyState icon={ClipboardCheck} title="Nenhuma inspecao" description={emptyDescription} />
+    return <EmptyState icon={ClipboardCheck} title="Nenhuma inspeção" description={emptyDescription} />
   return <>{children(state.inspections)}</>
 }
 
@@ -570,15 +570,15 @@ function InspectionAsync({
   id: string
   children: (inspection: TechnicianInspection) => React.ReactNode
 }) {
-  if (state.type === 'loading') return <LoadingState label="Carregando inspecao..." />
+  if (state.type === 'loading') return <LoadingState label="Carregando inspeção..." />
   if (state.type === 'error') return <ErrorState message={state.message} onRetry={reload} />
   const inspection = state.inspections.find((item) => item.id === id)
   if (!inspection)
     return (
       <EmptyState
         icon={AlertTriangle}
-        title="Inspecao nao encontrada"
-        description="A inspecao solicitada nao esta entre as suas atribuicoes."
+        title="Inspeção não encontrada"
+        description="A inspeção solicitada não está entre as suas atribuições."
       />
     )
   return <>{children(inspection)}</>
@@ -638,9 +638,9 @@ function ChecklistItem({ item, index }: { item: TemplateItem; index: number }) {
           {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
             <Badge tone="primary">{responseTypeLabel(item.responseType)}</Badge>
-            {item.required && <Badge tone="neutral">Obrigatorio</Badge>}
+            {item.required && <Badge tone="neutral">Obrigatório</Badge>}
             {item.requireObservationOnFailure && <Badge tone="warning">Obs. na falha</Badge>}
-            {item.requireEvidenceOnFailure && <Badge tone="danger">Evidencia na falha</Badge>}
+            {item.requireEvidenceOnFailure && <Badge tone="danger">Evidência na falha</Badge>}
           </div>
           {item.options && item.options.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -663,10 +663,10 @@ function ChecklistItem({ item, index }: { item: TemplateItem; index: number }) {
 const responseTypeLabels: Record<ResponseType, string> = {
   [ResponseType.TEXT_SHORT]: 'Texto curto',
   [ResponseType.TEXT_LONG]: 'Texto longo',
-  [ResponseType.NUMBER]: 'Numero',
-  [ResponseType.BOOLEAN]: 'Sim / Nao',
+  [ResponseType.NUMBER]: 'Número',
+  [ResponseType.BOOLEAN]: 'Sim / Não',
   [ResponseType.CONFORMITY]: 'Conformidade',
-  [ResponseType.SINGLE_CHOICE]: 'Selecao unica',
+  [ResponseType.SINGLE_CHOICE]: 'Seleção única',
   [ResponseType.DATE]: 'Data',
 }
 
@@ -729,7 +729,7 @@ function Progress({ value }: { value: number }) {
       <div className="h-2 rounded-full bg-app-bg dark:bg-muted-surface">
         <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, value)}%` }} />
       </div>
-      <p className="mt-1 text-xs text-muted">{value}% concluido</p>
+      <p className="mt-1 text-xs text-muted">{value}% concluído</p>
     </div>
   )
 }
