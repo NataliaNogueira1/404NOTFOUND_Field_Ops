@@ -1,109 +1,198 @@
-import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 /**
- * Isolated client for uploading an evidence file to the server (PBI-044, RN-078).
+ * Uploads an evidence photo to the backend using the two-step protocol (issue #229 / RN-078):
  *
- * Contract: POST /api/v1/inspections/{id}/evidence (multipart/form-data)
- *   - file            (required) — binary file blob
- *   - itemId          (required) — Long id of the snapshot item
- *   - capturedAtDevice (required) — ISO-8601 timestamp from the device (RN-074)
- *   - operationId     (required) — UUID for idempotent re-sends (RN-068)
- *   - responseId      (optional) — ties the evidence to a specific answer
- *   - mimeType        (optional) — defaults to image/jpeg on the server
- *   - description     (optional) — free-text caption
- *   - latitude        (optional) — must accompany longitude
- *   - longitude       (optional) — must accompany latitude
+ *  Step 1 — Binary upload via FileSystem.uploadAsync (multipart/form-data):
+ *    POST /api/v1/mobile/evidence/upload
+ *    ← { fileRef: "abc123.jpg" }
  *
- * Response 201: { id: number, checksum: string }
- * Response 409: already applied — treated as idempotent success (RN-068).
+ *  Step 2 — Metadata sync via POST /api/v1/mobile/sync/push (EVIDENCE_CREATE):
+ *    ← { results: [{ status: "APPLIED" | "ALREADY_APPLIED" | ... }] }
+ *
+ * FileSystem.uploadAsync is the correct way to send multipart files in Expo/Hermes.
+ * Using fetch() + FormData with { uri, name, type } causes "Unsupported FormDataPart
+ * implementation" on the New Architecture / Hermes engine.
+ *
+ * Resolves only when the server confirms APPLIED or ALREADY_APPLIED; any other
+ * outcome throws so the outbox keeps the photo as FAILED and available for retry
+ * (PBI-044 / RN-047).
+ *
+ * itemId note: the mobile stores item ids as "<inspectionId>::<templateItemId>"
+ * (scopedId). The server expects the numeric templateItemId only.
+ * extractTemplateItemId() strips the scope prefix before sending.
  */
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
 
 export interface EvidenceUploadInput {
-  inspectionId: string;
-  itemId: string;
-  /** ISO-8601 timestamp captured on the device — mapped to capturedAtDevice in FormData (RN-074). */
-  capturedAt: string;
-  /** UUID used as the server-side idempotency key (RN-068). */
   operationId: string;
+  inspectionId: string;
+  /** Scoped local item id: "<inspectionId>::<templateItemId>" or plain numeric string */
+  itemId: string;
   responseId?: string;
   localUri: string;
   description?: string;
   mimeType?: string;
-  /** Latitude (optional — must accompany longitude). */
+  capturedAt: string;
   latitude?: number;
-  /** Longitude (optional — must accompany latitude). */
   longitude?: number;
 }
 
 export interface EvidenceUploadResult {
-  /** Server-confirmed status. Only 'APPLIED' allows marking the evidence SYNCED. */
-  status: 'APPLIED';
-  storageKey?: string;
-  /** Numeric id of the evidence on the server (field "id" from the 201 response). */
-  serverId?: number;
+  status: 'APPLIED' | 'ALREADY_APPLIED';
+  fileRef: string;
 }
+
+// ─── Public client class ───────────────────────────────────────────────────────
 
 export class EvidenceUploadClient {
   /**
-   * Uploads a single evidence file. Resolves only when the server confirms
-   * APPLIED; otherwise it throws so the caller keeps the photo pending/failed.
+   * Uploads a single evidence photo end-to-end (binary + metadata).
+   * Throws on any non-terminal server outcome so the outbox marks it FAILED.
    */
   async upload(token: string, input: EvidenceUploadInput): Promise<EvidenceUploadResult> {
     if (!input.localUri) {
       throw new Error('Evidence has no local file to upload.');
     }
 
-    const form = new FormData();
-    form.append('itemId', input.itemId);
-    form.append('capturedAtDevice', input.capturedAt);
-    form.append('operationId', input.operationId);
-    if (input.responseId) form.append('responseId', input.responseId);
-    if (input.description) form.append('description', input.description);
-    if (input.mimeType) form.append('mimeType', input.mimeType);
-    if (input.latitude !== undefined && input.longitude !== undefined) {
-      form.append('latitude', String(input.latitude));
-      form.append('longitude', String(input.longitude));
-    }
-    // React Native FormData file shape.
-    form.append('file', {
-      uri: input.localUri,
-      name: input.localUri.split('/').pop() ?? 'evidence.jpg',
-      type: input.mimeType ?? 'image/jpeg',
-    } as unknown as Blob);
+    // Step 1 — upload the binary via FileSystem.uploadAsync and get the fileRef.
+    const fileRef = await this.uploadBinary(token, input);
 
-    // TODO(#229): o backend espera um Long no path param {id}, mas o mobile
-    // identifica inspeções por UUID. Essa chamada usa o UUID como fallback;
-    // se o backend rejeitar (404/400), será necessário persistir o id numérico
-    // do servidor ao sincronizar inspeções.
-    const response = await fetch(
-      `${BASE_URL}/api/v1/inspections/${input.inspectionId}/evidence`,
-      {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          // NOTE: do not set Content-Type; the platform sets the multipart boundary.
-          ...(Platform.OS === 'web' ? {} : {}),
-        },
-        body: form,
+    // Step 2 — push the EVIDENCE_CREATE metadata through the sync batch endpoint.
+    const status = await this.pushMetadata(token, input, fileRef);
+
+    return { status, fileRef };
+  }
+
+  // ─── Step 1: multipart binary upload via FileSystem.uploadAsync ──────────
+
+  private async uploadBinary(token: string, input: EvidenceUploadInput): Promise<string> {
+    const uploadUrl = `${BASE_URL}/api/v1/mobile/evidence/upload`;
+
+    // FileSystem.uploadAsync is the Expo-recommended way to send multipart files.
+    // It handles the multipart boundary correctly on both Android and iOS with
+    // Hermes/New Architecture, avoiding "Unsupported FormDataPart implementation".
+    const result = await FileSystem.uploadAsync(uploadUrl, input.localUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: input.mimeType ?? 'image/jpeg',
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    );
+    });
 
-    // 409 = already applied on the server → idempotent success (RN-068).
-    if (response.status === 409) {
-      return { status: 'APPLIED' };
+    if (result.status === 0) {
+      throw new Error('Binary upload failed: no response from server (network error).');
     }
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`Binary upload failed (API ${result.status}): ${result.body}`);
+    }
+
+    let data: { fileRef?: string } = {};
+    try {
+      data = JSON.parse(result.body) as { fileRef?: string };
+    } catch {
+      throw new Error('Binary upload succeeded but server returned invalid JSON.');
+    }
+
+    if (!data.fileRef) {
+      throw new Error('Binary upload succeeded but server returned no fileRef.');
+    }
+
+    return data.fileRef;
+  }
+
+  // ─── Step 2: EVIDENCE_CREATE via sync/push ────────────────────────────────
+
+  private async pushMetadata(
+    token: string,
+    input: EvidenceUploadInput,
+    fileRef: string,
+  ): Promise<'APPLIED' | 'ALREADY_APPLIED'> {
+    // The server expects the numeric templateItemId, not the scoped local id.
+    const templateItemId = extractTemplateItemId(input.itemId);
+
+    const body = {
+      operations: [
+        {
+          operationId: input.operationId,
+          type: 'EVIDENCE_CREATE' as const,
+          baseVersion: 0,
+          dependencyIds: input.responseId ? [input.responseId] : [],
+          payload: {
+            inspectionId: Number(input.inspectionId),
+            itemId: templateItemId,
+            fileRef,
+            capturedAt: input.capturedAt,
+            latitude: input.latitude ?? null,
+            longitude: input.longitude ?? null,
+            description: input.description ?? null,
+          },
+        },
+      ],
+    };
+
+    const response = await fetch(`${BASE_URL}/api/v1/mobile/sync/push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
 
     if (!response.ok) {
       const message = await response.text().catch(() => response.statusText);
-      throw new Error(`Upload falhou (API ${response.status}): ${message}`);
+      throw new Error(`Metadata sync failed (API ${response.status}): ${message}`);
     }
 
-    // 201 → { id: number, checksum: string }
-    const data = (await response.json().catch(() => ({}))) as { id?: number; checksum?: string };
-    return { status: 'APPLIED', storageKey: data.checksum, serverId: data.id };
+    const data = (await response.json()) as {
+      results?: Array<{
+        operationId: string;
+        status: 'APPLIED' | 'ALREADY_APPLIED' | 'CONFLICT' | 'DEFERRED' | 'FAILED';
+        detail?: string | null;
+      }>;
+    };
+    const result = data.results?.[0];
+
+    if (!result) {
+      throw new Error('Server returned no result for EVIDENCE_CREATE operation.');
+    }
+    if (result.status === 'APPLIED' || result.status === 'ALREADY_APPLIED') {
+      return result.status;
+    }
+    throw new Error(
+      `EVIDENCE_CREATE ${result.status}: ${result.detail ?? 'no detail'}`,
+    );
   }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts the numeric templateItemId from a scoped local item id.
+ *
+ * InspectionRepository.saveTemplate stores item ids as
+ * "<inspectionId>::<templateItemId>" (scopedId). The server expects the
+ * original numeric templateItemId.
+ *
+ * Examples:
+ *   "insp-1::42"  → 42
+ *   "5::11"       → 11
+ *   "42"          → 42  (already unscoped, defensive fallback)
+ */
+export function extractTemplateItemId(scopedItemId: string): number {
+  const sep = scopedItemId.lastIndexOf('::');
+  const raw = sep !== -1 ? scopedItemId.slice(sep + 2) : scopedItemId;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(
+      `Cannot extract a valid templateItemId from "${scopedItemId}": got "${raw}".`,
+    );
+  }
+  return id;
 }
 
 export const evidenceUploadClient = new EvidenceUploadClient();
