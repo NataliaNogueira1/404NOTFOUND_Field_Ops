@@ -7,7 +7,7 @@ import { apiRequest } from '@/api/client'
  *
  * - `byStatus`       — inspection counts keyed by InspectionStatus name
  * - `byCriticality`  — non-terminal inspection counts keyed by Priority name
- * - `openNonConformities` — always 0 until backend NonConformity domain is implemented
+ * - `openNonConformities` — count of non-conformities currently in the OPEN status
  * - `overdue`        — inspections whose dueDate has passed and are not terminal
  */
 export interface DashboardSummary {
