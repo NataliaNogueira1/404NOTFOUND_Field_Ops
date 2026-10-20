@@ -8,6 +8,8 @@ export interface CapturedLocation {
   longitude: number;
   /** Accuracy in metres (may be undefined on some platforms). */
   accuracy?: number;
+  /** ISO-8601 timestamp of when the reading was taken (PBI-045 / RN-062). */
+  capturedAt: string;
 }
 
 export type LocationPermission = 'granted' | 'denied' | 'undetermined';
@@ -67,13 +69,15 @@ export function useLocation() {
       if (status !== 'granted') return null;
 
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
 
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy ?? undefined,
+        // position.timestamp is epoch millis; keep an ISO string for the payload (RN-062).
+        capturedAt: new Date(position.timestamp).toISOString(),
       };
     } catch {
       return null;

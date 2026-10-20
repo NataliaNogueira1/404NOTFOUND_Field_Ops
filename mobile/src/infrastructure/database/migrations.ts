@@ -200,6 +200,22 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_review_comments_inspection_item ON review_comments(inspection_id, item_id);
     `,
   },
+  {
+    version: 7,
+    description: 'PBI-045: store conclusion GPS location and capture timestamps on inspections',
+    sql: `
+      -- End-of-inspection location (start_* already exist since v2). Captured
+      -- once at conclusion (PBI-040). Nullable: the technician may opt out or be
+      -- denied the permission and still conclude (RN-059).
+      ALTER TABLE inspections ADD COLUMN end_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN end_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN end_accuracy REAL;
+      -- Capture timestamps (RN-062) kept for both moments so the device mirrors
+      -- what is sent to and shown by the server.
+      ALTER TABLE inspections ADD COLUMN start_captured_at TEXT;
+      ALTER TABLE inspections ADD COLUMN end_captured_at TEXT;
+    `,
+  },
 ];
 
 /**

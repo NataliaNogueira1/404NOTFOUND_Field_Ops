@@ -7,6 +7,18 @@ import type {
   TemplateItem,
 } from '@/features/fieldops/types';
 
+/**
+ * One-shot GPS reading persisted with a start/conclusion transition (PBI-045).
+ * Kept as a local shape so the repository does not depend on the location hook.
+ * All coordinate fields are optional because capturing is optional (RN-059).
+ */
+interface DeviceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: string;
+}
+
 // Snapshot section/item ids are unique only within a template. Scoping them to the
 // inspection keeps the global TEXT PRIMARY KEY unique when several inspections share
 // the same template, and keeps answers/evidences pointing at the right item.
@@ -253,7 +265,7 @@ export class InspectionRepository {
   async markStartedWithDevice(
     id: string,
     startedAtDevice: string,
-    location: { latitude: number; longitude: number; accuracy?: number } | null,
+    location: DeviceLocation | null,
   ): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections SET
@@ -262,6 +274,7 @@ export class InspectionRepository {
          start_latitude = ?,
          start_longitude = ?,
          start_accuracy = ?,
+         start_captured_at = ?,
          sync_status = 'pending',
          updated_at = datetime('now')
        WHERE id = ?`,
@@ -269,6 +282,7 @@ export class InspectionRepository {
       location?.latitude ?? null,
       location?.longitude ?? null,
       location?.accuracy ?? null,
+      location?.capturedAt ?? null,
       id,
     );
   }
@@ -277,6 +291,37 @@ export class InspectionRepository {
     await this.db.runAsync(
       `UPDATE inspections SET status = 'SUBMITTED', completed_at = datetime('now'),
        progress = 100, sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
+      id,
+    );
+  }
+
+  /**
+   * Mark an inspection as submitted (concluded) and, optionally, store the GPS
+   * location captured at conclusion time (PBI-040 / PBI-045). Location may be
+   * null when permission was denied (RN-059) — the inspection still concludes.
+   */
+  async markSubmittedWithDevice(
+    id: string,
+    endedAtDevice: string,
+    location: DeviceLocation | null,
+  ): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET
+         status = 'SUBMITTED',
+         completed_at = ?,
+         end_latitude = ?,
+         end_longitude = ?,
+         end_accuracy = ?,
+         end_captured_at = ?,
+         progress = 100,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      endedAtDevice,
+      location?.latitude ?? null,
+      location?.longitude ?? null,
+      location?.accuracy ?? null,
+      location?.capturedAt ?? null,
       id,
     );
   }
