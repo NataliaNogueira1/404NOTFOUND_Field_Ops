@@ -58,10 +58,10 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
         FROM NonConformity n
         JOIN n.inspection i
         WHERE n.status = :status
-          AND (:from IS NULL OR i.dueDate >= :from)
-          AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
-          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+          AND (CAST(:from AS date) IS NULL OR i.dueDate >= :from)
+          AND (CAST(:to AS date) IS NULL OR i.dueDate <= :to)
+          AND (CAST(:clientName AS string) IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (CAST(:technicianId AS long) IS NULL OR i.technician.id = :technicianId)
     """)
     long countByStatusAndInspectionFilters(
             @Param("status") NonConformityStatus status,
