@@ -41,7 +41,7 @@ export function TemplatesPage() {
       setRows([])
       setTotalElements(0)
       setTotalPages(1)
-      setError('Nao foi possivel carregar os modelos. Tente novamente.')
+      setError('Não foi possível carregar os modelos. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -54,13 +54,13 @@ export function TemplatesPage() {
 
   const columns: Column<TemplateSummary>[] = [
     {
-      header: 'Titulo',
+      header: 'Título',
       sortKey: 'title',
-      cell: (template) => <span className="font-medium">{template.title || 'Modelo sem titulo'}</span>,
+      cell: (template) => <span className="font-medium">{template.title || 'Modelo sem título'}</span>,
     },
     { header: 'Categoria', sortKey: 'category', cell: (template) => template.category || '-' },
-    { header: 'Versao atual', sortKey: 'currentVersion', cell: (template) => `v${template.version}` },
-    { header: 'Secoes', cell: (template) => template.sectionCount },
+    { header: 'Versão atual', sortKey: 'currentVersion', cell: (template) => `v${template.version}` },
+    { header: 'Seções', cell: (template) => template.sectionCount },
     { header: 'Itens', cell: (template) => template.itemCount },
     {
       header: 'Status',
@@ -72,7 +72,7 @@ export function TemplatesPage() {
       ),
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (template) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -89,11 +89,11 @@ export function TemplatesPage() {
             onClick={() => navigate(`/app/inspection-templates/${template.id}/preview`)}
           >
             <Eye size={16} />
-            Previa
+            Prévia
           </Button>
           <Button variant="ghost" className="h-8 px-2">
             <FileClock size={16} />
-            Versoes
+            Versões
           </Button>
           <Button variant="ghost" className="h-8 px-2">
             <Copy size={16} />
@@ -111,8 +111,8 @@ export function TemplatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Modelos de inspecao"
-        description="Crie e publique checklists utilizados pelos tecnicos."
+        title="Modelos de inspeção"
+        description="Crie e publique checklists utilizados pelos técnicos."
         action={
           <Button onClick={createTemplate}>
             <Plus size={17} />
@@ -126,7 +126,7 @@ export function TemplatesPage() {
           id="template-search"
           value={query}
           onChange={(event) => list.update('name', event.target.value)}
-          placeholder="Titulo ou categoria"
+          placeholder="Título ou categoria"
         />
         <Select
           label="Status"
