@@ -1,0 +1,13 @@
+# Keep shell scripts with LF line endings so Linux containers can exec them.
+# Prevents the "no such file or directory" error on entrypoints when the repo
+# is checked out on Windows (CRLF would corrupt the shebang inside the container).
+*.sh text eol=lf
+
+# Maven/Gradle wrapper scripts also need LF.
+mvnw text eol=lf
+gradlew text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

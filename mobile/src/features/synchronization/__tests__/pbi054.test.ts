@@ -224,7 +224,9 @@ describe('PBI-054 — sync status screen data layer', () => {
 
   // Test 2 — "última sincronização" shows the last SUCCESSFUL sync timestamp.
   it('records the last successful sync timestamp after a clean full sync', async () => {
-    mockGet.mockResolvedValue([]); // pull returns nothing, no errors
+    // PBI-053: fullSync now pulls via GET /mobile/sync/pull, so the mock returns a
+    // SyncPullResponse (empty delta) instead of the old inspections array.
+    mockGet.mockResolvedValue({ changes: [], nextCursor: null, hasMore: false });
     const result = await service.fullSync(TOKEN);
     expect(result.errors).toHaveLength(0);
 
@@ -236,13 +238,15 @@ describe('PBI-054 — sync status screen data layer', () => {
   // Test 15 — a FAILED attempt must NOT advance the last successful sync.
   it('does not advance last successful sync when the attempt fails', async () => {
     // First: a clean sync sets a baseline timestamp.
-    mockGet.mockResolvedValueOnce([]);
+    mockGet.mockResolvedValueOnce({ changes: [], nextCursor: null, hasMore: false });
     await service.fullSync(TOKEN);
     const baseline = await metadataRepo.getLastSuccessfulSync();
     expect(baseline).not.toBeNull();
 
-    // Then: a failing pull (errors) must keep the baseline unchanged.
-    mockGet.mockRejectedValueOnce(new Error('network down'));
+    // Then: a failing pull (errors) must keep the baseline unchanged. The first
+    // (incremental) pull rejects; with no stored cursor fullSync also tries the
+    // fallback full pull, so reject that too to keep the attempt a clean failure.
+    mockGet.mockRejectedValue(new Error('network down'));
     const result = await service.fullSync(TOKEN);
     expect(result.errors.length).toBeGreaterThan(0);
 
@@ -254,7 +258,7 @@ describe('PBI-054 — sync status screen data layer', () => {
   // (RN-066): a new set of repositories over the same DB sees the same data.
   it('keeps operations and last successful sync after an app restart', async () => {
     await service.enqueueStatusChange(INSPECTION_ID, 'SUBMITTED');
-    mockGet.mockResolvedValue([]);
+    mockGet.mockResolvedValue({ changes: [], nextCursor: null, hasMore: false });
     // Status push succeeds (APPLIED) so the op is sent and cleaned up.
     mockPost.mockResolvedValue({ results: [{ operationId: 'op', status: 'APPLIED' }] });
     await service.fullSync(TOKEN); // clears the sent op, sets last successful sync

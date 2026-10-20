@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -110,6 +111,16 @@ public class GlobalExceptionHandler {
             BusinessException ex, HttpServletRequest request) {
 
         return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+
+        // A required multipart part is absent (e.g. the evidence 'file'); report 400 with the
+        // offending part name rather than letting the catch-all turn it into a 500.
+        String message = "Required multipart part '" + ex.getRequestPartName() + "' is missing.";
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request, List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

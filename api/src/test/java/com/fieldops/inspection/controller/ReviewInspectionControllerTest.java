@@ -157,6 +157,34 @@ class ReviewInspectionControllerTest {
     }
 
     @Test
+    void beginsReviewForSubmittedInspectionAndRecordsAudit() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.SUBMITTED);
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", inspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
+
+        assertThat(inspectionRepository.findById(inspection.getId()).orElseThrow().getStatus())
+                .isEqualTo(InspectionStatus.UNDER_REVIEW);
+        assertThat(auditEventRepository.findAll())
+                .anySatisfy(event -> {
+                    assertThat(event.getAction()).isEqualTo(AuditAction.INSPECTION_REVIEW_STARTED);
+                    assertThat(event.getEntityId()).isEqualTo(inspection.getId());
+                    assertThat(event.getActorId()).isEqualTo(supervisor.getId());
+                });
+    }
+
+    @Test
+    void refusesToBeginReviewWhenInspectionIsNotSubmitted() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);
+
+        mockMvc.perform(post("/api/v1/inspections/{id}/begin-review", inspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     void approvesWithoutCommentWhenBodyIsAbsent() throws Exception {
         Inspection inspection = saveInspection(InspectionStatus.UNDER_REVIEW);
         String token = obtainToken();

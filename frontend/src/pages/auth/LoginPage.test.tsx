@@ -70,17 +70,17 @@ describe('LoginPage — dark theme (issue #172)', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
-  it('hint box does not use hardcoded bg-slate-50', () => {
+  it('tagline does not use hardcoded slate text colors', () => {
     renderLoginPage()
-    const hint = screen.getByText(/use credenciais cadastradas/i).closest('div')
-    expect(hint?.className).not.toContain('bg-slate-50')
+    const tagline = screen.getByText(/transforme inspecoes de campo/i)
+    expect(tagline.className).not.toMatch(/text-slate-\d/)
   })
 
-  it('hint box uses semantic token class that adapts to dark mode', () => {
+  it('tagline uses a semantic token class that adapts to dark mode', () => {
     renderLoginPage()
-    const hint = screen.getByText(/use credenciais cadastradas/i).closest('div')
-    // bg-app-bg and bg-surface are redefined under .dark in index.css
-    expect(hint?.className).toMatch(/bg-app-bg|bg-surface/)
+    const tagline = screen.getByText(/transforme inspecoes de campo/i)
+    // text-muted is redefined under .dark in index.css
+    expect(tagline.className).toMatch(/text-muted/)
   })
 
   it('AuthLayout outer wrapper uses semantic bg-app-bg', () => {
@@ -110,8 +110,15 @@ describe('LoginPage — dark theme (issue #172)', () => {
     await userEvent.click(toggle)
     await userEvent.click(toggle) // sistema → claro → escuro
 
+    expect(screen.getByRole('button', { name: /admin/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /supervisor/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /tecnico/i })).toBeInTheDocument()
+  })
+
+  it('admin quick-fill button populates the email field', async () => {
+    renderLoginPage()
+    await userEvent.click(screen.getByRole('button', { name: /admin/i }))
+    expect(screen.getByLabelText(/e-mail/i)).toHaveValue('ana@fieldops.com')
   })
 
   it('ThemeToggle persists dark preference to localStorage', async () => {

@@ -5,7 +5,6 @@ import {
   FileSearch,
   Gauge,
   Menu,
-  ShieldCheck,
   TriangleAlert,
   Users,
   Warehouse,
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { NavLink } from 'react-router-dom'
+import fieldopsLogo from '@/assets/fieldops-logo.png'
 import { authSession } from '@/auth/session'
 import { useReviewCount } from '@/hooks/useReviewCount'
 import { cn } from '@/utils/cn'
@@ -82,9 +82,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* Brand */}
         <div className="flex h-18 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-3">
-            <span className="rounded-fieldops bg-primary p-2 text-white">
-              <ShieldCheck size={21} />
-            </span>
+            <img
+              src={fieldopsLogo}
+              alt=""
+              aria-hidden="true"
+              className="h-10 w-10 shrink-0 rounded-fieldops"
+            />
             <div>
               <span className="block text-xl font-semibold text-primary">FieldOps</span>
               <span className="text-xs text-muted">Web Admin</span>

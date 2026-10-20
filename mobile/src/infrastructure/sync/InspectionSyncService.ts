@@ -8,6 +8,7 @@ import {
   AnswerRepository,
   EvidenceRepository,
   NonConformityRepository,
+  ReviewCommentRepository,
   SyncQueueRepository,
   SyncMetadataRepository,
 } from '@/infrastructure/database/repositories';
@@ -19,6 +20,7 @@ import type {
   ChecklistValue,
   Evidence,
   NonConformity,
+  ReviewComment,
 } from '@/features/fieldops/types';
 
 // ─── API Response types ────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ interface ApiInspection {
   siteName: string;
   equipmentId: string;
   equipmentName: string;
+  equipmentQrCode?: string;
   technicianId: string;
   supervisorId: string;
   supervisorName: string;
@@ -52,7 +55,10 @@ interface ApiInspection {
   rejectedAt?: string;
   version: number;
   template: ApiTemplate;
+  reviewComments?: ApiReviewComment[];
 }
+
+interface ApiReviewComment { id: string; itemId: string; comment: string; createdBy: string; createdAt: string }
 
 interface ApiTemplate {
   id: string;
@@ -81,13 +87,22 @@ interface ApiItem {
 
 // ─── Batch sync (POST /mobile/sync/push) — PBI-051/052 ───────────────────────────
 
-/** One operation in a sync batch. Only INSPECTION_STATUS is supported server-side today. */
+/** Operation types accepted by the backend sync applicators (PBI-051, #223). */
+type SyncPushType = 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
+
+/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.). */
+type SyncPushPayload =
+  | { inspectionId: string; status: string }
+  | { inspectionId: string; itemId: string; value: string; observation?: string }
+  | { inspectionId: string; itemId: string; title: string; description: string; severity: string };
+
+/** One operation in a sync batch. */
 interface SyncPushOperation {
   operationId: string;
-  type: 'INSPECTION_STATUS';
+  type: SyncPushType;
   baseVersion: number;
   dependencyIds: string[];
-  payload: { inspectionId: string; status: string };
+  payload: SyncPushPayload;
 }
 
 interface SyncPushBody {
@@ -102,6 +117,35 @@ interface SyncPushResult {
   }>;
 }
 
+// ─── Incremental pull (GET /mobile/sync/pull) — PBI-053 ──────────────────────────
+
+/**
+ * Server-side classification of each change (SyncPullService.classify):
+ * - INSPECTION: ordinary create/update
+ * - REVIEW: supervisor decision (status APPROVED/REJECTED)
+ * - CANCELLATION: inspection cancelled (status CANCELED)
+ */
+type SyncChangeType = 'INSPECTION' | 'REVIEW' | 'CANCELLATION';
+
+interface SyncChange {
+  type: SyncChangeType;
+  /** Same DTO (MobileInspectionResponse) consumed by GET /mobile/inspections. */
+  inspection: ApiInspection;
+}
+
+interface SyncPullResponse {
+  changes: SyncChange[];
+  /**
+   * Opaque Base64 URL-safe cursor for the NEXT page. `null` means "no more
+   * changes to hand out" — in that case the previous cursor is kept as-is.
+   */
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/** Safety net so a server/bug that keeps returning hasMore never loops forever. */
+const MAX_PULL_PAGES = 1000;
+
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 /**
@@ -110,18 +154,24 @@ interface SyncPushResult {
  * - Push: sends local answers/evidences/non-conformities → API
  */
 export class InspectionSyncService {
+  private db: SQLiteDatabase;
   private inspectionRepo: InspectionRepository;
   private answerRepo: AnswerRepository;
   private evidenceRepo: EvidenceRepository;
   private ncRepo: NonConformityRepository;
+  private reviewCommentRepo: ReviewCommentRepository;
   private syncQueueRepo: SyncQueueRepository;
   private metadataRepo: SyncMetadataRepository;
 
   constructor(db: SQLiteDatabase) {
+    // Kept so the incremental pull can wrap a whole changes batch in a single
+    // SQLite transaction (db.withTransactionAsync), PBI-053.
+    this.db = db;
     this.inspectionRepo = new InspectionRepository(db);
     this.answerRepo = new AnswerRepository(db);
     this.evidenceRepo = new EvidenceRepository(db);
     this.ncRepo = new NonConformityRepository(db);
+    this.reviewCommentRepo = new ReviewCommentRepository(db);
     this.syncQueueRepo = new SyncQueueRepository(db);
     this.metadataRepo = new SyncMetadataRepository(db);
   }
@@ -152,7 +202,6 @@ export class InspectionSyncService {
         '/api/v1/mobile/inspections',
         token,
       );
-
       for (const apiInsp of apiInspections) {
         try {
           await this.saveInspectionLocally(apiInsp);
@@ -198,6 +247,83 @@ export class InspectionSyncService {
     await this.saveInspectionLocally(apiInsp);
   }
 
+  /**
+   * Incremental pull by opaque cursor (PBI-053, GET /mobile/sync/pull).
+   *
+   * Reads the stored cursor and fetches the delta for the authenticated
+   * technician. The FIRST sync (no local cursor) is issued WITHOUT the `cursor`
+   * query param, so the server returns the full initial set. Each page's whole
+   * `changes` batch is written inside a SINGLE SQLite transaction; the cursor is
+   * advanced ONLY after that transaction commits. On ANY error (network, parse,
+   * 422 INVALID_CURSOR, or a write/rollback) the cursor is left untouched and the
+   * loop stops — a resend re-applies idempotently via upsert-by-id. Pagination
+   * continues while `hasMore` is true.
+   */
+  async pullChanges(token: string): Promise<{ downloaded: number; errors: string[] }> {
+    const errors: string[] = [];
+    let downloaded = 0;
+
+    // The first sync has no cursor → start WITHOUT the query param.
+    let cursor = await this.metadataRepo.getPullCursor();
+
+    for (let page = 0; page < MAX_PULL_PAGES; page++) {
+      let response: SyncPullResponse;
+      try {
+        // `limit` is omitted → server default (100). `cursor` is only sent when
+        // present, URL-encoded because it is an opaque Base64 URL-safe string.
+        const query = cursor !== null ? `?cursor=${encodeURIComponent(cursor)}` : '';
+        response = await apiClient.get<SyncPullResponse>(
+          `/api/v1/mobile/sync/pull${query}`,
+          token,
+        );
+      } catch (err) {
+        // Network failure or a non-2xx (e.g. 422 INVALID_CURSOR) — do NOT advance.
+        const msg = err instanceof Error ? err.message : 'Failed to pull changes';
+        errors.push(msg);
+        break;
+      }
+
+      const changes = response.changes ?? [];
+      try {
+        // Atomic per-page write: either the whole batch lands or none of it does,
+        // so a mid-batch failure cannot leave a half-applied page behind.
+        await this.db.withTransactionAsync(async () => {
+          for (const change of changes) {
+            await this.applyChange(change);
+          }
+        });
+      } catch (err) {
+        // Rollback already ran; keep the old cursor so the page is retried.
+        const msg = err instanceof Error ? err.message : 'Failed to persist changes';
+        errors.push(msg);
+        break;
+      }
+
+      downloaded += changes.length;
+
+      // Only AFTER a successful commit do we move the cursor forward. A null
+      // nextCursor means "nothing new to hand out" → keep the previous cursor.
+      if (response.nextCursor !== null) {
+        cursor = response.nextCursor;
+        await this.metadataRepo.setPullCursor(cursor);
+      }
+
+      if (!response.hasMore) break;
+    }
+
+    return { downloaded, errors };
+  }
+
+  /**
+   * Apply one change to the local store. INSPECTION/REVIEW/CANCELLATION all go
+   * through the same {@link saveInspectionLocally} upsert: the extended
+   * InspectionRepository.upsert applies REJECTED/APPROVED/CANCELED coming from
+   * the server while preserving the technician's pending child rows (RN-077).
+   */
+  private async applyChange(change: SyncChange): Promise<void> {
+    await this.saveInspectionLocally(change.inspection);
+  }
+
   private async saveInspectionLocally(apiInsp: ApiInspection): Promise<void> {
     // Save the inspection record
     await this.inspectionRepo.upsert({
@@ -210,6 +336,7 @@ export class InspectionSyncService {
       siteName: apiInsp.siteName,
       equipmentId: apiInsp.equipmentId,
       equipmentName: apiInsp.equipmentName,
+      equipmentQrCode: apiInsp.equipmentQrCode,
       technicianId: apiInsp.technicianId,
       supervisorId: apiInsp.supervisorId,
       supervisorName: apiInsp.supervisorName,
@@ -241,6 +368,7 @@ export class InspectionSyncService {
       const template = this.mapApiTemplate(apiInsp.template);
       await this.inspectionRepo.saveTemplate(apiInsp.id, template);
     }
+    await this.reviewCommentRepo.replaceForInspection(apiInsp.id, (apiInsp.reviewComments ?? []).map((comment): ReviewComment => ({ ...comment, inspectionId: apiInsp.id, itemId: `${apiInsp.id}::${comment.itemId}` })));
   }
 
   private mapApiTemplate(api: ApiTemplate): InspectionTemplate {
@@ -324,7 +452,7 @@ export class InspectionSyncService {
 
   private async sendOperation(
     token: string,
-    operation: { operationType: string; entityType: string; entityId: string; payload: string },
+    operation: { id: string; operationType: string; entityType: string; entityId: string; payload: string; dependencyIds: string[] },
   ): Promise<void> {
     const payload = JSON.parse(operation.payload);
 
@@ -340,14 +468,18 @@ export class InspectionSyncService {
         // the upload endpoint is unavailable it throws, keeping the photo FAILED.
         await this.uploadEvidence(token, operation.entityId, payload);
         break;
-      // answer/non_conformity have no server endpoint yet: only INSPECTION_STATUS
-      // is implemented in POST /mobile/sync/push (PBI-051/052). They stay queued
-      // (marked error → retried) until their endpoints exist.
+      // Checklist answer → ANSWER_UPSERT (PBI-051, backend #223). Marks the local
+      // answer row SYNCED only after the server confirms APPLIED/ALREADY_APPLIED.
       case 'answer':
+        await this.pushAnswer(token, payload);
+        await this.answerRepo.markSynced([operation.entityId]);
+        break;
+      // Non-conformity → NON_CONFORMITY_CREATE (PBI-051, backend #223). Same rule:
+      // the local NC row is flipped SYNCED only on a confirmed result.
       case 'non_conformity':
-        throw new Error(
-          `Sync for '${operation.entityType}' is not supported by the API yet; keeping it queued.`,
-        );
+        await this.pushNonConformity(token, payload);
+        await this.ncRepo.markSynced([operation.entityId]);
+        break;
       default:
         throw new Error(`Unknown entity type: ${operation.entityType}`);
     }
@@ -397,16 +529,19 @@ export class InspectionSyncService {
     inspectionId: string,
     payload: { operationId?: string; status: string; baseVersion?: number },
   ): Promise<void> {
-    if (payload.baseVersion === undefined) {
-      throw new Error('Operation is missing its base server version.');
-    }
+    // Tolerate a missing baseVersion instead of throwing. Legacy outbox rows
+    // enqueued before PBI-055 (server version tracking) have no baseVersion;
+    // rejecting them would wedge the operation as a permanent error that never
+    // drains. Default to 0 — the same `?? 0` fallback the enqueue path uses —
+    // which matches a never-bumped inspection (version 0). Any real divergence
+    // still comes back as CONFLICT below and is preserved, never lost.
     const operationId = payload.operationId ?? randomUuidV4();
     const body: SyncPushBody = {
       operations: [
         {
           operationId,
           type: 'INSPECTION_STATUS',
-          baseVersion: payload.baseVersion,
+          baseVersion: payload.baseVersion ?? 0,
           dependencyIds: [],
           payload: { inspectionId, status: payload.status },
         },
@@ -426,6 +561,103 @@ export class InspectionSyncService {
     if (result && result.status === 'FAILED') {
       throw new Error(result.detail ?? `Inspection status transition failed for ${inspectionId}`);
     }
+  }
+
+  /**
+   * Push a single checklist answer through the batch endpoint as ANSWER_UPSERT
+   * (PBI-051, backend applicator #223). The server is idempotent on
+   * {@code operationId}, so a resend of the same queued row returns
+   * ALREADY_APPLIED instead of duplicating the answer (RN-068). The stable
+   * {@code operationId}/{@code baseVersion} come from the enqueued payload.
+   */
+  private async pushAnswer(
+    token: string,
+    payload: { operationId?: string; inspectionId: string; itemId: string; value: ChecklistValue; observation?: string; baseVersion?: number },
+  ): Promise<void> {
+    await this.pushContentOperation(token, {
+      operationId: payload.operationId,
+      baseVersion: payload.baseVersion,
+      type: 'ANSWER_UPSERT',
+      payload: {
+        inspectionId: payload.inspectionId,
+        itemId: payload.itemId,
+        value: serializeAnswerValue(payload.value),
+        observation: payload.observation,
+      },
+      failureMessage: `Answer upsert failed for item ${payload.itemId}`,
+    });
+  }
+
+  /**
+   * Push a single non-conformity through the batch endpoint as
+   * NON_CONFORMITY_CREATE (PBI-051, backend applicator #223). Idempotent on
+   * {@code operationId} so a resend never creates a duplicate NC (RN-068).
+   */
+  private async pushNonConformity(
+    token: string,
+    payload: { operationId?: string; inspectionId: string; itemId: string; title: string; description: string; severity: string; baseVersion?: number },
+  ): Promise<void> {
+    await this.pushContentOperation(token, {
+      operationId: payload.operationId,
+      baseVersion: payload.baseVersion,
+      type: 'NON_CONFORMITY_CREATE',
+      payload: {
+        inspectionId: payload.inspectionId,
+        itemId: payload.itemId,
+        title: payload.title,
+        description: payload.description,
+        severity: payload.severity,
+      },
+      failureMessage: `Non-conformity create failed for item ${payload.itemId}`,
+    });
+  }
+
+  /**
+   * Shared sender for content operations (answers, non-conformities) through
+   * {@code POST /api/v1/mobile/sync/push}. A single operation per call keeps the
+   * dependency ordering simple: the server already applied earlier operations in
+   * previous calls and recognises resends by {@code operationId}. CONFLICT is
+   * surfaced as a {@link VersionConflictError}; FAILED as a plain error so the
+   * outbox flags it instead of silently dropping the operation.
+   */
+  private async pushContentOperation(
+    token: string,
+    input: {
+      operationId?: string;
+      baseVersion?: number;
+      type: SyncPushType;
+      payload: SyncPushPayload;
+      failureMessage: string;
+    },
+  ): Promise<void> {
+    const body: SyncPushBody = {
+      operations: [
+        {
+          operationId: input.operationId ?? randomUuidV4(),
+          type: input.type,
+          baseVersion: input.baseVersion ?? 0,
+          dependencyIds: [],
+          payload: input.payload,
+        },
+      ],
+    };
+
+    const response = await apiClient.post<SyncPushResult>(
+      '/api/v1/mobile/sync/push',
+      body,
+      token,
+    );
+
+    const result = response.results?.[0];
+    if (result && result.status === 'CONFLICT') {
+      throw new VersionConflictError(result.detail ?? input.failureMessage);
+    }
+    if (result && result.status === 'FAILED') {
+      throw new Error(result.detail ?? input.failureMessage);
+    }
+    // APPLIED / ALREADY_APPLIED → success. DEFERRED is not expected for a
+    // single-operation batch with no dependencyIds; treat it like success-wait
+    // by leaving the row for the next cycle (no throw, no mark).
   }
 
   // ─── Full sync (pull + push) ─────────────────────────────────────────────
@@ -450,9 +682,43 @@ export class InspectionSyncService {
     const pushResult = await this.pushPendingOperations(token);
     errors.push(...pushResult.errors);
 
-    // Then pull (to get server-side updates), forwarding the reminders callback.
-    const pullResult = await this.pullInspections(token, onAfterPull);
+    // Then pull server-side updates incrementally by cursor (PBI-053). With no
+    // local cursor this does the initial full pull; with one it only fetches the
+    // delta (new inspections, reviews, cancellations). `pullInspections` is kept
+    // as a recovery fallback: if the incremental pull failed AND we have never
+    // stored a cursor (so there is nothing local to lose), fall back to the plain
+    // full pull so a first-run sync still populates the device.
+    const pullResult = await this.pullChanges(token);
     errors.push(...pullResult.errors);
+    let pulled = pullResult.downloaded;
+
+    if (pullResult.errors.length > 0 && (await this.metadataRepo.getPullCursor()) === null) {
+      const fallback = await this.pullInspections(token);
+      errors.push(...fallback.errors);
+      pulled += fallback.downloaded;
+    }
+
+    // Reschedule local deadline reminders (PBI-084) after the incremental pull.
+    // `pullChanges` only returns a change count, so we read the current state
+    // from SQLite (the source of truth, already reflecting this pull's updates
+    // — new inspections, due-date changes, cancellations) and hand it to the
+    // callback. Failures here must never break the sync result (RN-041).
+    if (onAfterPull) {
+      try {
+        const all = await this.inspectionRepo.getAll();
+        await onAfterPull(
+          all.map((i) => ({
+            id: i.id,
+            title: i.title,
+            dueDate: i.dueDate,
+            dueTime: i.dueTime,
+            status: i.status,
+          })),
+        );
+      } catch {
+        // Notification scheduling failure is silently swallowed.
+      }
+    }
 
     // Record the timestamp of the last *successful* sync only when the whole
     // cycle finished with no errors (RN-072). A failed attempt must NOT advance
@@ -462,7 +728,7 @@ export class InspectionSyncService {
     }
 
     return {
-      pulled: pullResult.downloaded,
+      pulled,
       pushed: pushResult.sent,
       errors,
     };
@@ -503,11 +769,19 @@ export class InspectionSyncService {
     observation?: string,
   ): Promise<void> {
     const id = InspectionSyncService.answerOperationId(inspectionId, itemId);
+    // operationId is the server-side idempotency key (RN-068): a stable UUID kept
+    // in the payload so a resend of this same outbox row returns ALREADY_APPLIED
+    // instead of duplicating. baseVersion carries the last known server version
+    // so the batch endpoint can detect a version conflict (PBI-055).
+    const inspection = await this.inspectionRepo.getById(inspectionId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'answer', `${inspectionId}-${itemId}`, {
+      operationId: randomUuidV4(),
       inspectionId,
-      itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(itemId),
       value,
       observation,
+      baseVersion: inspection?.serverVersion ?? 0,
     });
   }
 
@@ -527,7 +801,10 @@ export class InspectionSyncService {
       evidence.id,
       {
         inspectionId: evidence.inspectionId,
-        itemId: evidence.itemId,
+        // Send the original (unscoped) item id the backend expects as a Long.
+        // responseId stays scoped: it is an internal outbox dependency key, not
+        // sent to the server, and must keep matching the answer operation id.
+        itemId: unscopeItemId(evidence.itemId),
         responseId: evidence.responseId,
         uri: evidence.uri,
         description: evidence.description,
@@ -555,12 +832,18 @@ export class InspectionSyncService {
    */
   async enqueueNonConformity(nc: NonConformity): Promise<void> {
     const id = `nc-${nc.id}`;
+    // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
+    // conflict detection (PBI-055), mirroring enqueueAnswer.
+    const inspection = await this.inspectionRepo.getById(nc.inspectionId);
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
+      operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
-      itemId: nc.itemId,
+      // Send the original (unscoped) item id the backend expects as a Long.
+      itemId: unscopeItemId(nc.itemId),
       title: nc.title,
       description: nc.description,
       severity: nc.severity,
+      baseVersion: inspection?.serverVersion ?? 0,
     });
   }
 
@@ -612,3 +895,26 @@ export class InspectionSyncService {
 
 /** A terminal sync outcome: preserve the local operation for technician review. */
 class VersionConflictError extends Error {}
+
+/**
+ * The backend {@code AnswerUpsertPayload.value} is a String, while a local
+ * {@link ChecklistValue} may be a boolean or number (BOOLEAN/NUMBER items).
+ * Serialize everything to the string the server stores — booleans/numbers via
+ * {@code String()}, text/enum values unchanged.
+ */
+function serializeAnswerValue(value: ChecklistValue): string {
+  return typeof value === 'string' ? value : String(value);
+}
+
+/**
+ * Local checklist item ids are stored scoped to their inspection
+ * (`InspectionRepository.scopedId` → `"${inspectionId}::${itemId}"`) because an
+ * item id is only unique inside a template, not across the global SQLite table.
+ * The backend sync payloads (AnswerUpsertPayload/NonConformityCreatePayload)
+ * expect the ORIGINAL item id (a Long), so strip the local scope prefix before
+ * sending. Ids without the `::` scope (legacy/unexpected) pass through unchanged.
+ */
+function unscopeItemId(scopedItemId: string): string {
+  const separator = scopedItemId.indexOf('::');
+  return separator === -1 ? scopedItemId : scopedItemId.slice(separator + 2);
+}

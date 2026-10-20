@@ -1,14 +1,14 @@
-import { ClipboardList, Home, LogOut, Menu, RefreshCw, ShieldCheck, User, X } from 'lucide-react'
+import { Bell, ClipboardList, Home, LogOut, Menu, User, X } from 'lucide-react'
 import { useState, useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import fieldopsLogo from '@/assets/fieldops-logo.png'
 import { authSession } from '@/auth/session'
-import { technicianUser } from '@/mocks/technician'
+import { ThemeToggle } from '@/theme/ThemeToggle'
 import { cn } from '@/utils/cn'
 
 const navItems = [
   { label: 'Inicio', to: '/technician/home', icon: Home },
   { label: 'Minhas Inspecoes', to: '/technician/inspections', icon: ClipboardList },
-  { label: 'Sincronizacao', to: '/technician/sync', icon: RefreshCw },
   { label: 'Perfil', to: '/technician/profile', icon: User },
 ]
 
@@ -17,6 +17,13 @@ export function TechnicianLayout() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
+  const displayName = user?.name ?? 'Tecnico'
+  const initials = displayName
+    .split(' ')
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
   function logout() {
     authSession.logout()
     navigate('/login')
@@ -29,15 +36,18 @@ export function TechnicianLayout() {
       />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-white transition-transform lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-sidebar transition-transform lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <div className="flex h-18 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-3">
-            <span className="rounded-fieldops bg-primary p-2 text-white">
-              <ShieldCheck size={21} />
-            </span>
+            <img
+              src={fieldopsLogo}
+              alt=""
+              aria-hidden="true"
+              className="h-10 w-10 shrink-0 rounded-fieldops"
+            />
             <div>
               <span className="block text-lg font-semibold text-primary">FieldOps</span>
               <span className="text-xs text-muted">Portal do tecnico</span>
@@ -72,7 +82,7 @@ export function TechnicianLayout() {
           ))}
         </nav>
         <div className="border-t border-border p-4">
-          <p className="text-sm font-semibold">{user?.name ?? technicianUser.name}</p>
+          <p className="text-sm font-semibold">{displayName}</p>
           <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
           <button
             className="focus-ring mt-3 inline-flex items-center gap-2 rounded-fieldops px-2 py-1.5 text-sm font-semibold text-danger hover:bg-danger-light/20"
@@ -84,7 +94,7 @@ export function TechnicianLayout() {
         </div>
       </aside>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-white/90 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-border bg-surface/90 px-4 backdrop-blur lg:px-8">
           <button
             className="focus-ring rounded-fieldops p-2 text-muted hover:bg-primary-light/30 lg:hidden"
             onClick={() => setOpen(true)}
@@ -92,13 +102,30 @@ export function TechnicianLayout() {
           >
             <Menu />
           </button>
-          <div>
-            <p className="text-sm font-semibold text-text">Portal do Tecnico</p>
-            <p className="text-xs text-muted">Operacao de campo web</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-text">Portal do Tecnico</p>
+            <p className="hidden text-xs text-muted sm:block">Operacao de campo web</p>
           </div>
-          <span className="rounded-md bg-primary-light/55 px-2.5 py-1 text-xs font-semibold text-primary-dark">
-            Mock
-          </span>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <ThemeToggle />
+            <button
+              className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
+              aria-label="Notificacoes"
+            >
+              <Bell size={20} />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
+            </button>
+            <div className="h-8 w-px bg-border" />
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-bold text-white">
+                {initials}
+              </span>
+              <div className="hidden sm:block">
+                <p className="text-sm font-semibold leading-tight text-text">{displayName}</p>
+                <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
+              </div>
+            </div>
+          </div>
         </header>
         <main className="mx-auto max-w-7xl p-5 lg:p-8">
           <Outlet />

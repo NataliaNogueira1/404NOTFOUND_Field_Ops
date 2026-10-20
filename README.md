@@ -9,6 +9,7 @@
 O **FieldOps** substitui processos baseados em formulários impressos, planilhas e registros informais por um fluxo digital integrado. A solução conecta o trabalho do técnico de campo à gestão administrativa, preservando evidências, histórico, localização e regras de negócio em um único fluxo rastreável.
 
 ### Links Úteis
+* **Guia do Avaliador:** [docs/guia-avaliador.md](docs/guia-avaliador.md) — ponto único de entrada para avaliar o projeto (OpenAPI, diagramas, execução e mapa de requisitos)
 * **Documentação Original:** [Notion - Projeto FieldOps](https://glaucotodesco.notion.site/Projeto-FieldOps-3af5d52a81f580c0b92ec261c686abb4)
 * **Design/Protótipo:** [Figma - Design](https://www.figma.com/design/TDZgjSw38R35CxhmAmyt64/Field-Ops?node-id=0-1&p=f&t=CF8K5GbmQBdqvael-0)
 
