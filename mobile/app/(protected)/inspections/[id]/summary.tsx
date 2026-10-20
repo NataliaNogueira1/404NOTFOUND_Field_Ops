@@ -8,6 +8,7 @@ import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
+import { useLocation } from '@/infrastructure/location';
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -15,8 +16,10 @@ export default function SummaryScreen() {
   const c = useThemeColors();
   const { answers, evidences, nonConformities, concludeInspection } = useFieldOps();
   const { template } = useInspectionTemplate(id);
+  const location = useLocation();
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [concluding, setConcluding] = useState(false);
 
   const items = useMemo(
     () => template?.sections.flatMap((section) => section.items) ?? [],
@@ -63,10 +66,21 @@ export default function SummaryScreen() {
     setConfirm(true);
   }
 
-  function conclude() {
-    concludeInspection(id);
-    setConfirm(false);
-    router.replace('/(protected)/(tabs)/sync');
+  async function conclude() {
+    if (concluding) return;
+    setConcluding(true);
+    try {
+      // One-shot GPS capture at conclusion (PBI-040 / PBI-045). If the permission
+      // is denied or the reading fails, `capture()` returns null and we conclude
+      // without a location — the flow is never blocked (RN-059).
+      const endedAtDevice = new Date().toISOString();
+      const captured = await location.capture();
+      concludeInspection(id, { endedAtDevice, location: captured });
+      setConfirm(false);
+      router.replace('/(protected)/(tabs)/sync');
+    } finally {
+      setConcluding(false);
+    }
   }
 
   return (
@@ -97,8 +111,8 @@ export default function SummaryScreen() {
           <Card style={styles.modal}>
             <Text style={[styles.modalTitle, { color: c.text }]}>Concluir inspeção?</Text>
             <Text style={{ color: c.textSecondary }}>A inspeção será marcada como enviada e ficará pendente de sincronização.</Text>
-            <Button label="Concluir inspeção" onPress={conclude} fullWidth />
-            <Button label="Cancelar" onPress={() => setConfirm(false)} variant="ghost" fullWidth />
+            <Button label="Concluir inspeção" onPress={conclude} loading={concluding} fullWidth />
+            <Button label="Cancelar" onPress={() => setConfirm(false)} variant="ghost" fullWidth disabled={concluding} />
           </Card>
         </View>
       </Modal>

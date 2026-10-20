@@ -39,14 +39,20 @@ interface FieldOpsContextValue {
     inspectionId: string,
     options?: {
       startedAtDevice?: string;
-      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+      location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
     },
   ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
-  concludeInspection: (inspectionId: string) => void;
+  concludeInspection: (
+    inspectionId: string,
+    options?: {
+      endedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
+    },
+  ) => void;
   reopenForCorrection: (inspectionId: string) => void;
   syncNow: () => void;
   resetSession: () => void;
@@ -231,7 +237,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       inspectionId: string,
       options?: {
         startedAtDevice?: string;
-        location?: { latitude: number; longitude: number; accuracy?: number } | null;
+        location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
       },
     ) => {
       const startedAtDevice = options?.startedAtDevice ?? new Date().toISOString();
@@ -413,21 +419,44 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
-  const concludeInspection = useCallback((inspectionId: string) => {
-    setInspections((current) =>
-      current.map((insp) =>
-        insp.id === inspectionId
-          ? { ...insp, status: InspectionStatus.SUBMITTED, progress: 100, syncStatus: 'pending' as const, pendingSyncCount: Math.max(insp.pendingSyncCount, 5) }
-          : insp,
-      ),
-    );
-    const repos = getRepos();
-    const sync = getSyncService();
-    if (repos && sync) {
-      repos.inspection.markSubmitted(inspectionId).catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
-    }
-  }, [getRepos, getSyncService]);
+  const concludeInspection = useCallback(
+    (
+      inspectionId: string,
+      options?: {
+        endedAtDevice?: string;
+        location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
+      },
+    ) => {
+      const endedAtDevice = options?.endedAtDevice ?? new Date().toISOString();
+      const location = options?.location ?? null;
+
+      setInspections((current) =>
+        current.map((insp) =>
+          insp.id === inspectionId
+            ? {
+                ...insp,
+                status: InspectionStatus.SUBMITTED,
+                progress: 100,
+                endLatitude: location?.latitude ?? insp.endLatitude,
+                endLongitude: location?.longitude ?? insp.endLongitude,
+                endAccuracy: location?.accuracy ?? insp.endAccuracy,
+                syncStatus: 'pending' as const,
+                pendingSyncCount: Math.max(insp.pendingSyncCount, 5),
+              }
+            : insp,
+        ),
+      );
+      const repos = getRepos();
+      const sync = getSyncService();
+      if (repos && sync) {
+        repos.inspection.markSubmittedWithDevice(inspectionId, endedAtDevice, location).catch(console.warn);
+        // Outbox: CONCLUSION transition carrying device timestamp + optional
+        // conclusion location (PBI-040 / PBI-045).
+        sync.enqueueConclusion(inspectionId, { endedAtDevice, location }).catch(console.warn);
+      }
+    },
+    [getRepos, getSyncService],
+  );
 
   // Reopen a REJECTED inspection so the technician can correct it (PBI-062).
   // Moves it back to IN_PROGRESS, making answers writable again, and queues the
