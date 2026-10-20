@@ -5,7 +5,7 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
 import { useAuth } from '@/features/auth';
-import { ThemeSelector, useThemeColors } from '@/features/theme';
+import { ThemeToggle, useThemeColors } from '@/features/theme';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,6 +109,9 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
+      <View style={styles.themeToggleRow}>
+        <ThemeToggle />
+      </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
         <Image source={fieldOpsLogo} style={styles.brandMark} accessibilityLabel="FieldOps" />
         <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
@@ -134,10 +137,6 @@ export default function LoginScreen() {
           {!!error && <Text style={styles.error}>{error}</Text>}
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
           <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
-          <View style={[styles.themeSection, { borderTopColor: c.border }]}>
-            <Text style={[styles.themeLabel, { color: c.textSecondary }]}>Tema</Text>
-            <ThemeSelector />
-          </View>
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -153,11 +152,9 @@ const styles = StyleSheet.create({
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
-  // ─── Theme switcher ──────────────────────────────────────────────────────
-  // Separated from the form by a hairline top border so the login screen also
-  // exposes the light/dark selector (not only the profile screen).
-  themeSection: { marginTop: Spacing.xs, paddingTop: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, gap: Spacing.sm },
-  themeLabel: { fontSize: FontSize.sm, fontWeight: '500', textAlign: 'center' },
+  // ─── Theme toggle ────────────────────────────────────────────────────────
+  // Compact icon-only switcher pinned to the top-right, mirroring the web login.
+  themeToggleRow: { alignItems: 'flex-end', paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
   // ─── PasswordInput ─────────────────────────────────────────────────────────
   // Layout only. Theme-dependent colours (border/background/text) are applied
   // inline via useThemeColors so the field follows dark mode like the rest of
