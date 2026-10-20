@@ -233,6 +233,21 @@ const migrations: Migration[] = [
       await addColumnIfMissing(db, 'inspections', 'end_captured_at', 'TEXT');
     },
   },
+  {
+    version: 8,
+    description: 'Reconcile v3 outbox columns on devices with a drifted schema',
+    // Some devices recorded v3 as applied without actually gaining its columns
+    // (schema drift between earlier app builds), so enqueue fails with
+    // "sync_queue has no column named dependency_ids". Re-add every v3 column
+    // defensively; each is a no-op when already present (idempotent guard).
+    run: async (db) => {
+      await addColumnIfMissing(db, 'sync_queue', 'dependency_ids', "TEXT NOT NULL DEFAULT '[]'");
+      await addColumnIfMissing(db, 'evidences', 'operation_id', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'response_id', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'last_error', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 /**
