@@ -12,7 +12,7 @@ import {
   SyncQueueRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '@/infrastructure/sync';
-import { rescheduleAllReminders } from '@/infrastructure/notifications/localNotifications';
+import { rescheduleAllReminders, cancelInspectionReminders } from '@/infrastructure/notifications/localNotifications';
 
 import {
   InspectionStatus,
@@ -428,6 +428,11 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       repos.inspection.markSubmitted(inspectionId).catch(console.warn);
       sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
     }
+    // Cancel the local deadline reminders immediately on conclusion, without
+    // waiting for the next sync (PBI-084). Works fully offline — the inspection
+    // is now SUBMITTED so it must no longer alert the technician. Fire-and-forget:
+    // a notification failure must never block the conclusion flow.
+    cancelInspectionReminders(inspectionId).catch(console.warn);
   }, [getRepos, getSyncService]);
 
   // Reopen a REJECTED inspection so the technician can correct it (PBI-062).
