@@ -196,7 +196,7 @@ function previewControl(item: TemplateItem): ReactNode {
     return <Input label="Numero" id={`preview-${item.id}`} type="number" placeholder="0" disabled />
   if (item.responseType === ResponseType.BOOLEAN)
     return (
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
         <Button variant="secondary" className="h-9 px-2 text-xs" disabled>
           Sim
         </Button>
@@ -207,7 +207,7 @@ function previewControl(item: TemplateItem): ReactNode {
     )
   if (item.responseType === ResponseType.CONFORMITY)
     return (
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
         <Button variant="secondary" className="h-9 px-2 text-xs" disabled>
           Conforme
         </Button>

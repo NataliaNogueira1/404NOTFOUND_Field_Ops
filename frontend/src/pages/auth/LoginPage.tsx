@@ -49,24 +49,26 @@ export function LoginPage() {
     setValue('password', '123456', { shouldValidate: true })
   }
   return (
-    <Card className="mx-auto w-full max-w-md px-7 py-10 sm:px-9 sm:py-14">
-      <div className="mb-8 text-center">
+    <Card className="mx-auto w-full max-w-md px-6 py-8 sm:px-9 sm:py-12">
+      <div className="mb-6 text-center sm:mb-8">
         <img
           src={fieldOpsLogo}
           alt="FieldOps"
-          className="mx-auto mb-4 h-14 w-14 rounded-card shadow-fieldops"
+          className="mx-auto mb-3 h-14 w-14 rounded-card shadow-fieldops sm:mb-4"
         />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mt-3 text-sm text-muted">Transforme inspecoes de campo em decisoes confiaveis</p>
+        <p className="mx-auto mt-2 max-w-xs text-sm text-muted sm:mt-3">
+          Transforme inspecoes de campo em decisoes confiaveis
+        </p>
       </div>
-      <div className="mb-6 grid gap-2 sm:grid-cols-3">
-        <Button variant="secondary" onClick={() => fillProfile('ana@fieldops.com')}>
+      <div className="mb-6 grid grid-cols-3 gap-2">
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('ana@fieldops.com')}>
           Admin
         </Button>
-        <Button variant="secondary" onClick={() => fillProfile('marina@fieldops.com')}>
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('marina@fieldops.com')}>
           Supervisor
         </Button>
-        <Button variant="secondary" onClick={() => fillProfile('carlos@fieldops.com')}>
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('carlos@fieldops.com')}>
           Tecnico
         </Button>
       </div>

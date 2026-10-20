@@ -52,8 +52,8 @@ export function DataTable<T>({
 
   return (
     <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+      <div className="focus-ring overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela com rolagem horizontal">
+        <table className="w-full min-w-[640px] text-left text-sm sm:min-w-[760px]">
           <thead className="bg-app-bg text-xs font-semibold uppercase tracking-wide text-muted">
             <tr>
               {columns.map((column) => (

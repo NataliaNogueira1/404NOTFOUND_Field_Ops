@@ -33,17 +33,17 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
     navigate('/login')
   }
   return (
-    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-surface/95 px-5 backdrop-blur lg:px-8">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-20 flex h-18 items-center justify-between gap-2 border-b border-border bg-surface/95 px-4 backdrop-blur sm:px-5 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
         <MobileMenuButton onClick={onMenuClick} />
-        <div>
-          <p className="text-xs text-muted">
+        <div className="min-w-0">
+          <p className="hidden text-xs text-muted sm:block">
             FieldOps / <span className="text-text">{titles[segment]}</span>
           </p>
-          <p className="font-semibold text-text">{titles[segment]}</p>
+          <p className="truncate font-semibold text-text">{titles[segment]}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <ThemeToggle />
         <button
           className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
