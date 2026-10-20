@@ -48,6 +48,7 @@ interface FieldOpsContextValue {
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
   concludeInspection: (inspectionId: string) => void;
   reopenForCorrection: (inspectionId: string) => void;
+  refreshInspection: (inspectionId: string) => Promise<void>;
   syncNow: () => void;
   resetSession: () => void;
   isSyncing: boolean;
@@ -453,6 +454,24 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
+  // Refresh a SINGLE inspection from the server by id (GET /mobile/inspections/{id}),
+  // instead of re-downloading the whole list. Used after a rejection/correction so
+  // the technician sees the latest server-authoritative state (status + rejection
+  // reason) of just the inspection they opened (PBI-062, EP-08). Offline-first:
+  // a pull failure (network/404/403) is swallowed so the local cache stays usable
+  // and never blocks the UI; the SQLite upsert is server-authoritative and keeps
+  // the technician's pending child rows (RN-077). Re-hydrates the UI from SQLite.
+  const refreshInspection = useCallback(async (inspectionId: string) => {
+    const sync = getSyncService();
+    if (!sync || !token) return;
+    try {
+      await sync.pullInspection(token, inspectionId);
+      await loadFromDb();
+    } catch (error) {
+      console.warn('[FieldOps] Refresh inspection failed:', error);
+    }
+  }, [getSyncService, token, loadFromDb]);
+
   const syncNow = useCallback(async () => {
     const sync = getSyncService();
     if (!sync || !token) {
@@ -535,6 +554,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       addNonConformity,
       concludeInspection,
       reopenForCorrection,
+      refreshInspection,
       syncNow,
       resetSession,
       isSyncing,
@@ -543,7 +563,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     [
       inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
-      concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
+      concludeInspection, reopenForCorrection, refreshInspection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );
 
