@@ -101,7 +101,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
             multiline
           />
           <Text style={[styles.label, { color: c.textSecondary }]}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
-          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
+          <Button label="📷 Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
         </View>
       ) : answer !== undefined ? (
         <View style={[styles.observationBox, { borderColor: c.border, backgroundColor: c.surface }]}>
@@ -114,6 +114,12 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
             placeholderTextColor={c.textSecondary}
             style={[styles.input, styles.textArea, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]}
             multiline
+          />
+          {/* Botão de foto disponível para qualquer item respondido — não só em falha (RN-011/UC-11). */}
+          <Button
+            label="📷 Adicionar foto"
+            onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)}
+            variant="secondary"
           />
         </View>
       ) : null}
