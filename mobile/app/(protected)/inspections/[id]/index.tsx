@@ -21,10 +21,20 @@ export default function InspectionDetailsScreen() {
   const router = useRouter();
   const db = useDatabase();
   const c = useThemeColors();
-  const { inspections, answers, evidences, nonConformities, reopenForCorrection } = useFieldOps();
+  const { inspections, answers, evidences, nonConformities, reopenForCorrection, refreshInspection } =
+    useFieldOps();
 
   // Detail screen must resolve the exact inspection from the route param.
   const inspection = inspections.find((item) => item.id === id);
+
+  // Pull THIS inspection by id when the detail screen opens, instead of waiting
+  // for the whole-list pull. Keeps the server-authoritative state fresh — most
+  // importantly the rejection decision (status + reason) after a supervisor
+  // review (PBI-062, EP-08). Offline-first: a failure is swallowed inside the
+  // context, so the screen still renders from the local SQLite cache.
+  useEffect(() => {
+    if (id) void refreshInspection(id);
+  }, [id, refreshInspection]);
 
   // Total checklist items (for the X/Y progress) — read locally from SQLite (offline).
   const [totalItems, setTotalItems] = useState<number | null>(null);
