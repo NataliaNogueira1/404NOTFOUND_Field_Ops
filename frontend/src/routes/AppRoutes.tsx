@@ -5,8 +5,11 @@ import { AppLayout } from '@/layouts/AppLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { TechnicianLayout } from '@/layouts/TechnicianLayout'
 import { LoginPage } from '@/pages/auth/LoginPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+
+const ForgotPasswordPage = lazy(() =>
+  import('@/pages/auth/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })),
+)
 
 const DashboardPage = lazy(() =>
   import('@/pages/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })),
@@ -116,7 +119,14 @@ export function AppRoutes() {
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="/forgot-password"
+          element={
+            <LazyPage>
+              <ForgotPasswordPage />
+            </LazyPage>
+          }
+        />
       </Route>
       <Route element={<RequireAdmin />}>
         <Route path="/app" element={<AppLayout />}>
