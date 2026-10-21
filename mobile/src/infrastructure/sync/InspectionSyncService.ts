@@ -793,13 +793,21 @@ export class InspectionSyncService {
 
   /**
    * Enqueue a status change to be synced later.
+   * For SUBMITTED transitions, also carries the technician's signature URI
+   * (PBI-086) so it can be relayed to the server during sync.
    */
   async enqueueStatusChange(inspectionId: string, status: string): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
     const id = `status-${inspectionId}-${Date.now()}`;
     await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
+      operationId: randomUuidV4(),
       status,
       baseVersion: inspection.serverVersion ?? 0,
+      // Include the signature (if any) so the server can store it once the
+      // conclusion transition is applied (PBI-086). Other transitions ignore it.
+      ...(status === 'SUBMITTED' && inspection.signatureUri
+        ? { signatureUri: inspection.signatureUri }
+        : {}),
     });
   }
 

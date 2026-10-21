@@ -200,6 +200,18 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_review_comments_inspection_item ON review_comments(inspection_id, item_id);
     `,
   },
+  {
+    version: 7,
+    description: 'PBI-086: store technician handwritten signature URI on inspection',
+    sql: `
+      -- signature_uri stores the SVG data URI (base64) or a local file path
+      -- of the technician's handwritten signature captured at conclusion.
+      -- signature_required mirrors the template's per-inspection setting; when
+      -- 1 the conclusion flow blocks until a non-empty signature is provided.
+      ALTER TABLE inspections ADD COLUMN signature_uri TEXT;
+      ALTER TABLE inspections ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /**
