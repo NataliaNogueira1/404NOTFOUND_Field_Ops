@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -9,10 +9,11 @@ import { authSession, roleHome } from '@/auth/session'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import fieldOpsLogo from '@/assets/fieldops-logo.png'
 
 const loginSchema = z.object({
-  email: z.email('Informe um e-mail valido'),
-  password: z.string().min(1, 'A senha e obrigatoria').min(6, 'A senha deve ter no minimo 6 caracteres'),
+  email: z.email('Informe um e-mail válido'),
+  password: z.string().min(1, 'A senha é obrigatória').min(6, 'A senha deve ter no mínimo 6 caracteres'),
 })
 type LoginForm = z.infer<typeof loginSchema>
 
@@ -32,15 +33,15 @@ export function LoginPage() {
       navigate(roleHome(user.role))
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.status === 401 || error.code === 'INVALID_CREDENTIALS') setServerError('E-mail ou senha invalidos.')
+        if (error.status === 401 || error.code === 'INVALID_CREDENTIALS') setServerError('E-mail ou senha inválidos.')
         else if (error.status === 400 || error.code === 'VALIDATION_ERROR')
           setServerError('Revise os dados informados.')
         else if (error.code === 'NETWORK_ERROR')
-          setServerError('Servidor indisponivel. Verifique a API e tente novamente.')
-        else setServerError('Nao foi possivel entrar agora. Tente novamente.')
+          setServerError('Servidor indisponível. Verifique a API e tente novamente.')
+        else setServerError('Não foi possível entrar agora. Tente novamente.')
         return
       }
-      setServerError('Nao foi possivel entrar agora. Tente novamente.')
+      setServerError('Não foi possível entrar agora. Tente novamente.')
     }
   }
   function fillProfile(email: string) {
@@ -48,20 +49,27 @@ export function LoginPage() {
     setValue('password', '123456', { shouldValidate: true })
   }
   return (
-    <Card className="mx-auto w-full max-w-md p-7 sm:p-9">
-      <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-card bg-primary text-white shadow-fieldops">
-          <ShieldCheck size={29} />
-        </div>
+    <Card className="mx-auto w-full max-w-md px-6 py-8 sm:px-9 sm:py-12">
+      <div className="mb-6 text-center sm:mb-8">
+        <img
+          src={fieldOpsLogo}
+          alt="FieldOps"
+          className="mx-auto mb-3 h-14 w-14 rounded-card shadow-fieldops sm:mb-4"
+        />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mt-1 text-sm text-muted">Acesso web integrado a API</p>
+        <p className="mx-auto mt-2 max-w-xs text-sm text-muted sm:mt-3">
+          Transforme inspeções de campo em decisões confiáveis
+        </p>
       </div>
-      <div className="mb-6 grid gap-2 sm:grid-cols-2">
-        <Button variant="secondary" onClick={() => fillProfile('marina@fieldops.com')}>
+      <div className="mb-6 grid grid-cols-3 gap-2">
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('ana@fieldops.com')}>
+          Admin
+        </Button>
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('marina@fieldops.com')}>
           Supervisor
         </Button>
-        <Button variant="secondary" onClick={() => fillProfile('carlos@fieldops.com')}>
-          Tecnico
+        <Button variant="secondary" className="px-2" onClick={() => fillProfile('carlos@fieldops.com')}>
+          Técnico
         </Button>
       </div>
       <form className="space-y-5" onSubmit={handleSubmit(submit)} noValidate>
@@ -95,10 +103,6 @@ export function LoginPage() {
           {isSubmitting ? 'Entrando...' : 'Entrar'} <ArrowRight size={17} />
         </Button>
       </form>
-      <div className="mt-7 rounded-fieldops border border-border bg-app-bg p-3 text-xs text-muted">
-        <p>Use credenciais cadastradas no backend.</p>
-        <p>O perfil e o redirecionamento vêm da API.</p>
-      </div>
     </Card>
   )
 }

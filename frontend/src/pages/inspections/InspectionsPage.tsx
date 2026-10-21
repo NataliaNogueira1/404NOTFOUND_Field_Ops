@@ -193,7 +193,7 @@ export function InspectionsPage() {
 
   const columns: Column<AdminInspectionSummary>[] = [
     {
-      header: 'Inspecao',
+      header: 'Inspeção',
       sortKey: 'title',
       cell: (item) => (
         <button
@@ -206,7 +206,7 @@ export function InspectionsPage() {
     },
     { header: 'Cliente', sortKey: 'clientName', cell: (item) => item.clientName },
     { header: 'Equipamento', sortKey: 'equipmentName', cell: (item) => item.equipmentName },
-    { header: 'Tecnico', sortKey: 'technician.name', cell: (item) => item.technicianName },
+    { header: 'Técnico', sortKey: 'technician.name', cell: (item) => item.technicianName },
     { header: 'Prioridade', sortKey: 'priority', cell: (item) => <PriorityBadge priority={item.priority} /> },
     {
       header: 'Data prevista',
@@ -227,7 +227,7 @@ export function InspectionsPage() {
       ),
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (item) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -252,8 +252,8 @@ export function InspectionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inspecoes"
-        description="Acompanhe e gerencie as inspecoes de campo."
+        title="Inspeções"
+        description="Acompanhe e gerencie as inspeções de campo."
         action={
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
@@ -270,7 +270,7 @@ export function InspectionsPage() {
             <Link to="/app/inspections/new">
               <Button>
                 <Plus size={17} aria-hidden="true" />
-                Nova inspecao
+                Nova inspeção
               </Button>
             </Link>
           </div>
@@ -282,7 +282,7 @@ export function InspectionsPage() {
           id="inspection-search"
           value={query}
           onChange={(event) => list.update('name', event.target.value)}
-          placeholder="Inspecao, cliente ou equipamento"
+          placeholder="Inspeção, cliente ou equipamento"
         />
         <Select
           label="Estado"
@@ -296,7 +296,7 @@ export function InspectionsPage() {
           ))}
         </Select>
         <Select
-          label="Tecnico"
+          label="Técnico"
           id="inspection-tech"
           value={technicianName}
           onChange={(event) => list.update('technicianName', event.target.value)}
@@ -361,7 +361,7 @@ export function InspectionsPage() {
             checked={review}
             onChange={(event) => list.update('review', event.target.checked ? 'true' : '')}
           />
-          Aguardando revisao
+          Aguardando revisão
         </label>
         {hasFilters && (
           <div className="xl:col-span-4">
@@ -380,7 +380,7 @@ export function InspectionsPage() {
         columns={columns}
         rows={rows}
         loading={loading}
-        loadingLabel="Carregando inspecoes..."
+        loadingLabel="Carregando inspeções..."
         page={list.page + 1}
         pageSize={list.size}
         totalRows={totalElements}
@@ -392,7 +392,7 @@ export function InspectionsPage() {
       />
       <Modal
         open={Boolean(canceling)}
-        title="Cancelar inspecao"
+        title="Cancelar inspeção"
         onClose={closeCancelModal}
         footer={
           <>
@@ -424,7 +424,7 @@ export function InspectionsPage() {
           )}
         </div>
       </Modal>
-      <Toast show={toast} message="Inspecao cancelada com sucesso" />
+      <Toast show={toast} message="Inspeção cancelada com sucesso" />
     </div>
   )
 }

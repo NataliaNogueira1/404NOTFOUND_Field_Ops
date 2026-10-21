@@ -48,7 +48,7 @@ export function ClientsPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch (cause) {
-      setError(clientError(cause, 'Nao foi possivel carregar os clientes.'))
+      setError(clientError(cause, 'Não foi possível carregar os clientes.'))
     } finally {
       setLoading(false)
     }
@@ -78,7 +78,7 @@ export function ClientsPage() {
       showClientToast(next === ClientStatus.ACTIVE ? 'Cliente ativado com sucesso.' : 'Cliente inativado com sucesso.')
       await loadClients()
     } catch (cause) {
-      setError(clientError(cause, 'Nao foi possivel alterar o status do cliente.'))
+      setError(clientError(cause, 'Não foi possível alterar o status do cliente.'))
       setChangingStatus(null)
     }
   }
@@ -107,7 +107,7 @@ export function ClientsPage() {
       cell: (client) => <ActiveBadge active={client.status === ClientStatus.ACTIVE} />,
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (client) => (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/clients/${client.id}/sites`)}>
@@ -192,8 +192,8 @@ export function ClientsPage() {
         title={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar cliente' : 'Ativar cliente'}
         description={
           changingStatus?.status === ClientStatus.ACTIVE
-            ? `O cliente ${changingStatus?.name} deixara de aparecer em novos agendamentos.`
-            : `O cliente ${changingStatus?.name} voltara a aparecer em novos agendamentos.`
+            ? `O cliente ${changingStatus?.name} deixará de aparecer em novos agendamentos.`
+            : `O cliente ${changingStatus?.name} voltará a aparecer em novos agendamentos.`
         }
         confirmLabel={changingStatus?.status === ClientStatus.ACTIVE ? 'Inativar' : 'Ativar'}
         variant={changingStatus?.status === ClientStatus.ACTIVE ? 'danger' : 'primary'}
@@ -232,13 +232,13 @@ function ManagedClientModal({
   const nameError = !draft.name.trim()
     ? 'Informe o nome do cliente.'
     : draft.name.trim().length > 200
-      ? 'Use no maximo 200 caracteres.'
+      ? 'Use no máximo 200 caracteres.'
       : ''
   const documentError =
     draft.document && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(draft.document)
       ? 'Use o formato XX.XXX.XXX/XXXX-XX.'
       : ''
-  const emailError = draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email) ? 'Informe um e-mail valido.' : ''
+  const emailError = draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email) ? 'Informe um e-mail válido.' : ''
   const formError = nameError || documentError || emailError
 
   async function submit() {
@@ -254,7 +254,7 @@ function ManagedClientModal({
         phone: draft.phone.trim(),
       })
     } catch (cause) {
-      setSubmitError(clientError(cause, 'Nao foi possivel salvar o cliente.'))
+      setSubmitError(clientError(cause, 'Não foi possível salvar o cliente.'))
     } finally {
       setSaving(false)
     }
@@ -286,7 +286,7 @@ function ManagedClientModal({
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
         <Input
-          label="Razao social (opcional)"
+          label="Razão social (opcional)"
           id="client-legal-name"
           maxLength={200}
           value={draft.legalName}
@@ -399,7 +399,7 @@ export function ClientDetailsPage() {
     { header: 'Equipamentos', cell: (site) => seedEquipment.filter((item) => item.siteId === site.id).length },
     { header: 'Status', cell: (site) => <ActiveBadge active={site.active} /> },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (site) => (
         <div className="flex gap-2">
           <Button
@@ -455,7 +455,7 @@ export function ClientDetailsPage() {
           </div>
           <dl className="grid gap-4 sm:grid-cols-2">
             <Info label="Nome" value={client.name} />
-            <Info label="Razao social" value={managedClient?.legalName} />
+            <Info label="Razão social" value={managedClient?.legalName} />
             <Info label="Documento" value={client.document} />
             <Info label="E-mail" value={client.email} />
             <Info label="Telefone" value={managedClient?.phone} />
@@ -500,7 +500,7 @@ export function ClientDetailsPage() {
       </section>
       <ClientModal client={editingClient} onClose={() => setEditingClient(null)} onSave={saveClient} />
       <SiteModal site={editingSite} clientId={client.id} onClose={() => setEditingSite(null)} onSave={saveSite} />
-      <Toast show={toast} message="Estrutura do cliente salva no prototipo" />
+      <Toast show={toast} message="Estrutura do cliente salva no protótipo" />
     </div>
   )
 }
@@ -556,8 +556,8 @@ export function ClientSiteDetailsPage() {
 
   const equipmentColumns: Column<Equipment>[] = [
     { header: 'Nome', cell: (item) => <span className="font-medium">{item.name}</span> },
-    { header: 'Patrimonio', cell: (item) => item.patrimony },
-    { header: 'Numero de serie', cell: (item) => item.serialNumber },
+    { header: 'Patrimônio', cell: (item) => item.patrimony },
+    { header: 'Número de série', cell: (item) => item.serialNumber },
     {
       header: 'QR Code',
       cell: (item) => (
@@ -569,7 +569,7 @@ export function ClientSiteDetailsPage() {
     },
     { header: 'Status', cell: (item) => <ActiveBadge active={item.active} /> },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (item) => (
         <div className="flex gap-2">
           <Button variant="ghost" className="h-8 px-2" onClick={() => setEditingEquipment(item)}>
@@ -636,7 +636,7 @@ export function ClientSiteDetailsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Equipamentos</h2>
-            <p className="text-sm text-muted">Patrimonio, serie, status e QR mockado deste local.</p>
+            <p className="text-sm text-muted">Patrimônio, série, status e QR mockado deste local.</p>
           </div>
           <Button
             onClick={() =>
@@ -669,7 +669,7 @@ export function ClientSiteDetailsPage() {
         onSave={saveEquipment}
       />
       <QrModal item={qr} onClose={() => setQr(null)} />
-      <Toast show={toast} message="Local salvo no prototipo" />
+      <Toast show={toast} message="Local salvo no protótipo" />
     </div>
   )
 }
@@ -719,7 +719,7 @@ function ClientModal({
     : !draft.document.trim()
       ? 'Informe o documento.'
       : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
-        ? 'Informe um e-mail valido.'
+        ? 'Informe um e-mail válido.'
         : ''
   return (
     <Modal
@@ -865,9 +865,9 @@ function EquipmentModal({
   const error = !draft.name.trim()
     ? 'Informe o nome do equipamento.'
     : !draft.patrimony.trim()
-      ? 'Informe o patrimonio.'
+      ? 'Informe o patrimônio.'
       : !draft.serialNumber.trim()
-        ? 'Informe o numero de serie.'
+        ? 'Informe o número de série.'
         : !draft.qrCode.trim()
           ? 'Informe o QR Code.'
           : ''
@@ -895,13 +895,13 @@ function EquipmentModal({
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
         <Input
-          label="Patrimonio"
+          label="Patrimônio"
           id="e-pat"
           value={draft.patrimony}
           onChange={(event) => setDraft({ ...draft, patrimony: event.target.value })}
         />
         <Input
-          label="Numero de serie"
+          label="Número de série"
           id="e-sn"
           value={draft.serialNumber}
           onChange={(event) => setDraft({ ...draft, serialNumber: event.target.value })}

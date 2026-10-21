@@ -49,6 +49,10 @@ interface InspectionRow {
   rejected_at: string | null;
   equipment_qr_code: string | null;
   server_version: number;
+  /** PBI-086: SVG data URI or local file path of the technician's signature. */
+  signature_uri: string | null;
+  /** PBI-086: 1 when the template requires a signature before conclusion. */
+  signature_required: number;
 }
 
 interface SectionRow {
@@ -281,6 +285,34 @@ export class InspectionRepository {
     );
   }
 
+  /**
+   * Persist the technician's handwritten signature for the given inspection
+   * (PBI-086). The value is an SVG data URI (base64) produced by SignaturePad
+   * and is stored alongside the inspection row so it survives offline restarts.
+   */
+  async saveSignature(inspectionId: string, signatureUri: string): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections
+         SET signature_uri = ?, sync_status = 'pending', updated_at = datetime('now')
+       WHERE id = ?`,
+      signatureUri,
+      inspectionId,
+    );
+  }
+
+  /**
+   * Mark whether a signature is required for this inspection (PBI-086).
+   * Kept as a separate setter so the value can be updated when a new template
+   * snapshot arrives without touching the rest of the inspection row.
+   */
+  async setSignatureRequired(inspectionId: string, required: boolean): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET signature_required = ?, updated_at = datetime('now') WHERE id = ?`,
+      required ? 1 : 0,
+      inspectionId,
+    );
+  }
+
   // ─── Sections & Items (template snapshot) ──────────────────────────────────
 
   async saveTemplate(inspectionId: string, template: InspectionTemplate): Promise<void> {
@@ -424,6 +456,9 @@ export class InspectionRepository {
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
     serverVersion: row.server_version,
+    // PBI-086: signature fields (may be absent in rows created before migration v7)
+    signatureUri: row.signature_uri ?? undefined,
+    signatureRequired: row.signature_required === 1,
   });
 
   private mapRowToItem = (row: ItemRow): TemplateItem => ({

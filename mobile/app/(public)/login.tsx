@@ -1,15 +1,18 @@
 ﻿import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
 import { useAuth } from '@/features/auth';
-import { useThemeColors } from '@/features/theme';
+import { ThemeToggle, useThemeColors } from '@/features/theme';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
+
+// Logo image shared with the app icon (Expo Go). require() needs a static path.
+const fieldOpsLogo = require('../../assets/images/icon.png');
 
 // ─── Password field with visibility toggle ────────────────────────────────────
 
@@ -106,12 +109,15 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
+      <View style={styles.themeToggleRow}>
+        <ThemeToggle />
+      </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-        <View style={styles.brandMark}>
-          <Text style={styles.brandMarkText}>F</Text>
-        </View>
+        <Image source={fieldOpsLogo} style={styles.brandMark} accessibilityLabel="FieldOps" />
         <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
-        <Text style={[styles.subtitle, { color: c.textSecondary }]}>Plataforma de Inspeção</Text>
+        <Text style={[styles.subtitle, { color: c.textSecondary }]}>
+          Tudo pronto para sua próxima inspeção
+        </Text>
         <Card style={styles.form} shadow="md">
           <TextInput
             label="E-mail"
@@ -132,7 +138,6 @@ export default function LoginScreen() {
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
           <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
         </Card>
-        <Text style={[styles.version, { color: c.textSecondary }]}>Versão 1.0.0</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -141,14 +146,15 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   container: { flex: 1, justifyContent: 'center', padding: Spacing.xl },
-  brandMark: { width: 64, height: 64, borderRadius: 18, backgroundColor: Colors.primary, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
-  brandMarkText: { color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold },
+  brandMark: { width: 64, height: 64, borderRadius: 18, alignSelf: 'center', marginBottom: Spacing.md },
   title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, textAlign: 'center' },
-  subtitle: { marginTop: Spacing.xs, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.xl },
+  subtitle: { marginTop: Spacing.sm, fontSize: FontSize.md, textAlign: 'center', marginBottom: Spacing.lg },
   form: { gap: Spacing.md },
   error: { fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center' },
   link: { color: Colors.primary, fontWeight: FontWeight.semibold, textAlign: 'center', paddingVertical: Spacing.xs },
-  version: { textAlign: 'center', marginTop: Spacing.xl, fontSize: FontSize.xs },
+  // ─── Theme toggle ────────────────────────────────────────────────────────
+  // Compact icon-only switcher pinned to the top-right, mirroring the web login.
+  themeToggleRow: { alignItems: 'flex-end', paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
   // ─── PasswordInput ─────────────────────────────────────────────────────────
   // Layout only. Theme-dependent colours (border/background/text) are applied
   // inline via useThemeColors so the field follows dark mode like the rest of

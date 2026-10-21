@@ -80,7 +80,7 @@ describe('ClientsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo cliente' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Cliente Novo')
-    await userEvent.type(within(dialog).getByLabelText('Razao social (opcional)'), 'Cliente Novo SA')
+    await userEvent.type(within(dialog).getByLabelText('Razão social (opcional)'), 'Cliente Novo SA')
     await userEvent.type(within(dialog).getByLabelText('Documento (CNPJ)'), '12.345.678/0001-90')
     await userEvent.type(within(dialog).getByLabelText('E-mail (opcional)'), 'novo@example.com')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }))
@@ -116,7 +116,7 @@ describe('ClientsPage', () => {
     await screen.findByText('Industria Atlas')
 
     await userEvent.click(screen.getByRole('button', { name: 'Inativar Industria Atlas' }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('deixara de aparecer em novos agendamentos')
+    expect(screen.getByRole('dialog')).toHaveTextContent('deixará de aparecer em novos agendamentos')
     expect(patchBody).toBeUndefined()
     await userEvent.click(screen.getByRole('button', { name: 'Inativar' }))
 

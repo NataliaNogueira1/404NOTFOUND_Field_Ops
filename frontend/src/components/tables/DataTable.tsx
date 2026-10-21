@@ -52,8 +52,8 @@ export function DataTable<T>({
 
   return (
     <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+      <div className="focus-ring overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela com rolagem horizontal">
+        <table className="w-full min-w-[640px] text-left text-sm sm:min-w-[760px]">
           <thead className="bg-app-bg text-xs font-semibold uppercase tracking-wide text-muted">
             <tr>
               {columns.map((column) => (
@@ -106,9 +106,9 @@ export function DataTable<T>({
           <div className="flex items-center gap-3">
             {onPageSizeChange && (
               <label className="flex items-center gap-2">
-                Por pagina
+                Por página
                 <select
-                  aria-label="Itens por pagina"
+                  aria-label="Itens por página"
                   className="focus-ring rounded-fieldops border border-border bg-surface px-2 py-1"
                   value={size}
                   onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -120,11 +120,11 @@ export function DataTable<T>({
               </label>
             )}
             <span>
-              Pagina {current} de {totalPages}
+              Página {current} de {totalPages}
             </span>
             <div className="flex gap-2">
               <Button
-                aria-label="Pagina anterior"
+                aria-label="Página anterior"
                 variant="secondary"
                 className="h-8 px-2"
                 disabled={current === 1}
@@ -133,7 +133,7 @@ export function DataTable<T>({
                 <ChevronLeft size={16} />
               </Button>
               <Button
-                aria-label="Proxima pagina"
+                aria-label="Próxima página"
                 variant="secondary"
                 className="h-8 px-2"
                 disabled={current === totalPages}

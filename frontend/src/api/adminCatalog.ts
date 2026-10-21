@@ -176,7 +176,7 @@ export const adminCatalogApi = {
     // Keeps the client tolerant of older API gateways that still return the template DTO.
     const template = managedTemplate(result as unknown as BackendManagedTemplate)
     const issues = template.sections.length === 0 || template.sections.some(section => section.items.length === 0)
-      ? ['Todas as secoes precisam de pelo menos um item.'] : []
+      ? ['Todas as seções precisam de pelo menos um item.'] : []
     return { template, validForPublication: issues.length === 0, issues }
   },
 
