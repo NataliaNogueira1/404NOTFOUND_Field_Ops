@@ -62,7 +62,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'carlos@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), '123456')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), '123456')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     // The technician portal is a lazy-loaded route, so give the chunk time to resolve under load.
@@ -78,7 +78,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), '123456')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), '123456')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
@@ -92,7 +92,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'errada123')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), 'errada123')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     expect(await screen.findByText(/e-mail ou senha inválidos/i, {}, { timeout: 5000 })).not.toBeNull()

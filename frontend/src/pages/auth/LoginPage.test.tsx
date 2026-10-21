@@ -100,7 +100,7 @@ describe('LoginPage — dark theme (issue #172)', () => {
 
     expect(screen.getByText('FieldOps')).toBeInTheDocument()
     expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Senha', { selector: 'input' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument()
   })
 
