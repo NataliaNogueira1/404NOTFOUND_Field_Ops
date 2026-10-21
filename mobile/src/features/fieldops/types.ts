@@ -53,6 +53,16 @@ export interface Inspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /**
+   * SVG data URI (base64) or local file path of the technician's handwritten
+   * signature captured at conclusion (PBI-086).
+   */
+  signatureUri?: string;
+  /**
+   * When true, the conclusion flow requires a non-empty signature before
+   * submitting (PBI-086, configurable per inspection template).
+   */
+  signatureRequired?: boolean;
 }
 export interface Evidence {
   id: string;
