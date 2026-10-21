@@ -93,7 +93,8 @@ DateInput.displayName = 'DateInput'
  * so the user can verify what they typed without clearing the field.
  */
 const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, id, label, ...props }, ref) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ({ className, error, id, label, type: _type, ...props }, ref) => {
     const [visible, setVisible] = useState(false)
 
     return (
