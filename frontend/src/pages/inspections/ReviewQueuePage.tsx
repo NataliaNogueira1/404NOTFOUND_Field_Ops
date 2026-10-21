@@ -41,7 +41,8 @@ export function ReviewQueuePage() {
         technicianName: '',
         clientName: '',
         priority: '',
-        dueDate: '',
+        dueDateFrom: '',
+        dueDateTo: '',
         overdue: false,
         review: true,          // always filter to SUBMITTED + UNDER_REVIEW
         page: list.page,

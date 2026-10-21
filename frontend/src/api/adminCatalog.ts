@@ -265,7 +265,10 @@ export const adminCatalogApi = {
     technicianName: string
     clientName: string
     priority: Priority | ''
-    dueDate: string
+    /** Start of the dueDate range (inclusive). Maps to the backend `dueDate` param for exact-match when used alone. */
+    dueDateFrom: string
+    /** End of the dueDate range (inclusive). Only used by the CSV export; not forwarded to the listing endpoint. */
+    dueDateTo: string
     overdue: boolean
     review: boolean
     page: number
@@ -278,7 +281,8 @@ export const adminCatalogApi = {
     if (filters.technicianName) params.set('technicianName', filters.technicianName)
     if (filters.clientName) params.set('clientName', filters.clientName)
     if (filters.priority) params.set('priority', filters.priority)
-    if (filters.dueDate) params.set('dueDate', filters.dueDate)
+    // The listing endpoint accepts a single `dueDate` for exact-match; use the start of the range.
+    if (filters.dueDateFrom) params.set('dueDate', filters.dueDateFrom)
     if (filters.overdue) params.set('overdue', 'true')
     if (filters.review) params.set('review', 'true')
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)
@@ -318,6 +322,63 @@ export const adminCatalogApi = {
       body: JSON.stringify({ reason }),
     })
     return { ...result, id: String(result.id), canceledBy: String(result.canceledBy) }
+  },
+
+  /**
+   * Downloads the inspection list as a CSV file, applying the filters currently
+   * active on the admin listing page. The browser is triggered to save the file
+   * via an invisible anchor element — no page navigation occurs.
+   *
+   * Only ADMINISTRATOR accounts may call this endpoint (403 for SUPERVISOR).
+   *
+   * Note: the backend export endpoint accepts `clientId` (numeric), not `clientName`.
+   * The caller is responsible for resolving clientName → clientId before calling this.
+   */
+  async exportCsv(filters: {
+    status: InspectionStatus | ''
+    from: string
+    to: string
+    clientId?: number
+  }): Promise<void> {
+    const params = new URLSearchParams()
+    if (filters.status) params.set('status', filters.status)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.clientId) params.set('clientId', String(filters.clientId))
+
+    const query = params.toString()
+    const apiUrl = import.meta.env.VITE_API_URL ?? ''
+    const url = `${apiUrl}/api/v1/inspections/export.csv${query ? `?${query}` : ''}`
+
+    // Use fetch directly — apiRequest always JSON.parses the body
+    const token = (await import('@/api/client')).tokenStorage.get()
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'text/csv',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Erro ao exportar CSV: ${response.status} ${text}`)
+    }
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+
+    // Derive filename from Content-Disposition header when available
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const match = /filename="?([^";\n]+)"?/.exec(disposition)
+    const filename = match?.[1] ?? `inspecoes-${new Date().toISOString().slice(0, 10)}.csv`
+
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(objectUrl)
   },
 }
 
