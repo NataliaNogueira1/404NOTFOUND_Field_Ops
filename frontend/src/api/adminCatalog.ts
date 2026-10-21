@@ -265,7 +265,10 @@ export const adminCatalogApi = {
     technicianName: string
     clientName: string
     priority: Priority | ''
-    dueDate: string
+    /** Start of the dueDate range (inclusive). Maps to the backend `dueDate` param for exact-match when used alone. */
+    dueDateFrom: string
+    /** End of the dueDate range (inclusive). Only used by the CSV export; not forwarded to the listing endpoint. */
+    dueDateTo: string
     overdue: boolean
     review: boolean
     page: number
@@ -278,7 +281,8 @@ export const adminCatalogApi = {
     if (filters.technicianName) params.set('technicianName', filters.technicianName)
     if (filters.clientName) params.set('clientName', filters.clientName)
     if (filters.priority) params.set('priority', filters.priority)
-    if (filters.dueDate) params.set('dueDate', filters.dueDate)
+    // The listing endpoint accepts a single `dueDate` for exact-match; use the start of the range.
+    if (filters.dueDateFrom) params.set('dueDate', filters.dueDateFrom)
     if (filters.overdue) params.set('overdue', 'true')
     if (filters.review) params.set('review', 'true')
     const result = await apiRequest<BackendPage<BackendInspection>>(`/api/v1/inspections?${params}`)

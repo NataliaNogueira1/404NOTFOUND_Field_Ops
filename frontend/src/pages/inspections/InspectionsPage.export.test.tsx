@@ -122,7 +122,7 @@ describe('InspectionsPage — exportação CSV', () => {
     setSessionUser(adminUser())
     const exportSpy = vi.spyOn(adminCatalogApi, 'exportCsv').mockResolvedValue()
 
-    renderPage('/app/inspections?status=ASSIGNED&clientName=Industria+Modelo&dueDate=2026-09-04')
+    renderPage('/app/inspections?status=ASSIGNED&clientName=Industria+Modelo&dueDateFrom=2026-09-01&dueDateTo=2026-09-30')
 
     // Aguarda os clientes carregarem para que o nome → id esteja disponível.
     await screen.findByRole('option', { name: 'Industria Modelo' })
@@ -131,9 +131,28 @@ describe('InspectionsPage — exportação CSV', () => {
     await waitFor(() => expect(exportSpy).toHaveBeenCalledTimes(1))
     expect(exportSpy).toHaveBeenCalledWith({
       status: 'ASSIGNED',
-      from: '2026-09-04',
-      to: '2026-09-04',
+      from: '2026-09-01',
+      to: '2026-09-30',
       clientId: 7,
+    })
+  })
+
+  it('chama exportCsv com to vazio quando apenas "De" está preenchido', async () => {
+    mountFetch()
+    setSessionUser(adminUser())
+    const exportSpy = vi.spyOn(adminCatalogApi, 'exportCsv').mockResolvedValue()
+
+    renderPage('/app/inspections?dueDateFrom=2026-09-04')
+
+    await screen.findByRole('button', { name: /exportar csv/i })
+    await userEvent.click(screen.getByRole('button', { name: /exportar csv/i }))
+
+    await waitFor(() => expect(exportSpy).toHaveBeenCalledTimes(1))
+    expect(exportSpy).toHaveBeenCalledWith({
+      status: '',
+      from: '2026-09-04',
+      to: '',
+      clientId: undefined,
     })
   })
 
