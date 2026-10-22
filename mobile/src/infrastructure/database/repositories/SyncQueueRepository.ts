@@ -161,6 +161,17 @@ export class SyncQueueRepository {
   }
 
   /**
+   * Move ALL failed operations back to pending so the next sync retries them.
+   * Used by the "Tentar novamente" button on the sync screen when multiple
+   * operations are stuck in error after a previous failed sync cycle.
+   */
+  async markAllPending(): Promise<void> {
+    await this.db.runAsync(
+      "UPDATE sync_queue SET status = 'pending', last_error = NULL, updated_at = datetime('now') WHERE status = 'error'",
+    );
+  }
+
+  /**
    * Remove successfully sent operations (cleanup).
    */
   async removeSent(): Promise<void> {
