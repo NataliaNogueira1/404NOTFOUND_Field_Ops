@@ -380,46 +380,64 @@ export class InspectionSyncService {
     // Only operations whose dependencies are already applied are eligible: a
     // photo UPLOAD stays deferred while its answer op is still pending/failed
     // (RN-069). This is enforced by the sync worker, not just the UI.
-    const pending = await this.syncQueueRepo.getReady();
-    let sent = 0;
-    let failed = 0;
-    const errors: string[] = [];
+    //
+    // The loop drains the queue in dependency order: after an answer is applied
+    // and removed, its dependent evidence UPLOAD becomes ready in the next pass.
+    // Without the loop, a single sync would only send the answer and leave the
+    // evidence pending until the user manually syncs again.
+    let totalSent = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
 
-    for (const operation of pending) {
-      try {
-        await this.syncQueueRepo.markInProgress(operation.id);
-        await this.sendOperation(token, operation);
-        await this.syncQueueRepo.markSent(operation.id);
-        // For an evidence UPLOAD, success means the server confirmed APPLIED, so
-        // the evidence row is marked SYNCED (its file may now be released).
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markSyncedById(operation.entityId);
+    while (true) {
+      const pending = await this.syncQueueRepo.getReady();
+      if (pending.length === 0) break;
+
+      let sent = 0;
+      let failed = 0;
+      for (const operation of pending) {
+        try {
+          await this.syncQueueRepo.markInProgress(operation.id);
+          await this.sendOperation(token, operation);
+          await this.syncQueueRepo.markSent(operation.id);
+          // For an evidence UPLOAD, success means the server confirmed APPLIED, so
+          // the evidence row is marked SYNCED (its file may now be released).
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markSyncedById(operation.entityId);
+          }
+          sent++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          if (err instanceof VersionConflictError) {
+            await this.syncQueueRepo.markConflict(operation.id, msg);
+            allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
+            continue;
+          }
+          // Failure never deletes the file or the evidence: we only flag it FAILED
+          // and persist the error so the photo stays available for retry (RN-047).
+          await this.syncQueueRepo.markError(operation.id, msg);
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markFailed(operation.entityId, msg);
+          }
+          failed++;
+          allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
         }
-        sent++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        if (err instanceof VersionConflictError) {
-          await this.syncQueueRepo.markConflict(operation.id, msg);
-          errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
-          continue;
-        }
-        // Failure never deletes the file or the evidence: we only flag it FAILED
-        // and persist the error so the photo stays available for retry (RN-047).
-        await this.syncQueueRepo.markError(operation.id, msg);
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markFailed(operation.entityId, msg);
-        }
-        failed++;
-        errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
       }
+
+      // Cleanup successfully sent operations after each pass so dependent
+      // operations become eligible in the next iteration.
+      if (sent > 0) {
+        await this.syncQueueRepo.removeSent();
+      }
+      totalSent += sent;
+      totalFailed += failed;
+
+      // If nothing was sent (all failed or conflicted), break to avoid
+      // an infinite loop — failed operations stay in the queue for retry.
+      if (sent === 0) break;
     }
 
-    // Cleanup successfully sent operations
-    if (sent > 0) {
-      await this.syncQueueRepo.removeSent();
-    }
-
-    return { sent, failed, errors };
+    return { sent: totalSent, failed: totalFailed, errors: allErrors };
   }
 
   private async sendOperation(
