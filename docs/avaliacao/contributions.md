@@ -8,7 +8,7 @@ Quantidade de commits, isoladamente, não representa percentual de implementaç�
 
 As identidades abaixo são identidades Git encontradas no histórico; não constituem, por si só, confirmação de composição atual da equipe. Nomes ou usernames distintos com o mesmo e-mail devem ser tratados com cuidado.
 
-Fontes: [auditoria técnica](../analise/Auditoria_Final_FieldOps.md), [diagnóstico da IA do professor](../analise/Auditoria_da_IA_do_professor.md), [plano coletivo](../analise/Plano_100_Pontos_FieldOps_Equipe.md), [índice de evidências](README.md) e histórico Git local.
+Fontes: [auditoria técnica](auditorias/auditoria-final-fieldops.md), [diagnóstico da IA do professor](auditorias/auditoria-ia-professor.md), [plano coletivo](plano-100-pontos-equipe.md), [índice de evidências](README.md) e histórico Git local.
 
 ## 2. Tipos de contribuição
 
@@ -117,7 +117,7 @@ O Git local permite verificar commits, diffs e merges, mas não estabelece sozin
 
 ## 9. Trabalho documental e de avaliação
 
-DOCUMENTOU é separado de IMPLEMENTOU. O histórico identifica commits de Júlia Paes de Medeiros para docs/analise e docs/evaluation, além de documentos de análise assinados por NataliaNogueira1. Esses registros facilitam a auditoria e a rastreabilidade, mas não são apresentados como implementação de funcionalidade.
+DOCUMENTOU é separado de IMPLEMENTOU. O histórico identifica commits de Júlia Paes de Medeiros para `docs/analises` e `docs/avaliacao`, além de documentos de análise assinados por NataliaNogueira1. Esses registros facilitam a auditoria e a rastreabilidade, mas não são apresentados como implementação de funcionalidade.
 
 VALIDOU não foi atribuído individualmente neste documento porque a coleta local não contém, por si só, um registro pessoal suficiente de execução de testes, dispositivo ou demo.
 

@@ -49,7 +49,7 @@ Eles ainda podem ser validados em dispositivo/demonstração, mas não são func
 
 - [Índice de evidências](README.md)
 - [Roteiro de demonstração E2E](demo-runbook.md)
-- [Escopo e rubrica oficiais](../analise/FieldOps.md)
-- [Auditoria técnica final](../analise/Auditoria_Final_FieldOps.md)
-- [Plano coletivo de conclusão](../analise/Plano_100_Pontos_FieldOps_Equipe.md)
+- [Escopo e rubrica oficiais](../requisitos/fieldops-requisitos-rubrica.md)
+- [Auditoria técnica final](auditorias/auditoria-final-fieldops.md)
+- [Plano coletivo de conclusão](plano-100-pontos-equipe.md)
 

@@ -10,16 +10,16 @@ Este diretório organiza as evidências de avaliação do FieldOps. Ele não sub
 
 | Dimensão | Evidência | Localização | Status | Observações |
 |---|---|---|---|---|
-| Visão, requisitos e aderência ao escopo | Requisitos oficiais, backlog de PBIs, regras de negócio e critérios de aceite. | [Escopo do FieldOps](../analise/FieldOps.md) | READY | Esta é a fonte de autoridade do escopo para a avaliação. |
+| Visão, requisitos e aderência ao escopo | Requisitos oficiais, backlog de PBIs, regras de negócio e critérios de aceite. | [Escopo do FieldOps](../requisitos/fieldops-requisitos-rubrica.md) | READY | Esta é a fonte de autoridade do escopo para a avaliação. |
 | Arquitetura e organização | Aplicações no monorepo, configuração Spring, rotas React, Expo Router e migrations SQLite/Flyway. | [README raiz](../../README.md), [configuração da API](../../api/src/main/resources/application.yml), [rotas Web](../../frontend/src/routes/AppRoutes.tsx), [layout raiz Mobile](../../mobile/app/_layout.tsx) | READY | A stack Web autorizada é React + TypeScript; não há migração para Angular implícita. |
 | Aplicativo Mobile | Router, autenticação, execução de inspeção, persistência local e fontes de sync. | [README Mobile](../../mobile/README.md), [app Mobile](../../mobile/app), [código-fonte Mobile](../../mobile/src) | PARTIAL | O código-fonte existe; a instalação do APK e o fluxo completo em dispositivo seguem pendentes de validação. |
 | Recursos nativos | Scanner QR, integração de câmera, hook de localização e configuração EAS de APK. | [scanner](<../../mobile/app/(protected)/scanner.tsx>), [hook de localização](../../mobile/src/infrastructure/location/useLocation.ts), [configuração EAS](../../mobile/eas.json) | PENDING_VALIDATION | QR/câmera estão implementados no código. APK, GPS final e evidência em dispositivo não foram registrados. |
 | Offline e sincronização | SQLite, fila/outbox, batch de sync, cursor incremental, idempotência, retry e testes de sync. | [database](../../mobile/src/infrastructure/database), [serviço de sync](../../mobile/src/infrastructure/sync/InspectionSyncService.ts), [API de sync](../../api/src/main/java/com/fieldops/sync) | PENDING_VALIDATION | Há código e fontes de testes direcionados; ainda não foi registrada uma execução E2E completa offline→online. |
 | Interface administrativa | Rotas protegidas, cadastros, templates, agendamento, revisão, auditoria, dashboard e testes Web. | [código-fonte Web](../../frontend/src), [README Web](../../frontend/README.md) | PARTIAL | Detalhes de cliente/local ainda usam dados seed; consulte [ClientsPage](../../frontend/src/pages/catalog/ClientsPage.tsx). Deploy público segue pendente de validação. |
 | API, regras e modelo de dados | JWT/roles, controllers/services/DTOs, Flyway, endpoint de evidências, auditoria, OpenAPI, Docker, seeds e testes automatizados. | [código-fonte da API](../../api/src/main/java/com/fieldops), [migrations](../../api/src/main/resources/db/migration), [README da API](../../api/README.md) | PARTIAL | O código e a configuração local de container existem. Deploy público da API e validação E2E de upload de evidências continuam pendentes. |
-| Testes, segurança e qualidade | Resultados de testes API e Web registrados pela auditoria técnica; testes de autorização e fontes de testes de cliente. | [auditoria técnica](../analise/Auditoria_Final_FieldOps.md), [testes da API](../../api/src/test/java), [testes Web](../../frontend/src) | PARTIAL | API: 180 aprovados, 0 falhas, 0 erros. Suíte Web aprovada. A suíte Mobile segue pendente de validação. |
+| Testes, segurança e qualidade | Resultados de testes API e Web registrados pela auditoria técnica; testes de autorização e fontes de testes de cliente. | [auditoria técnica](auditorias/auditoria-final-fieldops.md), [testes da API](../../api/src/test/java), [testes Web](../../frontend/src) | PARTIAL | API: 180 aprovados, 0 falhas, 0 erros. Suíte Web aprovada. A suíte Mobile segue pendente de validação. |
 | Documentação e processo | READMEs das aplicações, OpenAPI, escopo, auditoria e plano coletivo. | [documentação das aplicações](#documentação-das-aplicações), [documentos relacionados](#documentos-de-avaliação-relacionados) | PARTIAL | Este índice melhora a localizabilidade; os demais documentos de avaliação serão produzidos separadamente. |
-| Demonstração e defesa técnica | Usuários/dados seed, fluxos de usuário implementados e registros de planejamento. | [seed de demonstração](../../api/src/main/java/com/fieldops/config/DemoSeedRunner.java), [plano coletivo](../analise/Plano_100_Pontos_FieldOps_Equipe.md) | PENDING_VALIDATION | Um roteiro E2E completo e uma demonstração registrada ainda não estão disponíveis. |
+| Demonstração e defesa técnica | Usuários/dados seed, fluxos de usuário implementados e registros de planejamento. | [seed de demonstração](../../api/src/main/java/com/fieldops/config/DemoSeedRunner.java), [plano coletivo](plano-100-pontos-equipe.md) | PENDING_VALIDATION | Um roteiro E2E completo e uma demonstração registrada ainda não estão disponíveis. |
 
 ## Documentação das aplicações
 
@@ -28,7 +28,7 @@ Este diretório organiza as evidências de avaliação do FieldOps. Ele não sub
 | API | [api/README.md](../../api/README.md) | [Docker Compose](../../api/docker-compose.yml), [Dockerfile](../../api/Dockerfile), [configuração Render](../../render.yaml) | READY |
 | Interface administrativa Web | [frontend/README.md](../../frontend/README.md) | [rotas](../../frontend/src/routes/AppRoutes.tsx), [manifesto de pacotes](../../frontend/package.json) | READY |
 | Aplicativo Mobile | [mobile/README.md](../../mobile/README.md) | [configuração Expo](../../mobile/app.json), [configuração EAS](../../mobile/eas.json), [manifesto de pacotes](../../mobile/package.json) | PARTIAL |
-| Visão geral do repositório | [README raiz](../../README.md) | [escopo oficial](../analise/FieldOps.md) | READY |
+| Visão geral do repositório | [README raiz](../../README.md) | [escopo oficial](../requisitos/fieldops-requisitos-rubrica.md) | READY |
 
 ## Evidências da API
 
@@ -45,7 +45,7 @@ Este diretório organiza as evidências de avaliação do FieldOps. Ele não sub
 | OpenAPI | Configuração OpenAPI e instruções de execução da API. | [OpenApiConfig](../../api/src/main/java/com/fieldops/config/OpenApiConfig.java), [README da API](../../api/README.md) | READY | A disponibilidade pública depende de validação do deploy. |
 | Docker/container | Dockerfile da API, stack Compose e manifesto Render. | [Dockerfile](../../api/Dockerfile), [docker-compose.yml](../../api/docker-compose.yml), [render.yaml](../../render.yaml) | PARTIAL | A configuração existe; a demonstração pública da API/container continua pendente de validação. |
 | Seed/usuários de demonstração | Bootstrap de usuários de desenvolvimento e dados de inspeção de demonstração. | [DevUsersBootstrapRunner](../../api/src/main/java/com/fieldops/config/DevUsersBootstrapRunner.java), [DemoSeedRunner](../../api/src/main/java/com/fieldops/config/DemoSeedRunner.java) | READY | Consulte o README da API para o ambiente de demonstração controlado. |
-| Testes automatizados da API | Execução Maven registrada pela auditoria e árvore de testes. | [auditoria técnica](../analise/Auditoria_Final_FieldOps.md), [testes da API](../../api/src/test/java) | READY | A auditoria registra 180 testes aprovados, 0 falhas e 0 erros. |
+| Testes automatizados da API | Execução Maven registrada pela auditoria e árvore de testes. | [auditoria técnica](auditorias/auditoria-final-fieldops.md), [testes da API](../../api/src/test/java) | READY | A auditoria registra 180 testes aprovados, 0 falhas e 0 erros. |
 
 ## Evidências Web
 
@@ -59,7 +59,7 @@ Este diretório organiza as evidências de avaliação do FieldOps. Ele não sub
 | Aprovação/reprovação | Página de revisão e evidência de revisão na API. | [InspectionReviewPage](../../frontend/src/pages/inspections/InspectionReviewPage.tsx), [ReviewInspectionControllerTest](../../api/src/test/java/com/fieldops/inspection/controller/ReviewInspectionControllerTest.java) | READY | A demonstração completa do fluxo de usuário continua pendente de validação. |
 | Auditoria | Página de auditoria, componente de timeline e testes. | [AuditPage](../../frontend/src/pages/audit/AuditPage.tsx), [AuditTimeline](../../frontend/src/components/inspections/AuditTimeline.tsx) | READY | |
 | Dashboard | Página de dashboard e testes. | [DashboardPage](../../frontend/src/pages/dashboard/DashboardPage.tsx), [testes de DashboardPage](../../frontend/src/pages/dashboard/DashboardPage.test.tsx) | READY | |
-| Testes e build Web | Fontes de teste e scripts do frontend. | [testes Web](../../frontend/src), [package.json](../../frontend/package.json), [auditoria técnica](../analise/Auditoria_Final_FieldOps.md) | READY | A auditoria registra uma suíte Web aprovada. Uma URL Web pública ainda está pendente de validação. |
+| Testes e build Web | Fontes de teste e scripts do frontend. | [testes Web](../../frontend/src), [package.json](../../frontend/package.json), [auditoria técnica](auditorias/auditoria-final-fieldops.md) | READY | A auditoria registra uma suíte Web aprovada. Uma URL Web pública ainda está pendente de validação. |
 
 ## Evidências Mobile
 
@@ -102,8 +102,8 @@ Esta seção diferencia presença de código de validação E2E. Nenhuma linha m
 
 | Área | Resultado registrado | Evidência | Status | Observações |
 |---|---|---|---|---|
-| API | 180 testes aprovados; 0 falhas; 0 erros. | [auditoria técnica](../analise/Auditoria_Final_FieldOps.md), [fontes de teste](../../api/src/test/java) | READY | Resultado registrado pela auditoria técnica em 20/10/2026. |
-| Web | Suíte de testes aprovada. | [auditoria técnica](../analise/Auditoria_Final_FieldOps.md), [fontes de teste](../../frontend/src) | READY | A auditoria registra código de saída 0 para o comando de testes Web. |
+| API | 180 testes aprovados; 0 falhas; 0 erros. | [auditoria técnica](auditorias/auditoria-final-fieldops.md), [fontes de teste](../../api/src/test/java) | READY | Resultado registrado pela auditoria técnica em 20/10/2026. |
+| Web | Suíte de testes aprovada. | [auditoria técnica](auditorias/auditoria-final-fieldops.md), [fontes de teste](../../frontend/src) | READY | A auditoria registra código de saída 0 para o comando de testes Web. |
 | Mobile | Não há resultado de suíte reproduzível registrado. | [fontes de teste](../../mobile/src) | PENDING_VALIDATION | A auditoria anterior não conseguiu iniciar o Jest local; não infira uma execução aprovada. |
 | Segurança e dependências | Há fontes/testes de autorização no servidor; auditoria atual de dependências não foi registrada. | [SecurityConfig](../../api/src/main/java/com/fieldops/config/SecurityConfig.java), [teste de autorização](../../api/src/test/java/com/fieldops/shared/security/RoleAuthorizationTest.java) | PARTIAL | Ainda é necessária uma verificação atual de vulnerabilidades de dependências. |
 | Build/release | Scripts Docker/EAS/Web estão no código-fonte. | [configuração Docker da API](../../api/Dockerfile), [configuração EAS](../../mobile/eas.json), [scripts Web](../../frontend/package.json) | PENDING_VALIDATION | Configuração de build não prova painel Web publicado nem APK instalado. |
@@ -134,8 +134,8 @@ O merge não representa automaticamente autoria de implementação. A avaliaçã
 
 ## Documentos de avaliação relacionados
 
-- [Escopo e rubrica oficiais do FieldOps](../analise/FieldOps.md)
-- [Auditoria técnica final](../analise/Auditoria_Final_FieldOps.md)
-- [Plano coletivo de conclusão](../analise/Plano_100_Pontos_FieldOps_Equipe.md)
-- [Auditoria diagnóstica da IA do professor](../analise/Auditoria_da_IA_do_professor.md)
+- [Escopo e rubrica oficiais do FieldOps](../requisitos/fieldops-requisitos-rubrica.md)
+- [Auditoria técnica final](auditorias/auditoria-final-fieldops.md)
+- [Plano coletivo de conclusão](plano-100-pontos-equipe.md)
+- [Auditoria diagnóstica da IA do professor](auditorias/auditoria-ia-professor.md)
 

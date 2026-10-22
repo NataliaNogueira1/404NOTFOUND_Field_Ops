@@ -20,7 +20,7 @@ Este registro contém somente execuções comprovadas pelas auditorias e verific
 
 | Comando | Status | Resultado | Evidência/observação |
 |---|---|---|---|
-| cd api; .\mvnw.cmd test | PASS | 180 testes; 0 failures; 0 errors; 0 ignorados. | Execução registrada em [Auditoria_Final_FieldOps.md](../analise/Auditoria_Final_FieldOps.md). |
+| cd api; .\mvnw.cmd test | PASS | 180 testes; 0 failures; 0 errors; 0 ignorados. | Execução registrada em [Auditoria_Final_FieldOps.md](auditorias/auditoria-final-fieldops.md). |
 
 O resultado acima cobre a execução automatizada registrada. Ele não deve ser confundido com validação Mobile, deploy público ou demonstração E2E.
 
