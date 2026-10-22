@@ -25,6 +25,9 @@ const nodeProject = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // The node project has no Expo runtime — mock the native SecureStore module
+    // so tokenStorage (imported transitively via EvidenceUploadClient) loads.
+    '^expo-secure-store$': '<rootDir>/jest/__mocks__/expo-secure-store.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],

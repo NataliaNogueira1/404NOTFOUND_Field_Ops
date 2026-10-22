@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
 
 /**
  * Isolated client for uploading an evidence file to the server (PBI-044, RN-078).
@@ -34,6 +35,12 @@ export class EvidenceUploadClient {
       throw new Error('Evidence has no local file to upload.');
     }
 
+    // Prefer the freshest token from storage: the apiClient interceptor may have
+    // renewed the access token (via /auth/refresh) during the same sync cycle
+    // after a 401 on the batch push. The token parameter captured when the sync
+    // started could be stale by the time the evidence upload runs.
+    const freshToken = (await tokenStorage.getAccessToken()) ?? token;
+
     const form = new FormData();
     form.append('itemId', input.itemId);
     if (input.description) form.append('description', input.description);
@@ -52,7 +59,7 @@ export class EvidenceUploadClient {
       {
         method: 'POST',
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
           // NOTE: do not set Content-Type; the platform sets the multipart boundary.
           ...(Platform.OS === 'web' ? {} : {}),
         },
