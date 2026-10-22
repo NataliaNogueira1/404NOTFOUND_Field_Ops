@@ -1,4 +1,4 @@
-import { Eye } from 'lucide-react'
+import { Eye, ImageOff, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '@/api/client'
 import {
@@ -7,6 +7,7 @@ import {
   nonConformitiesApi,
 } from '@/api/nonConformities'
 import { SeverityBadge } from '@/components/badges/Badge'
+import { Lightbox, PhotoThumbnails } from '@/components/feedback/Lightbox'
 import { Modal } from '@/components/feedback/Modal'
 import { Select } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
+import { useNonConformityEvidences } from '@/hooks/useNonConformityEvidences'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
 import { Severity } from '@/types/domain'
 
@@ -176,10 +178,53 @@ export function NonConformitiesPage() {
                 <Detail label="Resolvida em" value={formatInstant(selected.closedAt)} />
               )}
             </dl>
+            <NonConformityEvidences nonConformity={selected} />
           </div>
         )}
       </Modal>
     </div>
+  )
+}
+
+/**
+ * Equipment photos linked to the non-conformity, shown to supervisor/admin in
+ * the NC detail modal (PBI-255). Reuses the shared PhotoThumbnails + Lightbox and
+ * the authenticated evidence download, so no capture/upload is recreated here.
+ */
+function NonConformityEvidences({ nonConformity }: { nonConformity: NonConformityListItem }) {
+  const { state, lightboxPhotos, openIndex, reload, openPhoto, closePhoto } = useNonConformityEvidences({
+    inspectionId: nonConformity.inspectionId,
+    inspectionItemSnapshotId: nonConformity.inspectionItemSnapshotId,
+  })
+
+  return (
+    <section aria-label="Evidencias fotograficas" className="border-t border-border pt-3">
+      <h3 className="mb-2 text-sm font-semibold text-text">Evidencias fotograficas</h3>
+      {state.status === 'loading' && (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted">
+          <Loader2 className="animate-spin" size={16} aria-hidden />
+          Carregando fotos...
+        </p>
+      )}
+      {state.status === 'empty' && (
+        <p className="flex items-center gap-2 text-sm text-muted">
+          <ImageOff size={16} aria-hidden />
+          Sem fotos para esta nao conformidade.
+        </p>
+      )}
+      {state.status === 'error' && (
+        <ErrorState
+          message="Nao foi possivel carregar as fotos desta nao conformidade."
+          onRetry={reload}
+        />
+      )}
+      {state.status === 'ready' && (
+        <>
+          <PhotoThumbnails photos={state.photos} onOpen={openPhoto} />
+          <Lightbox photos={lightboxPhotos} initialIndex={openIndex} onClose={closePhoto} />
+        </>
+      )}
+    </section>
   )
 }
 
