@@ -1,4 +1,5 @@
-import { Platform } from 'react-native';
+import { File, UploadType } from 'expo-file-system';
+
 import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
 
 /**
@@ -6,6 +7,13 @@ import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
  *
  * The server endpoint persists the binary and metadata idempotently. The outbox
  * supplies a stable UUID so retries remain safe after connectivity failures.
+ *
+ * Why `File.upload` instead of `fetch` + `FormData` (Expo SDK 57 / RN 0.86 new
+ * architecture): the new-architecture `FormData` rejects the React Native file
+ * part shape (`{ uri, name, type }`) at runtime with
+ * "Unsupported FormDataPart implementation". `expo-file-system`'s native
+ * multipart upload reads the file directly from disk and builds the
+ * multipart/form-data body on the native side, so the binary part is valid.
  */
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
@@ -41,39 +49,43 @@ export class EvidenceUploadClient {
     // started could be stale by the time the evidence upload runs.
     const freshToken = (await tokenStorage.getAccessToken()) ?? token;
 
-    const form = new FormData();
-    form.append('itemId', input.itemId);
-    if (input.description) form.append('description', input.description);
-    if (input.mimeType) form.append('mimeType', input.mimeType);
-    form.append('capturedAtDevice', input.capturedAtDevice);
-    form.append('operationId', input.operationId);
-    // React Native FormData file shape.
-    form.append('file', {
-      uri: input.localUri,
-      name: input.localUri.split('/').pop() ?? 'evidence.jpg',
-      type: input.mimeType ?? 'image/jpeg',
-    } as unknown as Blob);
+    const url = `${BASE_URL}/api/v1/inspections/${input.inspectionId}/evidence`;
 
-    const response = await fetch(
-      `${BASE_URL}/api/v1/inspections/${input.inspectionId}/evidence`,
-      {
-        method: 'POST',
-        headers: {
-          ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
-          // NOTE: do not set Content-Type; the platform sets the multipart boundary.
-          ...(Platform.OS === 'web' ? {} : {}),
-        },
-        body: form,
-      },
-    );
+    // Non-file multipart parts (the backend EvidenceUploadRequest fields). The
+    // binary `file` part is added by expo-file-system from the File reference.
+    const parameters: Record<string, string> = {
+      itemId: input.itemId,
+      capturedAtDevice: input.capturedAtDevice,
+      operationId: input.operationId,
+    };
+    if (input.description) parameters.description = input.description;
+    if (input.mimeType) parameters.mimeType = input.mimeType;
 
-    if (!response.ok) {
-      const message = await response.text().catch(() => response.statusText);
-      throw new Error(`Upload falhou (API ${response.status}): ${message}`);
+    const file = new File(input.localUri);
+    const result = await file.upload(url, {
+      uploadType: UploadType.MULTIPART,
+      // Must match @RequestPart("file") on EvidenceUploadController.
+      fieldName: 'file',
+      mimeType: input.mimeType ?? 'image/jpeg',
+      parameters,
+      headers: freshToken ? { Authorization: `Bearer ${freshToken}` } : {},
+    });
+
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`Upload falhou (API ${result.status}): ${result.body}`);
     }
 
-    const data = (await response.json().catch(() => ({}))) as { id?: number; checksum?: string };
+    const data = parseResponse(result.body);
     return { status: 'APPLIED', storageKey: data.checksum ?? String(data.id ?? '') };
+  }
+}
+
+/** Parse the EvidenceUploadResponse JSON body, tolerating an empty/invalid body. */
+function parseResponse(body: string): { id?: number; checksum?: string } {
+  try {
+    return JSON.parse(body) as { id?: number; checksum?: string };
+  } catch {
+    return {};
   }
 }
 
