@@ -3,11 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError } from '@/api/client'
 import { ClientStatus, type ClientInput, type ManagedClient, clientsApi } from '@/api/clients'
-import { sitesApi } from '@/api/sites'
+import { InspectionSiteStatus, type InspectionSiteInput, type ManagedInspectionSite, sitesApi } from '@/api/sites'
 import { ActiveBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
-import { Select } from '@/components/forms/Fields'
+import { Select, Textarea } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
+import { LoadingState } from '@/components/ui/LoadingState'
 import { byId, clients as seedClients, equipment as seedEquipment, sites as seedSites } from '@/mocks/domain'
 import type { Client, Equipment, Site } from '@/types/domain'
 
@@ -337,67 +338,108 @@ function clientError(cause: unknown, fallback: string) {
 export function ClientDetailsPage() {
   const navigate = useNavigate()
   const { clientId = '' } = useParams()
-  const source = byId(seedClients, clientId) ?? seedClients[0]
-  const [client, setClient] = useState<Client>(source)
   const [managedClient, setManagedClient] = useState<ManagedClient | null>(null)
-  const [sites, setSites] = useState(seedSites)
-  const [editingClient, setEditingClient] = useState<Client | null>(null)
-  const [editingSite, setEditingSite] = useState<Site | null>(null)
-  const [toast, setToast] = useState(false)
-  const clientSites = useMemo(() => sites.filter((site) => site.clientId === client.id), [sites, client.id])
+  const [sites, setSites] = useState<ManagedInspectionSite[]>([])
+  const [loadingClient, setLoadingClient] = useState(true)
+  const [loadingSites, setLoadingSites] = useState(true)
+  const [clientError, setClientError] = useState('')
+  const [notFound, setNotFound] = useState(false)
+  const [editingClient, setEditingClient] = useState<ManagedClient | null>(null)
+  const [editingSite, setEditingSite] = useState<ManagedInspectionSite | 'new' | null>(null)
+  const [changingSiteStatus, setChangingSiteStatus] = useState<ManagedInspectionSite | null>(null)
+  const [toast, setToast] = useState('')
 
-  useEffect(() => {
-    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(clientId)) return
-    void clientsApi
-      .get(clientId)
-      .then((result) => {
-        setManagedClient(result)
-        setClient({
-          id: result.id,
-          name: result.name,
-          document: result.document,
-          email: result.email,
-          active: result.status === ClientStatus.ACTIVE,
-          siteIds: [],
-        })
-      })
-      .catch(() => {
-        /* Keep the fallback view when the client cannot be loaded. */
-      })
+  const loadClient = useCallback(async () => {
+    setLoadingClient(true)
+    setClientError('')
+    setNotFound(false)
+    try {
+      const result = await clientsApi.get(clientId)
+      setManagedClient(result)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) {
+        setNotFound(true)
+      } else {
+        setClientError('Não foi possível carregar os dados do cliente.')
+      }
+    } finally {
+      setLoadingClient(false)
+    }
   }, [clientId])
 
-  function saveClient(next: Client) {
-    setClient(next)
+  const loadSites = useCallback(async () => {
+    setLoadingSites(true)
+    try {
+      const result = await sitesApi.listByClient(clientId)
+      setSites(result)
+    } catch {
+      /* mantém lista vazia em caso de erro */
+    } finally {
+      setLoadingSites(false)
+    }
+  }, [clientId])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void loadClient()
+      void loadSites()
+    }, 0)
+    return () => window.clearTimeout(t)
+  }, [loadClient, loadSites])
+
+  async function saveClientEdit(input: ClientInput) {
+    if (!editingClient) return
+    await clientsApi.update(editingClient.id, input)
     setEditingClient(null)
-    showToast(setToast)
+    showDetailToast('Cliente atualizado com sucesso.', setToast)
+    await loadClient()
   }
 
-  function saveSite(site: Site) {
-    setSites((current) =>
-      current.some((item) => item.id === site.id)
-        ? current.map((item) => (item.id === site.id ? site : item))
-        : [site, ...current],
-    )
+  async function saveSite(input: InspectionSiteInput) {
+    if (!editingSite) return
+    const creating = editingSite === 'new'
+    if (creating) await sitesApi.create(input)
+    else await sitesApi.update(editingSite.id, input)
     setEditingSite(null)
-    showToast(setToast)
+    showDetailToast(creating ? 'Local criado com sucesso.' : 'Local atualizado com sucesso.', setToast)
+    await loadSites()
   }
 
-  const siteColumns: Column<Site>[] = [
+  async function changeSiteStatus() {
+    if (!changingSiteStatus) return
+    const next =
+      changingSiteStatus.status === InspectionSiteStatus.ACTIVE
+        ? InspectionSiteStatus.INACTIVE
+        : InspectionSiteStatus.ACTIVE
+    try {
+      await sitesApi.updateStatus(changingSiteStatus.id, next)
+      setChangingSiteStatus(null)
+      showDetailToast(
+        next === InspectionSiteStatus.ACTIVE ? 'Local ativado com sucesso.' : 'Local inativado com sucesso.',
+        setToast,
+      )
+      await loadSites()
+    } catch {
+      setChangingSiteStatus(null)
+    }
+  }
+
+  const siteColumns: Column<ManagedInspectionSite>[] = [
     {
       header: 'Local',
       cell: (site) => (
         <button
           className="text-left font-medium text-primary"
-          onClick={() => navigate(`/app/clients/${client.id}/sites/${site.id}`)}
+          onClick={() => navigate(`/app/clients/${clientId}/sites/${site.id}`)}
         >
           {site.name}
         </button>
       ),
     },
-    { header: 'Cidade / UF', cell: (site) => `${site.city} / ${site.state}` },
-    { header: 'Contato', cell: (site) => site.contact },
-    { header: 'Equipamentos', cell: (site) => seedEquipment.filter((item) => item.siteId === site.id).length },
-    { header: 'Status', cell: (site) => <ActiveBadge active={site.active} /> },
+    { header: 'Cidade / UF', cell: (site) => [site.city, site.state].filter(Boolean).join(' / ') || '-' },
+    { header: 'Contato', cell: (site) => site.contactName || site.contactPhone || '-' },
+    { header: 'Equipamentos', cell: (site) => site.equipmentCount },
+    { header: 'Status', cell: (site) => <ActiveBadge active={site.status === InspectionSiteStatus.ACTIVE} /> },
     {
       header: 'Ações',
       cell: (site) => (
@@ -405,22 +447,24 @@ export function ClientDetailsPage() {
           <Button
             variant="ghost"
             className="h-8 px-2"
-            onClick={() => navigate(`/app/clients/${client.id}/sites/${site.id}`)}
+            onClick={() => navigate(`/app/clients/${clientId}/sites/${site.id}`)}
           >
             <Eye size={16} />
             Abrir
           </Button>
-          <Button variant="ghost" className="h-8 px-2" onClick={() => setEditingSite(site)}>
+          <Button
+            aria-label={`Editar ${site.name}`}
+            variant="ghost"
+            className="h-8 px-2"
+            onClick={() => setEditingSite(site)}
+          >
             <Pencil size={16} />
           </Button>
           <Button
+            aria-label={`${site.status === InspectionSiteStatus.ACTIVE ? 'Inativar' : 'Ativar'} ${site.name}`}
             variant="ghost"
             className="h-8 px-2"
-            onClick={() =>
-              setSites((current) =>
-                current.map((item) => (item.id === site.id ? { ...item, active: !item.active } : item)),
-              )
-            }
+            onClick={() => setChangingSiteStatus(site)}
           >
             <Power size={16} />
           </Button>
@@ -428,6 +472,34 @@ export function ClientDetailsPage() {
       ),
     },
   ]
+
+  if (loadingClient) return <LoadingState label="Carregando dados do cliente..." />
+
+  if (notFound) {
+    return (
+      <div className="space-y-6">
+        <Link className="inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/clients">
+          <ArrowLeft size={16} />
+          Clientes
+        </Link>
+        <ErrorState message="Cliente não encontrado. Ele pode ter sido removido ou o endereço está incorreto." />
+      </div>
+    )
+  }
+
+  if (clientError) {
+    return (
+      <div className="space-y-6">
+        <Link className="inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/clients">
+          <ArrowLeft size={16} />
+          Clientes
+        </Link>
+        <ErrorState message={clientError} onRetry={() => void loadClient()} />
+      </div>
+    )
+  }
+
+  if (!managedClient) return null
 
   return (
     <div className="space-y-6">
@@ -437,10 +509,10 @@ export function ClientDetailsPage() {
           Clientes
         </Link>
         <PageHeader
-          title={client.name}
+          title={managedClient.name}
           description="Estrutura de cadastro do cliente: dados gerais, locais e equipamentos vinculados."
           action={
-            <Button variant="secondary" onClick={() => setEditingClient(client)}>
+            <Button variant="secondary" onClick={() => setEditingClient(managedClient)}>
               <Pencil size={17} />
               Editar cliente
             </Button>
@@ -454,12 +526,12 @@ export function ClientDetailsPage() {
             <h2 className="text-base font-semibold">Dados do cliente</h2>
           </div>
           <dl className="grid gap-4 sm:grid-cols-2">
-            <Info label="Nome" value={client.name} />
-            <Info label="Razão social" value={managedClient?.legalName} />
-            <Info label="Documento" value={client.document} />
-            <Info label="E-mail" value={client.email} />
-            <Info label="Telefone" value={managedClient?.phone} />
-            <Info label="Status" value={client.active ? 'Ativo' : 'Inativo'} />
+            <Info label="Nome" value={managedClient.name} />
+            <Info label="Razão social" value={managedClient.legalName} />
+            <Info label="Documento" value={managedClient.document} />
+            <Info label="E-mail" value={managedClient.email} />
+            <Info label="Telefone" value={managedClient.phone} />
+            <Info label="Status" value={managedClient.status === ClientStatus.ACTIVE ? 'Ativo' : 'Inativo'} />
           </dl>
         </Card>
         <Card className="p-5">
@@ -468,8 +540,7 @@ export function ClientDetailsPage() {
             <h2 className="text-base font-semibold">Resumo da estrutura</h2>
           </div>
           <div className="grid gap-3">
-            <Summary label="Locais cadastrados" value={managedClient?.activeSitesCount ?? clientSites.length} />
-            <Summary label="Equipamentos vinculados" value={equipmentByClient(client.id).length} />
+            <Summary label="Locais cadastrados" value={managedClient.activeSitesCount} />
           </div>
         </Card>
       </section>
@@ -479,28 +550,46 @@ export function ClientDetailsPage() {
             <h2 className="text-lg font-semibold">Locais</h2>
             <p className="text-sm text-muted">Unidades e pontos de atendimento deste cliente.</p>
           </div>
-          <Button
-            onClick={() =>
-              setEditingSite({
-                id: `site-${Date.now()}`,
-                name: '',
-                clientId: client.id,
-                city: '',
-                state: 'SP',
-                contact: '',
-                active: true,
-              })
-            }
-          >
+          <Button onClick={() => setEditingSite('new')}>
             <Plus size={17} />
             Adicionar local
           </Button>
         </div>
-        <DataTable columns={siteColumns} rows={clientSites} empty="Nenhum local cadastrado para este cliente." />
+        <DataTable
+          columns={siteColumns}
+          rows={sites}
+          loading={loadingSites}
+          loadingLabel="Carregando locais..."
+          empty="Nenhum local cadastrado para este cliente."
+        />
       </section>
-      <ClientModal client={editingClient} onClose={() => setEditingClient(null)} onSave={saveClient} />
-      <SiteModal site={editingSite} clientId={client.id} onClose={() => setEditingSite(null)} onSave={saveSite} />
-      <Toast show={toast} message="Estrutura do cliente salva no protótipo" />
+      <ManagedClientModal
+        key={editingClient?.id ?? 'client-edit-closed'}
+        target={editingClient}
+        onClose={() => setEditingClient(null)}
+        onSave={saveClientEdit}
+      />
+      <InspectionSiteModal
+        key={editingSite === 'new' ? 'new' : (editingSite?.id ?? 'site-closed')}
+        target={editingSite}
+        clientId={clientId}
+        onClose={() => setEditingSite(null)}
+        onSave={saveSite}
+      />
+      <ConfirmDialog
+        open={Boolean(changingSiteStatus)}
+        title={changingSiteStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar local' : 'Ativar local'}
+        description={
+          changingSiteStatus?.status === InspectionSiteStatus.ACTIVE
+            ? `O local ${changingSiteStatus?.name} deixará de aparecer em novas inspeções.`
+            : `O local ${changingSiteStatus?.name} voltará a aparecer em novas inspeções.`
+        }
+        confirmLabel={changingSiteStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar' : 'Ativar'}
+        variant={changingSiteStatus?.status === InspectionSiteStatus.ACTIVE ? 'danger' : 'primary'}
+        onCancel={() => setChangingSiteStatus(null)}
+        onConfirm={() => void changeSiteStatus()}
+      />
+      <Toast show={Boolean(toast)} message={toast} />
     </div>
   )
 }
@@ -674,14 +763,14 @@ export function ClientSiteDetailsPage() {
   )
 }
 
-function equipmentByClient(clientId: string) {
-  const clientSiteIds = seedSites.filter((site) => site.clientId === clientId).map((site) => site.id)
-  return seedEquipment.filter((item) => clientSiteIds.includes(item.siteId))
-}
-
 function showToast(setToast: (show: boolean) => void) {
   setToast(true)
   setTimeout(() => setToast(false), 1800)
+}
+
+function showDetailToast(message: string, setToast: (msg: string) => void) {
+  setToast(message)
+  window.setTimeout(() => setToast(''), 2200)
 }
 
 function Info({ label, value }: { label: string; value?: string }) {
@@ -702,37 +791,107 @@ function Summary({ label, value }: { label: string; value: number }) {
   )
 }
 
-function ClientModal({
-  client,
+const STATES = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
+  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+]
+
+function InspectionSiteModal({
+  target,
+  clientId,
   onClose,
   onSave,
 }: {
-  client: Client | null
+  target: ManagedInspectionSite | 'new' | null
+  clientId: string
   onClose: () => void
-  onSave: (client: Client) => void
+  onSave: (input: InspectionSiteInput) => Promise<void>
 }) {
-  const [draft, setDraft] = useState<Client | null>(client)
-  if (client && draft?.id !== client.id) setDraft(client)
-  if (!draft) return null
-  const error = !draft.name.trim()
-    ? 'Informe o nome do cliente.'
-    : !draft.document.trim()
-      ? 'Informe o documento.'
-      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
-        ? 'Informe um e-mail válido.'
-        : ''
+  const [draft, setDraft] = useState<InspectionSiteInput>(() =>
+    target && target !== 'new'
+      ? {
+          clientId: target.clientId,
+          name: target.name,
+          description: target.description,
+          address: target.address,
+          city: target.city,
+          state: target.state,
+          zipCode: target.zipCode,
+          latitude: target.latitude,
+          longitude: target.longitude,
+          contactName: target.contactName,
+          contactPhone: target.contactPhone,
+        }
+      : {
+          clientId,
+          name: '',
+          description: '',
+          address: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          latitude: null,
+          longitude: null,
+          contactName: '',
+          contactPhone: '',
+        },
+  )
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  if (!target) return null
+
+  const nameError = !draft.name.trim()
+    ? 'Informe o nome do local.'
+    : draft.name.trim().length > 200
+      ? 'Use no máximo 200 caracteres.'
+      : ''
+  const zipError = draft.zipCode && !/^\d{5}-\d{3}$/.test(draft.zipCode) ? 'Use o formato XXXXX-XXX.' : ''
+  const latitudeError =
+    draft.latitude !== null && (draft.latitude < -90 || draft.latitude > 90) ? 'Use um valor entre -90 e 90.' : ''
+  const longitudeError =
+    draft.longitude !== null && (draft.longitude < -180 || draft.longitude > 180)
+      ? 'Use um valor entre -180 e 180.'
+      : ''
+  const formError = nameError || zipError || latitudeError || longitudeError
+
+  async function submit() {
+    if (formError) return
+    setSaving(true)
+    setSubmitError('')
+    try {
+      await onSave({
+        ...draft,
+        name: draft.name.trim(),
+        description: draft.description.trim(),
+        address: draft.address.trim(),
+        city: draft.city.trim(),
+        zipCode: draft.zipCode.trim(),
+        contactName: draft.contactName.trim(),
+        contactPhone: draft.contactPhone.trim(),
+      })
+    } catch (cause) {
+      setSubmitError(
+        cause instanceof ApiError && cause.fieldErrors.length
+          ? cause.fieldErrors.map((e) => e.message).join(' ')
+          : 'Não foi possível salvar o local.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Modal
-      open={Boolean(client)}
-      title="Cliente"
+      open
+      title={target === 'new' ? 'Novo local' : 'Editar local'}
       onClose={onClose}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button disabled={Boolean(error)} onClick={() => onSave(draft)}>
-            Salvar
+          <Button disabled={Boolean(formError) || saving} onClick={() => void submit()}>
+            {saving ? 'Salvando...' : 'Salvar'}
           </Button>
         </>
       }
@@ -740,32 +899,95 @@ function ClientModal({
       <div className="grid gap-4 sm:grid-cols-2">
         <Input
           label="Nome"
-          id="c-name"
+          id="site-form-name"
+          maxLength={200}
           value={draft.name}
+          error={nameError}
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
+        <div className="sm:col-span-2">
+          <Textarea
+            label="Descrição (opcional)"
+            id="site-form-description"
+            value={draft.description}
+            onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+          />
+        </div>
         <Input
-          label="Documento"
-          id="c-doc"
-          value={draft.document}
-          onChange={(event) => setDraft({ ...draft, document: event.target.value })}
+          label="Endereço (opcional)"
+          id="site-form-address"
+          maxLength={255}
+          value={draft.address}
+          onChange={(event) => setDraft({ ...draft, address: event.target.value })}
         />
         <Input
-          label="E-mail"
-          id="c-email"
-          value={draft.email}
-          onChange={(event) => setDraft({ ...draft, email: event.target.value })}
+          label="Cidade (opcional)"
+          id="site-form-city"
+          maxLength={100}
+          value={draft.city}
+          onChange={(event) => setDraft({ ...draft, city: event.target.value })}
         />
         <Select
-          label="Status"
-          id="c-status"
-          value={String(draft.active)}
-          onChange={(event) => setDraft({ ...draft, active: event.target.value === 'true' })}
+          label="Estado (UF)"
+          id="site-form-state"
+          value={draft.state}
+          onChange={(event) => setDraft({ ...draft, state: event.target.value })}
         >
-          <option value="true">Ativo</option>
-          <option value="false">Inativo</option>
+          <option value="">Selecione</option>
+          {STATES.map((st) => (
+            <option key={st}>{st}</option>
+          ))}
         </Select>
-        {error && <p className="text-sm font-medium text-danger sm:col-span-2">{error}</p>}
+        <Input
+          label="CEP (opcional)"
+          id="site-form-zip"
+          placeholder="XXXXX-XXX"
+          maxLength={9}
+          value={draft.zipCode}
+          error={zipError}
+          onChange={(event) => setDraft({ ...draft, zipCode: event.target.value })}
+        />
+        <Input
+          label="Latitude (opcional)"
+          id="site-form-latitude"
+          type="number"
+          step="any"
+          value={draft.latitude ?? ''}
+          error={latitudeError}
+          onChange={(event) =>
+            setDraft({ ...draft, latitude: event.target.value === '' ? null : Number(event.target.value) })
+          }
+        />
+        <Input
+          label="Longitude (opcional)"
+          id="site-form-longitude"
+          type="number"
+          step="any"
+          value={draft.longitude ?? ''}
+          error={longitudeError}
+          onChange={(event) =>
+            setDraft({ ...draft, longitude: event.target.value === '' ? null : Number(event.target.value) })
+          }
+        />
+        <Input
+          label="Contato — nome (opcional)"
+          id="site-form-contact-name"
+          maxLength={100}
+          value={draft.contactName}
+          onChange={(event) => setDraft({ ...draft, contactName: event.target.value })}
+        />
+        <Input
+          label="Contato — telefone (opcional)"
+          id="site-form-contact-phone"
+          maxLength={20}
+          value={draft.contactPhone}
+          onChange={(event) => setDraft({ ...draft, contactPhone: event.target.value })}
+        />
+        {submitError && (
+          <p role="alert" className="text-sm font-medium text-danger sm:col-span-2">
+            {submitError}
+          </p>
+        )}
       </div>
     </Modal>
   )
