@@ -9,6 +9,8 @@ import { authSession, roleHome } from '@/auth/session'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useRotatingIndex } from '@/hooks/useRotatingIndex'
+import { LOGIN_PHRASES, LOGIN_PHRASE_INTERVAL_MS } from '@/pages/auth/loginPhrases'
 import fieldOpsLogo from '@/assets/fieldops-logo.png'
 
 const loginSchema = z.object({
@@ -57,9 +59,7 @@ export function LoginPage() {
           className="mx-auto mb-3 h-14 w-14 rounded-card shadow-fieldops sm:mb-4"
         />
         <h1 className="text-2xl font-semibold text-primary">FieldOps</h1>
-        <p className="mx-auto mt-2 max-w-xs text-sm text-muted sm:mt-3">
-          Transforme inspeções de campo em decisões confiáveis
-        </p>
+        <RotatingTagline />
       </div>
       <div className="mb-6 grid grid-cols-3 gap-2">
         <Button variant="secondary" className="px-2" onClick={() => fillProfile('ana@fieldops.com')}>
@@ -104,5 +104,25 @@ export function LoginPage() {
         </Button>
       </form>
     </Card>
+  )
+}
+
+/**
+ * Motivational tagline that rotates every few seconds with a smooth CSS
+ * cross-fade (PBI-274). The timing lives in useRotatingIndex (interval cleaned
+ * up on unmount); this component fades the text out and back in whenever the
+ * active phrase changes. The phrase list is centralized in loginPhrases.ts.
+ */
+function RotatingTagline() {
+  const index = useRotatingIndex(LOGIN_PHRASES.length, LOGIN_PHRASE_INTERVAL_MS)
+
+  return (
+    <p aria-live="polite" className="mx-auto mt-2 max-w-xs text-sm text-muted sm:mt-3">
+      {/* Keyed span so each phrase change remounts the node and replays the
+          CSS fade-in, giving a soft transition without JS opacity state. */}
+      <span key={index} className="animate-fade-in inline-block">
+        {LOGIN_PHRASES[index]}
+      </span>
+    </p>
   )
 }
