@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { ApiError } from '@/api/client'
 import { authSession, roleHome } from '@/auth/session'
@@ -95,9 +95,12 @@ export function LoginPage() {
           </p>
         )}
         <div className="flex justify-end">
-          <button type="button" className="focus-ring rounded text-sm font-medium text-primary hover:text-primary-dark">
+          <Link
+            to="/forgot-password"
+            className="focus-ring rounded text-sm font-medium text-primary hover:text-primary-dark"
+          >
             Esqueci a senha
-          </button>
+          </Link>
         </div>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando...' : 'Entrar'} <ArrowRight size={17} />
