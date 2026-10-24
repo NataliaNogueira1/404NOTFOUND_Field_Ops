@@ -53,6 +53,12 @@ interface FieldOpsContextValue {
   resetSession: () => void;
   isSyncing: boolean;
   lastSyncError: string | null;
+  // True while a single-inspection refresh (refreshInspection) is in flight.
+  isRefreshingInspection: boolean;
+  // Non-null when the last refreshInspection failed. Offline-first: the screen
+  // still renders from the local cache, but this lets the UI surface a warning
+  // so the technician knows the data may be stale.
+  refreshInspectionError: string | null;
 }
 
 // Downloads the technician's inspections from the API into SQLite. Failures are
@@ -110,6 +116,8 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   const [syncOperations, setSyncOperations] = useState<SyncOperation[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
+  const [isRefreshingInspection, setIsRefreshingInspection] = useState(false);
+  const [refreshInspectionError, setRefreshInspectionError] = useState<string | null>(null);
 
   // Keep inspectionsRef in sync with state
   useEffect(() => { inspectionsRef.current = inspections; }, [inspections]);
@@ -461,14 +469,25 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   // a pull failure (network/404/403) is swallowed so the local cache stays usable
   // and never blocks the UI; the SQLite upsert is server-authoritative and keeps
   // the technician's pending child rows (RN-077). Re-hydrates the UI from SQLite.
+  // Exposes isRefreshingInspection/refreshInspectionError so the screen can show a
+  // discreet "updating" / "failed to update, showing cached data" hint.
   const refreshInspection = useCallback(async (inspectionId: string) => {
     const sync = getSyncService();
     if (!sync || !token) return;
+    setIsRefreshingInspection(true);
+    setRefreshInspectionError(null);
     try {
       await sync.pullInspection(token, inspectionId);
       await loadFromDb();
     } catch (error) {
+      // Still offline-first: the error is not re-thrown, so the screen keeps
+      // rendering from the local cache. We only record it so the UI can warn.
       console.warn('[FieldOps] Refresh inspection failed:', error);
+      setRefreshInspectionError(
+        error instanceof Error ? error.message : 'Falha ao atualizar a inspeção',
+      );
+    } finally {
+      setIsRefreshingInspection(false);
     }
   }, [getSyncService, token, loadFromDb]);
 
@@ -559,11 +578,14 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       resetSession,
       isSyncing,
       lastSyncError,
+      isRefreshingInspection,
+      refreshInspectionError,
     }),
     [
       inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
       concludeInspection, reopenForCorrection, refreshInspection, syncNow, resetSession, isSyncing, lastSyncError,
+      isRefreshingInspection, refreshInspectionError,
     ],
   );
 
