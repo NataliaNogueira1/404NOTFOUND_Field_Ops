@@ -14,7 +14,7 @@ Progresso conservador de P0, por PBIs: **64 DONE, 6 PARTIAL, 1 NOT_IMPLEMENTED, 
 
 | Fonte | Uso | Limitação |
 |---|---|---|
-| `docs/analise/FieldOps.md` | Fonte primária: escopo, PBIs 001–082, RN, critérios de aceite e DoD. | Documento contém uma repetição do modelo de dados e imagens embutidas; não altera a interpretação do backlog. |
+| `docs/requisitos/fieldops-requisitos-rubrica.md` | Fonte primária: escopo, PBIs 001–082, RN, critérios de aceite e DoD. | Documento contém uma repetição do modelo de dados e imagens embutidas; não altera a interpretação do backlog. |
 | Código atual (`api`, `frontend`, `mobile`) | Fonte de verdade da implementação: controllers, services, migrations, APIs, telas, SQLite/sync e testes. | Não houve execução de aplicativo em dispositivo físico. |
 | `Análise_Integração.md`, `Análise_Integração_FieldOps.md`, `Análise_PBI_PBI_Backend_Frontend_Web.md` | Hipóteses e histórico, sempre revalidados. | Têm conclusões superadas pelo código atual. |
 | Git, `git status`, `git log --oneline --decorate -30` | Confirmação de revisão atual. | Os quatro documentos em `docs/analise/` já estavam não rastreados. |
