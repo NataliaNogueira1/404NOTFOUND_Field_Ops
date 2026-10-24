@@ -118,6 +118,13 @@ export class SyncQueueRepository {
    * the direct entity_id for inspection ops. Used to reconcile the per-inspection
    * pendingSyncCount against the real outbox after a sync, so the home counter
    * never stays stuck on a value that no longer matches the queue.
+   *
+   * Counts the SAME statuses as {@link countPending} ('pending', 'error') so the
+   * inspection card agrees with the sync screen's pending count. A 'conflict' is
+   * a terminal state awaiting the technician's resolution, surfaced separately on
+   * the sync screen — it must NOT make the card read "pending upload", otherwise
+   * the two indicators disagree (card: pending; sync screen: 0 pending + N
+   * conflicts). 'in_progress' is transient during an active sync, not a backlog.
    */
   async countPendingByInspection(): Promise<Map<string, number>> {
     const rows = await this.db.getAllAsync<{ owning_inspection_id: string; count: number }>(
@@ -127,7 +134,7 @@ export class SyncQueueRepository {
          LEFT JOIN answers a          ON q.entity_type = 'answer'          AND q.entity_id = a.id
          LEFT JOIN evidences e        ON q.entity_type = 'evidence'        AND q.entity_id = e.id
          LEFT JOIN non_conformities n ON q.entity_type = 'non_conformity'  AND q.entity_id = n.id
-        WHERE q.status IN ('pending', 'error', 'in_progress', 'conflict')
+        WHERE q.status IN ('pending', 'error')
         GROUP BY owning_inspection_id`,
     );
     const counts = new Map<string, number>();

@@ -87,6 +87,25 @@ describe('pending-sync reconciliation against the real outbox', () => {
     expect(saved?.syncStatus).toBe('pending');
   });
 
+  it('does NOT count a version-conflict operation as pending (matches the sync screen)', async () => {
+    // A conclusion transition rejected by optimistic version control (PBI-055)
+    // sits in the queue as 'conflict'. The sync screen surfaces it as a separate
+    // "conflito de versão", NOT as a pending op — so the inspection card must not
+    // read "pending upload" because of it.
+    await queueRepo.enqueue('op-conflict', 'TRANSITION', 'inspection', INSPECTION_ID, {
+      status: 'SUBMITTED',
+    });
+    await queueRepo.markConflict('op-conflict', 'Inspection version conflict: local=0, server=1');
+
+    const counts = await queueRepo.countPendingByInspection();
+    expect(counts.get(INSPECTION_ID)).toBeUndefined();
+
+    await inspectionRepo.setSyncState(INSPECTION_ID, counts.get(INSPECTION_ID) ?? 0);
+    const saved = await inspectionRepo.getById(INSPECTION_ID);
+    expect(saved?.pendingSyncCount).toBe(0);
+    expect(saved?.syncStatus).toBe('synced');
+  });
+
   it('resolves a queued answer back to its owning inspection via join', async () => {
     // Seed the section/item the answer FK-references, then an answer row + its
     // queued upsert op (entity_id points at the answer, not the inspection) must
