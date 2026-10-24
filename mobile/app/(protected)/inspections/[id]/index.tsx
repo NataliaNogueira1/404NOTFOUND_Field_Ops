@@ -7,6 +7,7 @@ import {
   InspectionStatusBadge,
   PriorityBadge,
   ProgressBar,
+  ReadOnlyBanner,
   RejectionBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
@@ -99,6 +100,12 @@ export default function InspectionDetailsScreen() {
             rejectedAt={inspection.rejectedAt}
             items={inspectionNCs.map((nc) => nc.title)}
           />
+        ) : null}
+
+        {(inspection.status === InspectionStatus.SUBMITTED ||
+          inspection.status === InspectionStatus.UNDER_REVIEW ||
+          inspection.status === InspectionStatus.APPROVED) ? (
+          <ReadOnlyBanner status={inspection.status} />
         ) : null}
 
         <Card style={styles.card}>
