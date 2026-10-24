@@ -21,8 +21,16 @@ export default function InspectionDetailsScreen() {
   const router = useRouter();
   const db = useDatabase();
   const c = useThemeColors();
-  const { inspections, answers, evidences, nonConformities, reopenForCorrection, refreshInspection } =
-    useFieldOps();
+  const {
+    inspections,
+    answers,
+    evidences,
+    nonConformities,
+    reopenForCorrection,
+    refreshInspection,
+    isRefreshingInspection,
+    refreshInspectionError,
+  } = useFieldOps();
 
   // Detail screen must resolve the exact inspection from the route param.
   const inspection = inspections.find((item) => item.id === id);
@@ -101,6 +109,17 @@ export default function InspectionDetailsScreen() {
           <PriorityBadge priority={inspection.priority} />
           <InspectionStatusBadge status={inspection.status} />
         </View>
+
+        {/* Feedback do refresh por id. Offline-first: mesmo em erro a tela segue
+            renderizando do cache local; o aviso só informa que os dados podem
+            estar desatualizados. */}
+        {isRefreshingInspection ? (
+          <Text style={[styles.refreshHint, { color: c.textSecondary }]}>Atualizando…</Text>
+        ) : refreshInspectionError ? (
+          <Text style={[styles.refreshHint, styles.refreshError]} numberOfLines={2}>
+            ⚠️ Não foi possível atualizar. Exibindo dados salvos no dispositivo.
+          </Text>
+        ) : null}
 
         {inspection.status === InspectionStatus.REJECTED ? (
           <RejectionBanner
@@ -261,6 +280,8 @@ const styles = StyleSheet.create({
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   badges: { flexDirection: 'row', gap: Spacing.sm },
+  refreshHint: { fontSize: FontSize.sm },
+  refreshError: { color: '#B45309' },
   card: { gap: Spacing.sm },
   section: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
   body: { lineHeight: 21 },
