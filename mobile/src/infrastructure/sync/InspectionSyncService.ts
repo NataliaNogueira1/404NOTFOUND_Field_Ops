@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
-import { randomUuidV4 } from './uuid';
+import { randomUuidV4, stableUuidFromSeed } from './uuid';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -380,46 +380,64 @@ export class InspectionSyncService {
     // Only operations whose dependencies are already applied are eligible: a
     // photo UPLOAD stays deferred while its answer op is still pending/failed
     // (RN-069). This is enforced by the sync worker, not just the UI.
-    const pending = await this.syncQueueRepo.getReady();
-    let sent = 0;
-    let failed = 0;
-    const errors: string[] = [];
+    //
+    // The loop drains the queue in dependency order: after an answer is applied
+    // and removed, its dependent evidence UPLOAD becomes ready in the next pass.
+    // Without the loop, a single sync would only send the answer and leave the
+    // evidence pending until the user manually syncs again.
+    let totalSent = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
 
-    for (const operation of pending) {
-      try {
-        await this.syncQueueRepo.markInProgress(operation.id);
-        await this.sendOperation(token, operation);
-        await this.syncQueueRepo.markSent(operation.id);
-        // For an evidence UPLOAD, success means the server confirmed APPLIED, so
-        // the evidence row is marked SYNCED (its file may now be released).
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markSyncedById(operation.entityId);
+    while (true) {
+      const pending = await this.syncQueueRepo.getReady();
+      if (pending.length === 0) break;
+
+      let sent = 0;
+      let failed = 0;
+      for (const operation of pending) {
+        try {
+          await this.syncQueueRepo.markInProgress(operation.id);
+          await this.sendOperation(token, operation);
+          await this.syncQueueRepo.markSent(operation.id);
+          // For an evidence UPLOAD, success means the server confirmed APPLIED, so
+          // the evidence row is marked SYNCED (its file may now be released).
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markSyncedById(operation.entityId);
+          }
+          sent++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          if (err instanceof VersionConflictError) {
+            await this.syncQueueRepo.markConflict(operation.id, msg);
+            allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
+            continue;
+          }
+          // Failure never deletes the file or the evidence: we only flag it FAILED
+          // and persist the error so the photo stays available for retry (RN-047).
+          await this.syncQueueRepo.markError(operation.id, msg);
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markFailed(operation.entityId, msg);
+          }
+          failed++;
+          allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
         }
-        sent++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        if (err instanceof VersionConflictError) {
-          await this.syncQueueRepo.markConflict(operation.id, msg);
-          errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
-          continue;
-        }
-        // Failure never deletes the file or the evidence: we only flag it FAILED
-        // and persist the error so the photo stays available for retry (RN-047).
-        await this.syncQueueRepo.markError(operation.id, msg);
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markFailed(operation.entityId, msg);
-        }
-        failed++;
-        errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
       }
+
+      // Cleanup successfully sent operations after each pass so dependent
+      // operations become eligible in the next iteration.
+      if (sent > 0) {
+        await this.syncQueueRepo.removeSent();
+      }
+      totalSent += sent;
+      totalFailed += failed;
+
+      // If nothing was sent (all failed or conflicted), break to avoid
+      // an infinite loop — failed operations stay in the queue for retry.
+      if (sent === 0) break;
     }
 
-    // Cleanup successfully sent operations
-    if (sent > 0) {
-      await this.syncQueueRepo.removeSent();
-    }
-
-    return { sent, failed, errors };
+    return { sent: totalSent, failed: totalFailed, errors: allErrors };
   }
 
   private async sendOperation(
@@ -471,6 +489,10 @@ export class InspectionSyncService {
       responseId?: string;
       uri?: string;
       description?: string;
+      capturedAt: string;
+      // Optional: legacy outbox rows enqueued before the operationId was added
+      // to the evidence payload (d64ece8) have no value here.
+      operationId?: string;
     },
   ): Promise<void> {
     // Prefer the freshest URI from the DB (retry reuses the persisted file).
@@ -480,12 +502,26 @@ export class InspectionSyncService {
       throw new Error('Evidence has no local file to upload.');
     }
 
+    // A legacy row may lack operationId, which the backend requires
+    // (VALIDATION_ERROR "operationId is required"). Derive a STABLE id from the
+    // evidence id so every resend of this photo maps to the same server
+    // operation and never duplicates (RN-068). New rows keep their own id.
+    const operationId = payload.operationId ?? stableUuidFromSeed(evidenceId);
+
+    // The backend also requires capturedAtDevice; fall back to the stored
+    // evidence capture time, then to "now", so a legacy row missing it in the
+    // payload still uploads instead of failing validation.
+    const capturedAtDevice = payload.capturedAt ?? evidence?.capturedAt ?? new Date().toISOString();
+
+    // Unscope defensively at send time too: legacy rows persisted a scoped
+    // itemId that the backend cannot parse as a Long. Idempotent for new rows.
     await evidenceUploadClient.upload(token, {
       inspectionId: payload.inspectionId,
-      itemId: payload.itemId,
-      responseId: payload.responseId,
+      itemId: unscopeItemId(payload.itemId),
       localUri,
       description: payload.description,
+      capturedAtDevice,
+      operationId,
     });
   }
 
@@ -552,7 +588,11 @@ export class InspectionSyncService {
       type: 'ANSWER_UPSERT',
       payload: {
         inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Unscope defensively at send time too: legacy outbox rows enqueued
+        // before the unscope fix (c7ae390) persisted a scoped id (e.g. "5::1"),
+        // which the backend cannot parse as a Long. unscopeItemId is idempotent,
+        // so already-unscoped payloads pass through unchanged.
+        itemId: unscopeItemId(payload.itemId),
         value: serializeAnswerValue(payload.value),
         observation: payload.observation,
       },
@@ -575,7 +615,10 @@ export class InspectionSyncService {
       type: 'NON_CONFORMITY_CREATE',
       payload: {
         inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Unscope defensively at send time (see pushAnswer): legacy NC rows
+        // enqueued before c7ae390 kept a scoped itemId that the backend rejects
+        // with "Invalid NON_CONFORMITY_CREATE payload". Idempotent for new rows.
+        itemId: unscopeItemId(payload.itemId),
         title: payload.title,
         description: payload.description,
         severity: payload.severity,
@@ -753,6 +796,7 @@ export class InspectionSyncService {
         uri: evidence.uri,
         description: evidence.description,
         capturedAt: evidence.capturedAt,
+        operationId: randomUuidV4(),
       },
       dependencyIds,
     );

@@ -16,7 +16,7 @@ export default function SyncScreen() {
   const c = useThemeColors();
   const {
     isOnline, isSyncing, lastSuccessfulSyncAt, pendingCount,
-    operations, lastSyncError, triggerSync,
+    operations, lastSyncError, triggerSync, retryFailed,
   } = useSyncStatus();
 
   const view = buildSyncScreenViewModel({ isOnline, isSyncing, pendingCount, operations });
@@ -62,7 +62,7 @@ export default function SyncScreen() {
           ))
         )}
         {view.hasFailedOperations ? (
-          <Button label="Tentar novamente" onPress={triggerSync} variant="secondary" disabled={view.syncDisabled} fullWidth />
+          <Button label="Tentar novamente" onPress={retryFailed} variant="secondary" disabled={view.syncDisabled} fullWidth />
         ) : null}
         <Card style={styles.card}>
           <Text style={[styles.section, { color: c.text }]}>Dispositivo</Text>

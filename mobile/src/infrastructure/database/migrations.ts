@@ -212,6 +212,15 @@ const migrations: Migration[] = [
       ALTER TABLE inspections ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 8,
+    description: 'PBI-045: persist inspection completion location',
+    sql: `
+      ALTER TABLE inspections ADD COLUMN completion_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_accuracy REAL;
+    `,
+  },
 ];
 
 /**

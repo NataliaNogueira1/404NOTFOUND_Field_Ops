@@ -52,7 +52,10 @@ interface FieldOpsContextValue {
    * and is included in the conclusion payload when synced.
    */
   saveSignature: (inspectionId: string, signatureUri: string) => void;
-  concludeInspection: (inspectionId: string) => void;
+  concludeInspection: (
+    inspectionId: string,
+    options?: { completedAtDevice?: string; location?: { latitude: number; longitude: number; accuracy?: number } | null },
+  ) => void;
   reopenForCorrection: (inspectionId: string) => void;
   syncNow: () => void;
   resetSession: () => void;
@@ -438,7 +441,10 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos]);
 
-  const concludeInspection = useCallback((inspectionId: string) => {
+  const concludeInspection = useCallback((inspectionId: string, options?: {
+    completedAtDevice?: string;
+    location?: { latitude: number; longitude: number; accuracy?: number } | null;
+  }) => {
     setInspections((current) =>
       current.map((insp) =>
         insp.id === inspectionId
@@ -449,7 +455,11 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const repos = getRepos();
     const sync = getSyncService();
     if (repos && sync) {
-      repos.inspection.markSubmitted(inspectionId).catch(console.warn);
+      repos.inspection.markSubmittedWithDevice(
+        inspectionId,
+        options?.completedAtDevice ?? new Date().toISOString(),
+        options?.location ?? null,
+      ).catch(console.warn);
       sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
     }
   }, [getRepos, getSyncService]);
