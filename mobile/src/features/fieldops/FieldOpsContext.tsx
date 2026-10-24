@@ -39,14 +39,26 @@ interface FieldOpsContextValue {
     inspectionId: string,
     options?: {
       startedAtDevice?: string;
-      location?: { latitude: number; longitude: number; accuracy?: number } | null;
+      location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
     },
   ) => void;
   answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
-  concludeInspection: (inspectionId: string) => void;
+  /**
+   * Persist the technician's handwritten signature for the given inspection
+   * (PBI-086). Saves the SVG data URI to SQLite so it survives offline restarts
+   * and is included in the conclusion payload when synced.
+   */
+  saveSignature: (inspectionId: string, signatureUri: string) => void;
+  concludeInspection: (
+    inspectionId: string,
+    options?: {
+      endedAtDevice?: string;
+      location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
+    },
+  ) => void;
   reopenForCorrection: (inspectionId: string) => void;
   refreshInspection: (inspectionId: string) => Promise<void>;
   syncNow: () => void;
@@ -73,6 +85,26 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
   } catch (apiError) {
     console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
   }
+}
+
+// Reconciles every inspection's pending-sync state with the real outbox after a
+// sync cycle. The per-action pendingSyncCount is set optimistically when an
+// operation is queued (e.g. the fixed "5" on conclusion); once the queue is
+// drained by the sync, those values must drop back to 0 / 'synced'. Inspections
+// with no remaining queued operation are reset; the rest get their real count.
+async function reconcilePendingSync(
+  inspectionRepo: InspectionRepository,
+  syncQueueRepo: SyncQueueRepository,
+): Promise<void> {
+  const [inspections, pendingByInspection] = await Promise.all([
+    inspectionRepo.getAll(),
+    syncQueueRepo.countPendingByInspection(),
+  ]);
+  await Promise.all(
+    inspections.map((inspection) =>
+      inspectionRepo.setSyncState(inspection.id, pendingByInspection.get(inspection.id) ?? 0),
+    ),
+  );
 }
 
 // Friendly label for a queued operation shown on the sync screen. Photos get a
@@ -134,6 +166,13 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const ncRepo = new NonConformityRepository(db);
     const commentRepo = new ReviewCommentRepository(db);
     const sqRepo = new SyncQueueRepository(db);
+
+    // Reconcile each inspection's pending-sync state against the REAL outbox
+    // before hydrating the UI, so the home counter is correct on app open too —
+    // not only right after a sync. This heals values left stuck by an earlier
+    // build (e.g. the optimistic "5" from concludeInspection) whose operations
+    // have since left the queue.
+    await reconcilePendingSync(inspRepo, sqRepo);
 
     const dbInspections = await inspRepo.getAll();
     setInspections(dbInspections);
@@ -240,7 +279,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       inspectionId: string,
       options?: {
         startedAtDevice?: string;
-        location?: { latitude: number; longitude: number; accuracy?: number } | null;
+        location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
       },
     ) => {
       const startedAtDevice = options?.startedAtDevice ?? new Date().toISOString();
@@ -422,21 +461,63 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
-  const concludeInspection = useCallback((inspectionId: string) => {
+  /**
+   * Persist the technician's handwritten signature (PBI-086).
+   * Updates in-memory state and saves the SVG data URI to SQLite. The signature
+   * is included in the sync payload when the inspection is concluded.
+   */
+  const saveSignature = useCallback((inspectionId: string, signatureUri: string) => {
     setInspections((current) =>
       current.map((insp) =>
         insp.id === inspectionId
-          ? { ...insp, status: InspectionStatus.SUBMITTED, progress: 100, syncStatus: 'pending' as const, pendingSyncCount: Math.max(insp.pendingSyncCount, 5) }
+          ? { ...insp, signatureUri, syncStatus: 'pending' as const }
           : insp,
       ),
     );
     const repos = getRepos();
-    const sync = getSyncService();
-    if (repos && sync) {
-      repos.inspection.markSubmitted(inspectionId).catch(console.warn);
-      sync.enqueueStatusChange(inspectionId, 'SUBMITTED').catch(console.warn);
+    if (repos) {
+      repos.inspection.saveSignature(inspectionId, signatureUri).catch(console.warn);
     }
-  }, [getRepos, getSyncService]);
+  }, [getRepos]);
+
+  const concludeInspection = useCallback(
+    (
+      inspectionId: string,
+      options?: {
+        endedAtDevice?: string;
+        location?: { latitude: number; longitude: number; accuracy?: number; capturedAt?: string } | null;
+      },
+    ) => {
+      const endedAtDevice = options?.endedAtDevice ?? new Date().toISOString();
+      const location = options?.location ?? null;
+
+      setInspections((current) =>
+        current.map((insp) =>
+          insp.id === inspectionId
+            ? {
+                ...insp,
+                status: InspectionStatus.SUBMITTED,
+                progress: 100,
+                endLatitude: location?.latitude ?? insp.endLatitude,
+                endLongitude: location?.longitude ?? insp.endLongitude,
+                endAccuracy: location?.accuracy ?? insp.endAccuracy,
+                syncStatus: 'pending' as const,
+                pendingSyncCount: Math.max(insp.pendingSyncCount, 5),
+              }
+            : insp,
+        ),
+      );
+      const repos = getRepos();
+      const sync = getSyncService();
+      if (repos && sync) {
+        repos.inspection.markSubmittedWithDevice(inspectionId, endedAtDevice, location).catch(console.warn);
+        // Outbox: CONCLUSION transition carrying device timestamp + optional
+        // conclusion location (PBI-040 / PBI-045).
+        sync.enqueueConclusion(inspectionId, { endedAtDevice, location }).catch(console.warn);
+      }
+    },
+    [getRepos, getSyncService],
+  );
 
   // Reopen a REJECTED inspection so the technician can correct it (PBI-062).
   // Moves it back to IN_PROGRESS, making answers writable again, and queues the
@@ -511,9 +592,15 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       if (result.errors.length > 0) {
         setLastSyncError(result.errors[0]);
       }
-      // Reload inspections from DB after sync
       const repos = getRepos();
-      if (repos) {
+      if (repos && db) {
+        // Reconcile each inspection's pending-sync state against the REAL outbox
+        // so the home counter never stays stuck on the optimistic value set when
+        // the action was queued (e.g. the fixed "5" from concludeInspection).
+        // After a successful sync the queue is drained, so most inspections map
+        // to 0 and flip back to 'synced'.
+        await reconcilePendingSync(repos.inspection, new SyncQueueRepository(db));
+        // Reload inspections from DB after sync (now carrying reconciled counts).
         const fresh = await repos.inspection.getAll();
         if (fresh.length > 0) setInspections(fresh);
       }
@@ -522,7 +609,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsSyncing(false);
     }
-  }, [getSyncService, getRepos, token]);
+  }, [getSyncService, getRepos, token, db]);
 
   const resetSession = useCallback(async () => {
     // Reset in-memory state
@@ -571,6 +658,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       addEvidence,
       retryEvidenceUpload,
       addNonConformity,
+      saveSignature,
       concludeInspection,
       reopenForCorrection,
       refreshInspection,
@@ -584,7 +672,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     [
       inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
-      concludeInspection, reopenForCorrection, refreshInspection, syncNow, resetSession, isSyncing, lastSyncError,
+      saveSignature, concludeInspection, reopenForCorrection, refreshInspection, syncNow, resetSession, isSyncing, lastSyncError,
       isRefreshingInspection, refreshInspectionError,
     ],
   );

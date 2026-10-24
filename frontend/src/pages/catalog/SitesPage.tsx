@@ -80,7 +80,7 @@ export function SitesPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch (cause) {
-      setError(siteError(cause, 'Nao foi possivel carregar os locais.'))
+      setError(siteError(cause, 'Não foi possível carregar os locais.'))
     } finally {
       setLoading(false)
     }
@@ -90,7 +90,7 @@ export function SitesPage() {
     void clientsApi
       .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 100 })
       .then((result) => setClients(result.content))
-      .catch((cause) => setError(siteError(cause, 'Nao foi possivel carregar os clientes ativos.')))
+      .catch((cause) => setError(siteError(cause, 'Não foi possível carregar os clientes ativos.')))
   }, [])
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export function SitesPage() {
       showToast(next === InspectionSiteStatus.ACTIVE ? 'Local ativado com sucesso.' : 'Local inativado com sucesso.')
       await loadSites()
     } catch (cause) {
-      setError(siteError(cause, 'Nao foi possivel alterar o status do local.'))
+      setError(siteError(cause, 'Não foi possível alterar o status do local.'))
       setChangingStatus(null)
     }
   }
@@ -145,7 +145,7 @@ export function SitesPage() {
       cell: (site) => <ActiveBadge active={site.status === InspectionSiteStatus.ACTIVE} />,
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (site) => (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" className="h-8 px-2" onClick={() => navigate(`/app/sites/${site.id}/equipment`)}>
@@ -256,8 +256,8 @@ export function SitesPage() {
         title={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar local' : 'Ativar local'}
         description={
           changingStatus?.status === InspectionSiteStatus.ACTIVE
-            ? `O local ${changingStatus?.name} deixara de aparecer em novas inspecoes.`
-            : `O local ${changingStatus?.name} voltara a aparecer em novas inspecoes.`
+            ? `O local ${changingStatus?.name} deixará de aparecer em novas inspeções.`
+            : `O local ${changingStatus?.name} voltará a aparecer em novas inspeções.`
         }
         confirmLabel={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'Inativar' : 'Ativar'}
         variant={changingStatus?.status === InspectionSiteStatus.ACTIVE ? 'danger' : 'primary'}
@@ -309,7 +309,7 @@ function InspectionSiteModal({
   const nameError = !draft.name.trim()
     ? 'Informe o nome do local.'
     : draft.name.trim().length > 200
-      ? 'Use no maximo 200 caracteres.'
+      ? 'Use no máximo 200 caracteres.'
       : ''
   const zipError = draft.zipCode && !/^\d{5}-\d{3}$/.test(draft.zipCode) ? 'Use o formato XXXXX-XXX.' : ''
   const latitudeError =
@@ -336,7 +336,7 @@ function InspectionSiteModal({
         contactPhone: draft.contactPhone.trim(),
       })
     } catch (cause) {
-      setSubmitError(siteError(cause, 'Nao foi possivel salvar o local.'))
+      setSubmitError(siteError(cause, 'Não foi possível salvar o local.'))
     } finally {
       setSaving(false)
     }
@@ -384,14 +384,14 @@ function InspectionSiteModal({
         />
         <div className="sm:col-span-2">
           <Textarea
-            label="Descricao (opcional)"
+            label="Descrição (opcional)"
             id="site-form-description"
             value={draft.description}
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
         </div>
         <Input
-          label="Endereco (opcional)"
+          label="Endereço (opcional)"
           id="site-form-address"
           maxLength={255}
           value={draft.address}

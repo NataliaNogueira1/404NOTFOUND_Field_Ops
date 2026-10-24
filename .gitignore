@@ -1,0 +1,4 @@
+# Arquivos temporários gerados por scripts de automação
+assign_log.txt
+body_*.json
+*_audit.json

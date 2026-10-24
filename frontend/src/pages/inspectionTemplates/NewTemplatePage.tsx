@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 
-const categories = ['Manutencao Preventiva', 'Seguranca', 'Eletrica']
+const categories = ['Manutenção Preventiva', 'Segurança', 'Elétrica']
 
 export function NewTemplatePage() {
   const navigate = useNavigate()
@@ -22,9 +22,9 @@ export function NewTemplatePage() {
 
   const titleError =
     submitted && !title.trim()
-      ? 'Informe o titulo do modelo.'
+      ? 'Informe o título do modelo.'
       : title.length > 200
-        ? 'Use no maximo 200 caracteres.'
+        ? 'Use no máximo 200 caracteres.'
         : ''
   const categoryError = submitted && !category ? 'Selecione uma categoria.' : ''
 
@@ -58,8 +58,8 @@ export function NewTemplatePage() {
           Modelos
         </Link>
         <PageHeader
-          title="Novo modelo de inspecao"
-          description="Defina os dados iniciais. O checklist sera criado como rascunho."
+          title="Novo modelo de inspeção"
+          description="Defina os dados iniciais. O checklist será criado como rascunho."
         />
       </div>
       <form
@@ -72,14 +72,14 @@ export function NewTemplatePage() {
       >
         <Card className="grid gap-4 p-5 md:grid-cols-2">
           <Input
-            label="Titulo"
+            label="Título"
             id="template-title"
             required
             maxLength={200}
             value={title}
             error={titleError}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Inspecao Preventiva de Compressor"
+            placeholder="Inspeção Preventiva de Compressor"
           />
           <Select
             label="Categoria"
@@ -98,11 +98,11 @@ export function NewTemplatePage() {
           </Select>
           <div className="md:col-span-2">
             <Textarea
-              label="Descricao"
+              label="Descrição"
               id="template-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Checklist para inspecao mensal de compressores"
+              placeholder="Checklist para inspeção mensal de compressores"
             />
           </div>
         </Card>
@@ -128,5 +128,5 @@ function templateError(cause: unknown) {
   if (cause instanceof ApiError && cause.fieldErrors.length) {
     return cause.fieldErrors.map((error) => error.message).join(' ')
   }
-  return 'Nao foi possivel criar o modelo. Tente novamente.'
+  return 'Não foi possível criar o modelo. Tente novamente.'
 }

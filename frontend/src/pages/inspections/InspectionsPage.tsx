@@ -1,9 +1,10 @@
-import { Ban, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Ban, Download, Plus } from 'lucide-react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { type AdminInspectionSummary, adminCatalogApi } from '@/api/adminCatalog'
-import { ClientStatus, clientsApi } from '@/api/clients'
+import { ClientStatus, clientsApi, type ManagedClient } from '@/api/clients'
 import { usersApi } from '@/api/users'
+import { authSession } from '@/auth/session'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
 import { Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
@@ -24,10 +25,12 @@ const cancelable = [
   InspectionStatus.SUBMITTED,
   InspectionStatus.UNDER_REVIEW,
 ]
-const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority', 'dueDate', 'overdue', 'review']
+const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority', 'dueDateFrom', 'dueDateTo', 'overdue', 'review']
 
 export function InspectionsPage() {
   const navigate = useNavigate()
+  const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
+  const isAdmin = session.user?.role === UserRole.ADMIN
   const list = useListQuery('dueDate,asc')
   const query = list.value('name')
   const debouncedQuery = useDebouncedValue(query)
@@ -35,7 +38,8 @@ export function InspectionsPage() {
   const technicianName = list.value('technicianName')
   const clientName = list.value('clientName')
   const priority = list.value('priority') as Priority | ''
-  const dueDate = list.value('dueDate')
+  const dueDateFrom = list.value('dueDateFrom')
+  const dueDateTo = list.value('dueDateTo')
   const overdue = list.value('overdue') === 'true'
   const review = list.value('review') === 'true'
 
@@ -45,9 +49,15 @@ export function InspectionsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
 
+  // ── Exportação CSV ──────────────────────────────────────────────────────────
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+
   // ── Dados para os filtros ───────────────────────────────────────────────────
   const [technicianNames, setTechnicianNames] = useState<string[]>([])
-  const [clientNames, setClientNames] = useState<string[]>([])
+  // Guarda os clientes completos (id + nome) para popular o filtro por nome e
+  // resolver nome → id na exportação CSV, que exige clientId numérico.
+  const [clients, setClients] = useState<ManagedClient[]>([])
 
   // ── Cancelamento ────────────────────────────────────────────────────────────
   const [canceling, setCanceling] = useState<AdminInspectionSummary | null>(null)
@@ -69,7 +79,7 @@ export function InspectionsPage() {
   useEffect(() => {
     clientsApi
       .list({ name: '', status: ClientStatus.ACTIVE, page: 0, size: 200 })
-      .then((result) => setClientNames(result.content.map((c) => c.name)))
+      .then((result) => setClients(result.content))
       .catch(() => { /* silently ignore */ })
   }, [])
 
@@ -83,7 +93,8 @@ export function InspectionsPage() {
         technicianName,
         clientName,
         priority,
-        dueDate,
+        dueDateFrom,
+        dueDateTo,
         overdue,
         review,
         page: list.page,
@@ -103,7 +114,8 @@ export function InspectionsPage() {
   }, [
     clientName,
     debouncedQuery,
-    dueDate,
+    dueDateFrom,
+    dueDateTo,
     list.page,
     list.size,
     list.sort,
@@ -157,9 +169,31 @@ export function InspectionsPage() {
     }
   }
 
+  // ── Exportação CSV ──────────────────────────────────────────────────────────
+  async function handleExport() {
+    setExporting(true)
+    setExportError('')
+    try {
+      // Resolve clientName → clientId: o endpoint de exportação aceita clientId
+      // (numérico), não clientName. Busca na lista real de clientes já carregada.
+      const matchedClient = clientName ? clients.find((c) => c.name === clientName) : undefined
+
+      await adminCatalogApi.exportCsv({
+        status,
+        from: dueDateFrom,
+        to: dueDateTo,
+        clientId: matchedClient ? Number(matchedClient.id) : undefined,
+      })
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Erro ao exportar CSV.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const columns: Column<AdminInspectionSummary>[] = [
     {
-      header: 'Inspecao',
+      header: 'Inspeção',
       sortKey: 'title',
       cell: (item) => (
         <button
@@ -172,7 +206,7 @@ export function InspectionsPage() {
     },
     { header: 'Cliente', sortKey: 'clientName', cell: (item) => item.clientName },
     { header: 'Equipamento', sortKey: 'equipmentName', cell: (item) => item.equipmentName },
-    { header: 'Tecnico', sortKey: 'technician.name', cell: (item) => item.technicianName },
+    { header: 'Técnico', sortKey: 'technician.name', cell: (item) => item.technicianName },
     { header: 'Prioridade', sortKey: 'priority', cell: (item) => <PriorityBadge priority={item.priority} /> },
     {
       header: 'Data prevista',
@@ -193,7 +227,7 @@ export function InspectionsPage() {
       ),
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (item) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -218,15 +252,28 @@ export function InspectionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inspecoes"
-        description="Acompanhe e gerencie as inspecoes de campo."
+        title="Inspeções"
+        description="Acompanhe e gerencie as inspeções de campo."
         action={
-          <Link to="/app/inspections/new">
-            <Button>
-              <Plus size={17} />
-              Nova inspecao
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                disabled={exporting}
+                onClick={() => void handleExport()}
+                title="Exportar inspeções filtradas como CSV"
+              >
+                <Download size={17} aria-hidden="true" />
+                {exporting ? 'Exportando...' : 'Exportar CSV'}
+              </Button>
+            )}
+            <Link to="/app/inspections/new">
+              <Button>
+                <Plus size={17} aria-hidden="true" />
+                Nova inspeção
+              </Button>
+            </Link>
+          </div>
         }
       />
       <Card className="grid gap-4 p-4 xl:grid-cols-4">
@@ -235,7 +282,7 @@ export function InspectionsPage() {
           id="inspection-search"
           value={query}
           onChange={(event) => list.update('name', event.target.value)}
-          placeholder="Inspecao, cliente ou equipamento"
+          placeholder="Inspeção, cliente ou equipamento"
         />
         <Select
           label="Estado"
@@ -249,7 +296,7 @@ export function InspectionsPage() {
           ))}
         </Select>
         <Select
-          label="Tecnico"
+          label="Técnico"
           id="inspection-tech"
           value={technicianName}
           onChange={(event) => list.update('technicianName', event.target.value)}
@@ -268,9 +315,9 @@ export function InspectionsPage() {
           onChange={(event) => list.update('clientName', event.target.value)}
         >
           <option value="">Todos</option>
-          {clientNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {clients.map((client) => (
+            <option key={client.id} value={client.name}>
+              {client.name}
             </option>
           ))}
         </Select>
@@ -286,11 +333,19 @@ export function InspectionsPage() {
           ))}
         </Select>
         <Input
-          label="Periodo"
-          id="period"
+          label="De"
+          id="period-from"
           type="date"
-          value={dueDate}
-          onChange={(event) => list.update('dueDate', event.target.value)}
+          value={dueDateFrom}
+          onChange={(event) => list.update('dueDateFrom', event.target.value)}
+        />
+        <Input
+          label="Até"
+          id="period-to"
+          type="date"
+          value={dueDateTo}
+          min={dueDateFrom || undefined}
+          onChange={(event) => list.update('dueDateTo', event.target.value)}
         />
         <label className="mt-7 flex items-center gap-2 text-sm">
           <input
@@ -306,7 +361,7 @@ export function InspectionsPage() {
             checked={review}
             onChange={(event) => list.update('review', event.target.checked ? 'true' : '')}
           />
-          Aguardando revisao
+          Aguardando revisão
         </label>
         {hasFilters && (
           <div className="xl:col-span-4">
@@ -316,11 +371,16 @@ export function InspectionsPage() {
           </div>
         )}
       </Card>
+      {exportError && (
+        <p role="alert" className="text-sm font-medium text-danger">
+          {exportError}
+        </p>
+      )}
       <DataTable
         columns={columns}
         rows={rows}
         loading={loading}
-        loadingLabel="Carregando inspecoes..."
+        loadingLabel="Carregando inspeções..."
         page={list.page + 1}
         pageSize={list.size}
         totalRows={totalElements}
@@ -332,7 +392,7 @@ export function InspectionsPage() {
       />
       <Modal
         open={Boolean(canceling)}
-        title="Cancelar inspecao"
+        title="Cancelar inspeção"
         onClose={closeCancelModal}
         footer={
           <>
@@ -364,7 +424,7 @@ export function InspectionsPage() {
           )}
         </div>
       </Modal>
-      <Toast show={toast} message="Inspecao cancelada com sucesso" />
+      <Toast show={toast} message="Inspeção cancelada com sucesso" />
     </div>
   )
 }

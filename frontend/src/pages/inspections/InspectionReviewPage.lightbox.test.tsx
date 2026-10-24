@@ -22,14 +22,14 @@ describe('InspectionReviewPage evidence lightbox', () => {
   it('renders multiple real evidences and opens, navigates and closes the lightbox', async () => {
     renderPage(); const open = await screen.findAllByRole('button', { name: /Abrir foto/ }); expect(open).toHaveLength(4)
     await userEvent.click(open[0]); const dialog = await screen.findByRole('dialog'); expect(within(dialog).getAllByText('Protecao').length).toBeGreaterThan(0); expect(within(dialog).getByText('Portao norte')).toBeInTheDocument(); expect(within(dialog).getByText('Frente')).toBeInTheDocument(); expect(within(dialog).getAllByAltText('Protecao')[0]).toHaveAttribute('src', 'blob:real-image')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Proxima foto' })); expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
-    expect(within(dialog).getByText('Localizacao nao informada')).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Próxima foto' })); expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
+    expect(within(dialog).getByText('Localização não informada')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Fechar lightbox' })); expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('shows the real loading failure instead of a mock image', async () => {
     renderPage(true)
     await userEvent.click((await screen.findAllByRole('button', { name: /Abrir foto/ }))[0])
-    expect(await screen.findByText('Nao foi possivel carregar a evidencia.')).toBeInTheDocument()
+    expect(await screen.findByText('Não foi possível carregar a evidência.')).toBeInTheDocument()
   })
 })

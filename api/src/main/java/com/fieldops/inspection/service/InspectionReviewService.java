@@ -67,7 +67,25 @@ public class InspectionReviewService {
                         .toList())).toList();
         return new InspectionReviewResponse(inspection.getId(), inspection.getTitle(), inspection.getStatus(), inspection.getPriority(),
                 inspection.getClientName(), inspection.getSiteName(), inspection.getEquipmentName(), inspection.getTechnician().getName(),
-                inspection.getDueDate(), inspection.getProgress(), sections, allNcs);
+                inspection.getDueDate(), inspection.getProgress(), startLocation(inspection), endLocation(inspection), sections, allNcs);
+    }
+
+    /** Start-of-inspection GPS reading, or null when it was not captured (PBI-045 / RN-059). */
+    private InspectionReviewResponse.Location startLocation(Inspection inspection) {
+        if (inspection.getStartLatitude() == null || inspection.getStartLongitude() == null) {
+            return null;
+        }
+        return new InspectionReviewResponse.Location(inspection.getStartLatitude(),
+                inspection.getStartLongitude(), inspection.getStartAccuracy(), inspection.getStartCapturedAt());
+    }
+
+    /** Conclusion GPS reading, or null when it was not captured (PBI-045 / RN-059). */
+    private InspectionReviewResponse.Location endLocation(Inspection inspection) {
+        if (inspection.getEndLatitude() == null || inspection.getEndLongitude() == null) {
+            return null;
+        }
+        return new InspectionReviewResponse.Location(inspection.getEndLatitude(),
+                inspection.getEndLongitude(), inspection.getEndAccuracy(), inspection.getEndCapturedAt());
     }
 
     private Map<Long, InspectionResponseHistory> latestAnswers(Long inspectionId) {
