@@ -367,4 +367,55 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     const [, body] = mockPost.mock.calls[0];
     expect(body.operations[0].payload.itemId).toBe('7');
   });
+
+  // ── Regression: LEGACY outbox rows persisted a scoped itemId ────────────────
+  // Rows enqueued before the unscope fix (c7ae390) stored a scoped itemId in the
+  // payload. Re-enqueuing does not rewrite them, so the unscope must also happen
+  // at SEND time or the backend keeps rejecting with "Invalid ... payload".
+
+  it('unscopes a legacy ANSWER_UPSERT payload at send time', async () => {
+    const scopedItemId = `${INSPECTION_ID}::7`;
+    await seedItem(scopedItemId);
+    // Simulate a row written by the OLD code: scoped itemId baked into the payload.
+    await queueRepo.enqueue(
+      `answer-${INSPECTION_ID}-${scopedItemId}`,
+      'CREATE',
+      'answer',
+      `${INSPECTION_ID}-${scopedItemId}`,
+      { operationId: 'legacy-op-1', inspectionId: INSPECTION_ID, itemId: scopedItemId, value: 'CONFORME', baseVersion: 0 },
+    );
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    await service.pushPendingOperations(TOKEN);
+
+    const [, body] = mockPost.mock.calls[0];
+    expect(body.operations[0].payload.itemId).toBe('7');
+  });
+
+  it('unscopes a legacy NON_CONFORMITY_CREATE payload at send time', async () => {
+    const scopedItemId = `${INSPECTION_ID}::7`;
+    await seedItem(scopedItemId);
+    // Simulate a row written by the OLD code: scoped itemId baked into the payload.
+    await queueRepo.enqueue(
+      'nc-legacy-1',
+      'CREATE',
+      'non_conformity',
+      'nc-legacy-1',
+      {
+        operationId: 'legacy-op-2',
+        inspectionId: INSPECTION_ID,
+        itemId: scopedItemId,
+        title: 'NC',
+        description: 'desc',
+        severity: 'MEDIUM',
+        baseVersion: 0,
+      },
+    );
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+
+    await service.pushPendingOperations(TOKEN);
+
+    const [, body] = mockPost.mock.calls[0];
+    expect(body.operations[0].payload.itemId).toBe('7');
+  });
 });

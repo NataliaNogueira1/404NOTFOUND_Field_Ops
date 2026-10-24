@@ -573,7 +573,11 @@ export class InspectionSyncService {
       type: 'ANSWER_UPSERT',
       payload: {
         inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Unscope defensively at send time too: legacy outbox rows enqueued
+        // before the unscope fix (c7ae390) persisted a scoped id (e.g. "5::1"),
+        // which the backend cannot parse as a Long. unscopeItemId is idempotent,
+        // so already-unscoped payloads pass through unchanged.
+        itemId: unscopeItemId(payload.itemId),
         value: serializeAnswerValue(payload.value),
         observation: payload.observation,
       },
@@ -596,7 +600,10 @@ export class InspectionSyncService {
       type: 'NON_CONFORMITY_CREATE',
       payload: {
         inspectionId: payload.inspectionId,
-        itemId: payload.itemId,
+        // Unscope defensively at send time (see pushAnswer): legacy NC rows
+        // enqueued before c7ae390 kept a scoped itemId that the backend rejects
+        // with "Invalid NON_CONFORMITY_CREATE payload". Idempotent for new rows.
+        itemId: unscopeItemId(payload.itemId),
         title: payload.title,
         description: payload.description,
         severity: payload.severity,
