@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 // lazy-load pattern used in pushNotifications.ts.
 import type * as NotificationsModule from 'expo-notifications';
 
+import { notificationsStorage } from '@/infrastructure/storage/tokenStorage';
+
 /**
  * Expo Go dropped local scheduling support in SDK 53. We follow the same
  * lazy-load pattern as pushNotifications.ts to avoid crashing under Expo Go.
@@ -69,6 +71,76 @@ export async function requestNotificationPermission(): Promise<boolean> {
     console.warn('[localNotifications] Could not request permission:', err);
     return false;
   }
+}
+
+/** Snapshot of the notification state the profile screen needs to render. */
+export interface NotificationSettings {
+  /** The user's in-app preference (persisted), independent of OS permission. */
+  enabled: boolean;
+  /** Whether local notifications can run in this runtime (not Expo Go / web). */
+  supported: boolean;
+  /** Whether the OS permission is currently granted. */
+  permissionGranted: boolean;
+  /**
+   * Whether we can still prompt for the OS permission. When `false` and not
+   * granted, the user must enable it from the system settings.
+   */
+  canAskPermission: boolean;
+}
+
+/**
+ * Reads the current notification settings (user preference + OS permission)
+ * without prompting the user. Safe everywhere: returns sane defaults when the
+ * runtime does not support local notifications.
+ */
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  const enabled = await notificationsStorage.isEnabled();
+  const notifications = loadNotifications();
+
+  if (!notifications) {
+    return { enabled, supported: false, permissionGranted: false, canAskPermission: false };
+  }
+
+  try {
+    const perm = await notifications.getPermissionsAsync();
+    return {
+      enabled,
+      supported: true,
+      permissionGranted: perm.status === 'granted',
+      canAskPermission: perm.canAskAgain ?? false,
+    };
+  } catch (err) {
+    console.warn('[localNotifications] Could not read permission state:', err);
+    return { enabled, supported: true, permissionGranted: false, canAskPermission: false };
+  }
+}
+
+/**
+ * Turns local deadline reminders on or off from the profile screen (PBI-084).
+ *
+ * - When enabling: persists the preference, requests OS permission if needed,
+ *   and reschedules reminders for the provided inspections. Returns the final
+ *   settings so the UI can reflect a denied permission.
+ * - When disabling: persists the preference and cancels every scheduled
+ *   reminder.
+ *
+ * Never throws — notification failures must not break the settings screen.
+ */
+export async function setNotificationsEnabled(
+  enabled: boolean,
+  inspections: InspectionReminderInput[] = [],
+): Promise<NotificationSettings> {
+  if (enabled) {
+    await notificationsStorage.enable();
+    // Make sure the OS permission is in place before scheduling.
+    await requestNotificationPermission();
+    await rescheduleAllReminders(inspections);
+  } else {
+    await notificationsStorage.disable();
+    await cancelAllInspectionReminders();
+  }
+
+  return getNotificationSettings();
 }
 
 // ─── Inspection input type ─────────────────────────────────────────────────────
@@ -174,6 +246,11 @@ export async function scheduleInspectionReminders(
 
   // Cancel any previous reminders before rescheduling (idempotent).
   await cancelInspectionReminders(inspection.id);
+
+  // Respect the user's in-app preference (PBI-084). When reminders are turned
+  // off in the profile screen, we leave everything cancelled and schedule
+  // nothing — the OS permission may still be granted, but the user opted out.
+  if (!(await notificationsStorage.isEnabled())) return;
 
   // Terminal or unexpected statuses: leave cancelled, do nothing else.
   if (TERMINAL_STATUSES.has(inspection.status)) return;

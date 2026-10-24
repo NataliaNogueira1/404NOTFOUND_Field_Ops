@@ -49,8 +49,11 @@ import {
   cancelAllInspectionReminders,
   rescheduleAllReminders,
   requestNotificationPermission,
+  getNotificationSettings,
+  setNotificationsEnabled,
   type InspectionReminderInput,
 } from '../localNotifications';
+import { notificationsStorage } from '@/infrastructure/storage/tokenStorage';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -75,8 +78,11 @@ function input(overrides: Partial<InspectionReminderInput> = {}): InspectionRemi
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  // The secure-store mock persists across tests (plain Map), so reset the
+  // preference to its default (enabled) before each test for isolation.
+  await notificationsStorage.enable();
 });
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -219,5 +225,51 @@ describe('requestNotificationPermission', () => {
     requestPermsMock.mockResolvedValueOnce({ status: 'denied' });
     await expect(requestNotificationPermission()).resolves.toBe(false);
     expect(requestPermsMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── In-app preference toggle (profile screen) ───────────────────────────────
+
+describe('notification preference (in-app toggle)', () => {
+  it('does NOT schedule reminders when the user turned notifications off', async () => {
+    await notificationsStorage.disable();
+
+    await scheduleInspectionReminders(input());
+
+    // Preference off: nothing scheduled, but existing reminders are cancelled.
+    expect(scheduleMock).not.toHaveBeenCalled();
+    expect(cancelMock).toHaveBeenCalledWith('local-due-insp-1');
+    expect(cancelMock).toHaveBeenCalledWith('local-pre-insp-1');
+  });
+
+  it('getNotificationSettings reports the stored preference and permission', async () => {
+    getPermsMock.mockResolvedValueOnce({ status: 'granted', canAskAgain: true });
+
+    const settings = await getNotificationSettings();
+
+    expect(settings.enabled).toBe(true);
+    expect(settings.supported).toBe(true);
+    expect(settings.permissionGranted).toBe(true);
+    expect(settings.canAskPermission).toBe(true);
+  });
+
+  it('setNotificationsEnabled(false) persists the preference and cancels all reminders', async () => {
+    const result = await setNotificationsEnabled(false, [input()]);
+
+    expect(cancelAllMock).toHaveBeenCalledTimes(1);
+    expect(scheduleMock).not.toHaveBeenCalled();
+    expect(result.enabled).toBe(false);
+    await expect(notificationsStorage.isEnabled()).resolves.toBe(false);
+  });
+
+  it('setNotificationsEnabled(true) persists the preference and reschedules reminders', async () => {
+    await notificationsStorage.disable();
+
+    const result = await setNotificationsEnabled(true, [input({ id: 'a' }), input({ id: 'b' })]);
+
+    // Two inspections => 2 reminders each.
+    expect(scheduleMock).toHaveBeenCalledTimes(4);
+    expect(result.enabled).toBe(true);
+    await expect(notificationsStorage.isEnabled()).resolves.toBe(true);
   });
 });
