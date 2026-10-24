@@ -121,7 +121,7 @@ Notificações, assinatura, visual, itens P1/P2 sem relação com risco de rubri
 | Interface administrativa | 10 | Cadastros, template, agenda e review presentes. | Detalhes sem mocks, CSV e URL. | #263/#264/#154/#89. | painel publicado e smoke. | Médio |
 | API/regras/dados | 15 | JWT/roles, regras, Flyway, sync, OpenAPI e 180 testes API reportados. | deploy, upload E2E e explicação de modelo. | #204/#229 + registro testável. | OpenAPI/API pública e teste. | Médio–alto |
 | Testes/segurança/qualidade | 7 | API/web tiveram resultados; mobile/scan atual pendentes. | mobile reproduzível e audit atualizado. | #85/#259/#260. | relatório datado de testes/audit. | Alto |
-| Documentação/processo | 4 | READMEs e material base existem. | Índice, limites, PRs e comandos validados. | #219 / `docs/evaluation`. | links verificáveis. | Médio |
+| Documentação/processo | 4 | READMEs e material base existem. | Índice, limites, PRs e comandos validados. | #219 / `docs/avaliacao`. | links verificáveis. | Médio |
 | Demonstração/defesa | 4 | Ainda sem prova E2E final. | fluxo não manual e preparo individual. | #92. | runbook, gravação/registro e defesa. | Alto |
 
 ### Síntese de rubricas específicas
@@ -154,10 +154,10 @@ Notificações, assinatura, visual, itens P1/P2 sem relação com risco de rubri
 
 ## 7. Documentação de avaliação recomendada
 
-Recomenda-se criar `docs/evaluation/` **somente dentro do trabalho já coordenado da #219**, evitando duas pessoas no mesmo arquivo:
+Recomenda-se manter `docs/avaliacao/` **somente dentro do trabalho já coordenado da #219**, evitando duas pessoas no mesmo arquivo:
 
 ```text
-docs/evaluation/
+docs/avaliacao/
 ├── README.md              # índice rubrica → evidência existente
 ├── demo-runbook.md        # roteiro e resultado esperado da demo
 ├── test-results.md        # comando, ambiente, data, resultado e bloqueio
