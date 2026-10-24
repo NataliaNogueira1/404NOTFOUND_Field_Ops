@@ -38,7 +38,7 @@ export function InspectionReportPage() {
         setState({ type: 'not-found' })
       } else {
         const message =
-          error instanceof ApiError ? error.message : 'Nao foi possivel carregar os dados da inspecao.'
+          error instanceof ApiError ? error.message : 'Não foi possível carregar os dados da inspeção.'
         setState({ type: 'error', message })
       }
     }
@@ -57,7 +57,7 @@ export function InspectionReportPage() {
       await inspectionReportApi.downloadPdf(id)
     } catch (error) {
       const message =
-        error instanceof ApiError ? error.message : 'Nao foi possivel gerar o PDF. Tente novamente.'
+        error instanceof ApiError ? error.message : 'Não foi possível gerar o PDF. Tente novamente.'
       setDownloadError(message)
     } finally {
       setDownloading(false)
@@ -69,7 +69,7 @@ export function InspectionReportPage() {
     return (
       <Card role="status" className="flex min-h-48 items-center justify-center gap-2 p-6 text-muted">
         <Loader2 className="animate-spin" size={18} />
-        Carregando relatorio...
+        Carregando relatório...
       </Card>
     )
   }
@@ -78,8 +78,8 @@ export function InspectionReportPage() {
     return (
       <EmptyState
         icon={AlertCircle}
-        title="Inspecao nao encontrada"
-        description="A inspecao solicitada nao existe ou foi removida."
+        title="Inspeção não encontrada"
+        description="A inspeção solicitada não existe ou foi removida."
       />
     )
   }
@@ -142,9 +142,9 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
             to={`/app/inspections/${id}/review`}
           >
             <ArrowLeft size={16} />
-            Voltar para revisao
+            Voltar para revisão
           </Link>
-          <h1 className="text-2xl font-semibold">Relatorio da inspecao</h1>
+          <h1 className="text-2xl font-semibold">Relatório da inspeção</h1>
           <p className="text-sm text-muted">{review.title}</p>
         </div>
 
@@ -158,9 +158,9 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
       <Card className="flex items-start gap-3 border-primary/30 bg-primary/5 p-4">
         <FileText size={18} className="mt-0.5 shrink-0 text-primary" />
         <div>
-          <p className="text-sm font-semibold text-primary">Pre-visualizacao do relatorio</p>
+          <p className="text-sm font-semibold text-primary">Pré-visualização do relatório</p>
           <p className="text-sm text-muted">
-            O PDF sera gerado pelo servidor com todos os dados oficiais da inspecao. Clique em
+            O PDF será gerado pelo servidor com todos os dados oficiais da inspeção. Clique em
             &quot;Baixar PDF&quot; para salvar o arquivo.
           </p>
         </div>
@@ -174,7 +174,7 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
 
       {/* Info grid */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <InfoCard label="Tecnico" value={review.technicianName} />
+        <InfoCard label="Técnico" value={review.technicianName} />
         <InfoCard label="Cliente" value={review.clientName} />
         <InfoCard label="Local" value={review.siteName} />
         <InfoCard label="Equipamento" value={review.equipmentName ?? '-'} />
@@ -195,7 +195,7 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatBox label="Total respondidos" value={String(totalAnswered)} color="text-primary" />
         <StatBox label="Conformes" value={String(conformeCount)} color="text-success-dark" />
-        <StatBox label="Nao conformes" value={String(ncCount)} color="text-danger" />
+        <StatBox label="Não conformes" value={String(ncCount)} color="text-danger" />
         <StatBox label="Conformidade" value={`${conformityPercent}%`} color={conformityColor} />
       </div>
 
@@ -231,7 +231,7 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
                             : 'shrink-0 text-xs font-bold text-success-dark'
                       }
                     >
-                      {item.answer === null ? 'Pendente' : nc ? 'NAO CONFORME' : item.answer}
+                      {item.answer === null ? 'Pendente' : nc ? 'NÃO CONFORME' : item.answer}
                     </span>
                   </div>
                 )
@@ -251,7 +251,7 @@ function ReportContent({ id, review, downloading, downloadError, onDownload }: R
       {review.nonConformities.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">
-            Nao conformidades ({review.nonConformities.length})
+            Não conformidades ({review.nonConformities.length})
           </h2>
           <Card className="divide-y divide-border">
             {review.nonConformities.map((nc) => (

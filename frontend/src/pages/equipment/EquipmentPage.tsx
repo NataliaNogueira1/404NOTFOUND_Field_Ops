@@ -50,7 +50,7 @@ export function EquipmentPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch (cause) {
-      setError(equipmentError(cause, 'Nao foi possivel carregar os equipamentos.'))
+      setError(equipmentError(cause, 'Não foi possível carregar os equipamentos.'))
     } finally {
       setLoading(false)
     }
@@ -60,7 +60,7 @@ export function EquipmentPage() {
     void sitesApi
       .list({ name: '', clientId: '', status: InspectionSiteStatus.ACTIVE, page: 0, size: 100 })
       .then((result) => setSites(result.content))
-      .catch((cause) => setError(equipmentError(cause, 'Nao foi possivel carregar os locais ativos.')))
+      .catch((cause) => setError(equipmentError(cause, 'Não foi possível carregar os locais ativos.')))
   }, [])
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export function EquipmentPage() {
       )
       await loadEquipment()
     } catch (cause) {
-      setError(equipmentError(cause, 'Nao foi possivel alterar o status do equipamento.'))
+      setError(equipmentError(cause, 'Não foi possível alterar o status do equipamento.'))
       setChangingStatus(null)
     }
   }
@@ -101,7 +101,7 @@ export function EquipmentPage() {
 
   const columns: Column<ManagedEquipment>[] = [
     { header: 'Nome', sortKey: 'name', cell: (item) => <span className="font-medium">{item.name}</span> },
-    { header: 'Patrimonio', sortKey: 'assetNumber', cell: (item) => item.assetNumber || '-' },
+    { header: 'Patrimônio', sortKey: 'assetNumber', cell: (item) => item.assetNumber || '-' },
     { header: 'Local', sortKey: 'site.name', cell: (item) => item.siteName },
     {
       header: 'QR Code',
@@ -115,7 +115,7 @@ export function EquipmentPage() {
     },
     { header: 'Status', sortKey: 'status', cell: (item) => <EquipmentStatusBadge status={item.status} /> },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (item) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -154,7 +154,7 @@ export function EquipmentPage() {
         description={
           contextualSiteId
             ? 'Equipamentos vinculados ao local selecionado.'
-            : 'Gerencie ativos, vinculos com locais e QR Codes unicos.'
+            : 'Gerencie ativos, vínculos com locais e QR Codes únicos.'
         }
         action={
           <Button onClick={() => setEditing('new')} disabled={sites.length === 0 && !contextualSiteId}>
@@ -226,8 +226,8 @@ export function EquipmentPage() {
         title={changingStatus?.status === EquipmentStatus.ACTIVE ? 'Inativar equipamento' : 'Ativar equipamento'}
         description={
           changingStatus?.status === EquipmentStatus.ACTIVE
-            ? `O equipamento ${changingStatus?.name} deixara de aparecer em novas inspecoes.`
-            : `O equipamento ${changingStatus?.name} voltara a aparecer em novas inspecoes.`
+            ? `O equipamento ${changingStatus?.name} deixará de aparecer em novas inspeções.`
+            : `O equipamento ${changingStatus?.name} voltará a aparecer em novas inspeções.`
         }
         confirmLabel={changingStatus?.status === EquipmentStatus.ACTIVE ? 'Inativar' : 'Ativar'}
         variant={changingStatus?.status === EquipmentStatus.ACTIVE ? 'danger' : 'primary'}
@@ -279,12 +279,12 @@ function EquipmentModal({
   const nameError = !draft.name.trim()
     ? 'Informe o nome do equipamento.'
     : draft.name.trim().length > 200
-      ? 'Use no maximo 200 caracteres.'
+      ? 'Use no máximo 200 caracteres.'
       : ''
   const qrError = !draft.qrCode.trim()
     ? 'Informe ou gere um QR Code.'
     : draft.qrCode.trim().length > 100
-      ? 'Use no maximo 100 caracteres.'
+      ? 'Use no máximo 100 caracteres.'
       : ''
   const formError = siteError || nameError || qrError
 
@@ -304,7 +304,7 @@ function EquipmentModal({
         qrCode: draft.qrCode.trim(),
       })
     } catch (cause) {
-      setSubmitError(equipmentError(cause, 'Nao foi possivel salvar o equipamento.'))
+      setSubmitError(equipmentError(cause, 'Não foi possível salvar o equipamento.'))
     } finally {
       setSaving(false)
     }
@@ -351,14 +351,14 @@ function EquipmentModal({
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
         <Input
-          label="Nº Patrimonio (opcional)"
+          label="Nº Patrimônio (opcional)"
           id="equipment-form-asset"
           maxLength={50}
           value={draft.assetNumber}
           onChange={(event) => setDraft({ ...draft, assetNumber: event.target.value })}
         />
         <Input
-          label="Nº Serie (opcional)"
+          label="Nº Série (opcional)"
           id="equipment-form-serial"
           maxLength={100}
           value={draft.serialNumber}
@@ -380,13 +380,13 @@ function EquipmentModal({
         />
         <div className="sm:col-span-2">
           <Textarea
-            label="Descricao (opcional)"
+            label="Descrição (opcional)"
             id="equipment-form-description"
             value={draft.description}
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
         </div>
-        <div className="sm:col-span-2 grid grid-cols-[1fr_auto] items-end gap-2">
+        <div className="grid grid-cols-1 items-end gap-2 min-[380px]:grid-cols-[1fr_auto] sm:col-span-2">
           <Input
             label="QR Code"
             id="equipment-form-qr"
@@ -411,7 +411,7 @@ function EquipmentModal({
           <option value={EquipmentStatus.DECOMMISSIONED}>Descomissionado</option>
         </Select>
         <Input
-          label="Data de instalacao (opcional)"
+          label="Data de instalação (opcional)"
           id="equipment-form-installed"
           type="date"
           value={draft.installedAt}
@@ -441,7 +441,7 @@ function QrModal({ item, onClose }: { item: ManagedEquipment | null; onClose: ()
       {item && (
         <div className="grid place-items-center gap-4">
           <div
-            aria-label={`Representacao visual do QR Code ${item.qrCode}`}
+            aria-label={`Representação visual do QR Code ${item.qrCode}`}
             className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-surface p-4"
           >
             {Array.from({ length: 49 }, (_, index) => (
@@ -479,7 +479,7 @@ function generateQrCode() {
 
 function equipmentError(cause: unknown, fallback: string) {
   if (cause instanceof ApiError) {
-    if (cause.status === 409) return 'Este QR Code ja esta vinculado a outro equipamento.'
+    if (cause.status === 409) return 'Este QR Code já está vinculado a outro equipamento.'
     if (cause.fieldErrors.length) return cause.fieldErrors.map((error) => error.message).join(' ')
   }
   return fallback

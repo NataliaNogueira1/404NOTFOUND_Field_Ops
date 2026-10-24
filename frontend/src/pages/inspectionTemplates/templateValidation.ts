@@ -15,10 +15,10 @@ export function inspectionTemplatePendingIssues(
 ): string[] {
   const issues: string[] = []
   issues.push(...templateMetadataIssues(title, category))
-  if (sections.length === 0) issues.push('Adicione pelo menos uma secao.')
-  if (sections.some((section) => !section.title.trim())) issues.push('Todas as secoes precisam de titulo.')
+  if (sections.length === 0) issues.push('Adicione pelo menos uma seção.')
+  if (sections.some((section) => !section.title.trim())) issues.push('Todas as seções precisam de título.')
   if (sections.some((section) => section.items.length === 0))
-    issues.push('Todas as secoes precisam de pelo menos um item.')
+    issues.push('Todas as seções precisam de pelo menos um item.')
   if (sections.some((section) => section.items.some((item) => !item.question.trim())))
     issues.push('Todos os itens precisam de pergunta.')
   if (sections.some((section) => section.items.some((item) => !item.responseType)))
@@ -32,14 +32,14 @@ export function inspectionTemplatePendingIssues(
       ),
     )
   )
-    issues.push('Itens SINGLE_CHOICE precisam de pelo menos duas opcoes.')
+    issues.push('Itens SINGLE_CHOICE precisam de pelo menos duas opções.')
   return issues
 }
 
 function templateMetadataIssues(title: string, category: string): string[] {
   const issues: string[] = []
-  if (!title.trim()) issues.push('Informe o titulo do modelo.')
-  if (title.length > 200) issues.push('Use no maximo 200 caracteres no titulo.')
+  if (!title.trim()) issues.push('Informe o título do modelo.')
+  if (title.length > 200) issues.push('Use no máximo 200 caracteres no título.')
   if (!category.trim()) issues.push('Informe a categoria do modelo.')
   return issues
 }

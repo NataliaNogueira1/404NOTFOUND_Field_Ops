@@ -7,13 +7,13 @@ import { ThemeToggle } from '@/theme/ThemeToggle'
 
 const titles: Record<string, string> = {
   dashboard: 'Dashboard',
-  users: 'Usuarios',
+  users: 'Usuários',
   clients: 'Clientes',
   sites: 'Locais',
   equipment: 'Equipamentos',
-  'inspection-templates': 'Modelos de inspecao',
-  inspections: 'Inspecoes',
-  'non-conformities': 'Nao conformidades',
+  'inspection-templates': 'Modelos de inspeção',
+  inspections: 'Inspeções',
+  'non-conformities': 'Não conformidades',
   audit: 'Auditoria',
 }
 
@@ -33,21 +33,21 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
     navigate('/login')
   }
   return (
-    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-border bg-surface/95 px-5 backdrop-blur lg:px-8">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-20 flex h-18 items-center justify-between gap-2 border-b border-border bg-surface/95 px-4 backdrop-blur sm:px-5 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
         <MobileMenuButton onClick={onMenuClick} />
-        <div>
-          <p className="text-xs text-muted">
+        <div className="min-w-0">
+          <p className="hidden text-xs text-muted sm:block">
             FieldOps / <span className="text-text">{titles[segment]}</span>
           </p>
-          <p className="font-semibold text-text">{titles[segment]}</p>
+          <p className="truncate font-semibold text-text">{titles[segment]}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <ThemeToggle />
         <button
           className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
-          aria-label="Notificacoes"
+          aria-label="Notificações"
         >
           <Bell size={20} />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-white" />
@@ -58,8 +58,8 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
             {initials}
           </span>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold leading-tight">{user?.name ?? 'Usuario'}</p>
-            <p className="text-xs text-muted">{user?.role ?? 'Sessao'}</p>
+            <p className="text-sm font-semibold leading-tight">{user?.name ?? 'Usuário'}</p>
+            <p className="text-xs text-muted">{user?.role ?? 'Sessão'}</p>
           </div>
         </div>
         <button

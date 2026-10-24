@@ -221,10 +221,37 @@ const migrations: Migration[] = [
   },
   {
     version: 7,
+    description: 'PBI-086: store technician handwritten signature URI on inspection',
+    sql: `
+      -- signature_uri stores the SVG data URI (base64) or a local file path
+      -- of the technician's handwritten signature captured at conclusion.
+      -- signature_required mirrors the template's per-inspection setting; when
+      -- 1 the conclusion flow blocks until a non-empty signature is provided.
+      ALTER TABLE inspections ADD COLUMN signature_uri TEXT;
+      ALTER TABLE inspections ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 8,
+    description: 'PBI-045: persist inspection completion location (legacy completion_* columns)',
+    // Kept for devices that already applied this migration on develop. The app now
+    // standardises on the end_* columns (v9) that match the backend contract, but
+    // dropping columns in SQLite is destructive, so these legacy columns are left
+    // in place (nullable, unused) to avoid rewriting the table.
+    sql: `
+      ALTER TABLE inspections ADD COLUMN completion_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_accuracy REAL;
+    `,
+  },
+  {
+    version: 9,
     description: 'PBI-045: store conclusion GPS location and capture timestamps on inspections',
     // End-of-inspection location + capture timestamps (PBI-040 / PBI-045 / RN-062).
-    // Added defensively: a device may already carry end_* from an earlier build,
-    // so each column is only added when missing to stay idempotent (RN-059).
+    // These end_* columns are the canonical ones the app reads/writes and mirror
+    // the backend contract. Added defensively: a device may already carry end_*
+    // from an earlier build, so each column is only added when missing to stay
+    // idempotent (RN-059).
     run: async (db) => {
       await addColumnIfMissing(db, 'inspections', 'end_latitude', 'REAL');
       await addColumnIfMissing(db, 'inspections', 'end_longitude', 'REAL');
@@ -234,7 +261,7 @@ const migrations: Migration[] = [
     },
   },
   {
-    version: 8,
+    version: 10,
     description: 'Reconcile v3 outbox columns on devices with a drifted schema',
     // Some devices recorded v3 as applied without actually gaining its columns
     // (schema drift between earlier app builds), so enqueue fails with

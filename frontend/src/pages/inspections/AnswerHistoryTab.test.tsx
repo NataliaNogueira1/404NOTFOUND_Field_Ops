@@ -60,7 +60,7 @@ describe('AnswerHistoryTab', () => {
     render(<AnswerHistoryTab inspectionId="1" />)
 
     // Loading state appears first.
-    expect(screen.getByText(/carregando historico de respostas/i)).not.toBeNull()
+    expect(screen.getByText(/carregando histórico de respostas/i)).not.toBeNull()
 
     // Section header appears once (grouped by section).
     expect(await screen.findByText('Equipamentos')).not.toBeNull()
@@ -90,7 +90,7 @@ describe('AnswerHistoryTab', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse([]))))
     render(<AnswerHistoryTab inspectionId="1" />)
 
-    expect(await screen.findByText(/nenhum historico de respostas encontrado/i)).not.toBeNull()
+    expect(await screen.findByText(/nenhum histórico de respostas encontrado/i)).not.toBeNull()
   })
 
   it('treats a 404 as "inspection not found", distinct from empty history', async () => {
@@ -104,8 +104,8 @@ describe('AnswerHistoryTab', () => {
     )
     render(<AnswerHistoryTab inspectionId="999" />)
 
-    expect(await screen.findByText(/inspecao nao encontrada/i)).not.toBeNull()
-    expect(screen.queryByText(/nenhum historico de respostas encontrado/i)).toBeNull()
+    expect(await screen.findByText(/inspeção não encontrada/i)).not.toBeNull()
+    expect(screen.queryByText(/nenhum histórico de respostas encontrado/i)).toBeNull()
   })
 
   it('shows an error state with a working retry', async () => {
@@ -117,7 +117,7 @@ describe('AnswerHistoryTab', () => {
     render(<AnswerHistoryTab inspectionId="1" />)
 
     // Error state appears first.
-    expect(await screen.findByText(/nao foi possivel carregar o historico de respostas/i)).not.toBeNull()
+    expect(await screen.findByText(/não foi possível carregar o histórico de respostas/i)).not.toBeNull()
 
     // Retry reloads and shows the data.
     await userEvent.click(screen.getByRole('button', { name: /tentar novamente/i }))

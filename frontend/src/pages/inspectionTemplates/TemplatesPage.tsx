@@ -1,15 +1,18 @@
-import { Copy, Eye, FileClock, Pencil, Plus } from 'lucide-react'
+import { Copy, Eye, FileClock, Loader2, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type TemplateListStatus, type TemplateSummary, adminCatalogApi } from '@/api/adminCatalog'
 import { Badge } from '@/components/badges/Badge'
+import { Modal } from '@/components/feedback/Modal'
 import { Select } from '@/components/forms/Fields'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable, type Column } from '@/components/tables/DataTable'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
 import { useDebouncedValue, useListQuery } from '@/hooks/useListQuery'
+import { useTemplateVersions } from '@/hooks/useTemplateVersions'
 
 export function TemplatesPage() {
   const navigate = useNavigate()
@@ -22,6 +25,8 @@ export function TemplatesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Template whose published versions are shown in the modal (PBI-246). null = closed.
+  const [versionsTemplate, setVersionsTemplate] = useState<TemplateSummary | null>(null)
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -41,7 +46,7 @@ export function TemplatesPage() {
       setRows([])
       setTotalElements(0)
       setTotalPages(1)
-      setError('Nao foi possivel carregar os modelos. Tente novamente.')
+      setError('Não foi possível carregar os modelos. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -54,13 +59,13 @@ export function TemplatesPage() {
 
   const columns: Column<TemplateSummary>[] = [
     {
-      header: 'Titulo',
+      header: 'Título',
       sortKey: 'title',
-      cell: (template) => <span className="font-medium">{template.title || 'Modelo sem titulo'}</span>,
+      cell: (template) => <span className="font-medium">{template.title || 'Modelo sem título'}</span>,
     },
     { header: 'Categoria', sortKey: 'category', cell: (template) => template.category || '-' },
-    { header: 'Versao atual', sortKey: 'currentVersion', cell: (template) => `v${template.version}` },
-    { header: 'Secoes', cell: (template) => template.sectionCount },
+    { header: 'Versão atual', sortKey: 'currentVersion', cell: (template) => `v${template.version}` },
+    { header: 'Seções', cell: (template) => template.sectionCount },
     { header: 'Itens', cell: (template) => template.itemCount },
     {
       header: 'Status',
@@ -72,7 +77,7 @@ export function TemplatesPage() {
       ),
     },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (template) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -89,11 +94,16 @@ export function TemplatesPage() {
             onClick={() => navigate(`/app/inspection-templates/${template.id}/preview`)}
           >
             <Eye size={16} />
-            Previa
+            Prévia
           </Button>
-          <Button variant="ghost" className="h-8 px-2">
-            <FileClock size={16} />
-            Versoes
+          <Button
+            variant="ghost"
+            className="h-8 px-2"
+            aria-label={`Ver versões do modelo ${template.title || 'sem título'}`}
+            onClick={() => setVersionsTemplate(template)}
+          >
+            <FileClock size={16} aria-hidden />
+            Versões
           </Button>
           <Button variant="ghost" className="h-8 px-2">
             <Copy size={16} />
@@ -111,8 +121,8 @@ export function TemplatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Modelos de inspecao"
-        description="Crie e publique checklists utilizados pelos tecnicos."
+        title="Modelos de inspeção"
+        description="Crie e publique checklists utilizados pelos técnicos."
         action={
           <Button onClick={createTemplate}>
             <Plus size={17} />
@@ -126,7 +136,7 @@ export function TemplatesPage() {
           id="template-search"
           value={query}
           onChange={(event) => list.update('name', event.target.value)}
-          placeholder="Titulo ou categoria"
+          placeholder="Título ou categoria"
         />
         <Select
           label="Status"
@@ -154,6 +164,70 @@ export function TemplatesPage() {
         onPageChange={(next) => list.setPage(next - 1)}
         onPageSizeChange={list.setSize}
       />
+      {versionsTemplate && (
+        <TemplateVersionsModal template={versionsTemplate} onClose={() => setVersionsTemplate(null)} />
+      )}
     </div>
+  )
+}
+
+const versionDateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+
+function formatPublishedAt(value: string) {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : versionDateFormatter.format(parsed)
+}
+
+/**
+ * Lists the published versions of an inspection template (PBI-246, Part A).
+ * Consumes the existing GET /inspection-templates/{id}/versions endpoint and
+ * handles loading, empty and error (with retry) states. Mounted only while open,
+ * so each opening fetches fresh. Switching the active version (Part B) is out of
+ * scope: it depends on a product decision and backend changes.
+ */
+function TemplateVersionsModal({ template, onClose }: { template: TemplateSummary; onClose: () => void }) {
+  const { state, reload } = useTemplateVersions(template.id)
+
+  return (
+    <Modal open title={`Versões de ${template.title || 'modelo sem título'}`} onClose={onClose}>
+      {state.status === 'loading' && (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted">
+          <Loader2 className="animate-spin" size={16} aria-hidden />
+          Carregando versões...
+        </p>
+      )}
+      {state.status === 'empty' && (
+        <p className="text-sm text-muted">Este modelo ainda não possui versões publicadas.</p>
+      )}
+      {state.status === 'error' && (
+        <ErrorState message="Não foi possível carregar as versões do modelo." onRetry={reload} />
+      )}
+      {state.status === 'ready' && (
+        <ol className="space-y-3">
+          {state.versions.map((version) => (
+            <li key={version.id} className="rounded-fieldops border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold">Versão v{version.versionNumber}</p>
+                <Badge tone="success">Publicada</Badge>
+              </div>
+              <p className="mt-1 text-sm font-medium">{version.titleSnapshot}</p>
+              {version.descriptionSnapshot && (
+                <p className="mt-1 text-sm text-muted">{version.descriptionSnapshot}</p>
+              )}
+              <dl className="mt-2 grid gap-1 text-sm text-muted">
+                <div className="flex justify-between gap-4">
+                  <dt className="font-medium text-muted">Publicada em</dt>
+                  <dd className="text-text">{formatPublishedAt(version.publishedAt)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="font-medium text-muted">Publicada por</dt>
+                  <dd className="text-text">{version.publishedBy || '-'}</dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Modal>
   )
 }

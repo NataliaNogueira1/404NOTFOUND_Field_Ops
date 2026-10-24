@@ -29,6 +29,8 @@ export interface SyncStatusData {
   refresh: () => Promise<void>;
   /** Trigger the existing sync mechanism (no-op while offline or already syncing). */
   triggerSync: () => Promise<void>;
+  /** Mark all failed operations back to pending, then trigger a sync. */
+  retryFailed: () => Promise<void>;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -140,6 +142,16 @@ export function useSyncStatus(): SyncStatusData {
     await refresh();
   }, [isOnline, syncNow, refresh]);
 
+  const retryFailed = useCallback(async () => {
+    // Same guard rails as triggerSync — retrying offline or during a sync
+    // would only pile up more errors.
+    if (!db || !isOnline || isSyncingRef.current) return;
+    const queueRepo = new SyncQueueRepository(db);
+    await queueRepo.markAllPending();
+    await refresh();
+    await triggerSync();
+  }, [db, isOnline, refresh, triggerSync]);
+
   return {
     isOnline,
     isSyncing,
@@ -149,5 +161,6 @@ export function useSyncStatus(): SyncStatusData {
     lastSyncError,
     refresh,
     triggerSync,
+    retryFailed,
   };
 }

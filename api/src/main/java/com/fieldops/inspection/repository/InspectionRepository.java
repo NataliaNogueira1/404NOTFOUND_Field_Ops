@@ -65,10 +65,10 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
     @Query("""
         SELECT i.status, COUNT(i)
         FROM Inspection i
-        WHERE (:from IS NULL OR i.dueDate >= :from)
-          AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
-          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+        WHERE (CAST(:from AS date) IS NULL OR i.dueDate >= :from)
+          AND (CAST(:to AS date) IS NULL OR i.dueDate <= :to)
+          AND (CAST(:clientName AS string) IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (CAST(:technicianId AS long) IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.status
     """)
     List<Object[]> countByStatus(
@@ -81,10 +81,10 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
         SELECT i.priority, COUNT(i)
         FROM Inspection i
         WHERE i.status NOT IN :terminalStatuses
-          AND (:from IS NULL OR i.dueDate >= :from)
-          AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
-          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+          AND (CAST(:from AS date) IS NULL OR i.dueDate >= :from)
+          AND (CAST(:to AS date) IS NULL OR i.dueDate <= :to)
+          AND (CAST(:clientName AS string) IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (CAST(:technicianId AS long) IS NULL OR i.technician.id = :technicianId)
         GROUP BY i.priority
     """)
     List<Object[]> countByPriority(
@@ -99,10 +99,10 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
         FROM Inspection i
         WHERE i.dueDate < :today
           AND i.status NOT IN :terminalStatuses
-          AND (:from IS NULL OR i.dueDate >= :from)
-          AND (:to IS NULL OR i.dueDate <= :to)
-          AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
-          AND (:technicianId IS NULL OR i.technician.id = :technicianId)
+          AND (CAST(:from AS date) IS NULL OR i.dueDate >= :from)
+          AND (CAST(:to AS date) IS NULL OR i.dueDate <= :to)
+          AND (CAST(:clientName AS string) IS NULL OR LOWER(i.clientName) = :clientName)
+          AND (CAST(:technicianId AS long) IS NULL OR i.technician.id = :technicianId)
     """)
     long countOverdue(
             @Param("today") LocalDate today,

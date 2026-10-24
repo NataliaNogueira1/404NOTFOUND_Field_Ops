@@ -46,6 +46,12 @@ interface FieldOpsContextValue {
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
   addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
+  /**
+   * Persist the technician's handwritten signature for the given inspection
+   * (PBI-086). Saves the SVG data URI to SQLite so it survives offline restarts
+   * and is included in the conclusion payload when synced.
+   */
+  saveSignature: (inspectionId: string, signatureUri: string) => void;
   concludeInspection: (
     inspectionId: string,
     options?: {
@@ -419,6 +425,25 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getRepos, getSyncService]);
 
+  /**
+   * Persist the technician's handwritten signature (PBI-086).
+   * Updates in-memory state and saves the SVG data URI to SQLite. The signature
+   * is included in the sync payload when the inspection is concluded.
+   */
+  const saveSignature = useCallback((inspectionId: string, signatureUri: string) => {
+    setInspections((current) =>
+      current.map((insp) =>
+        insp.id === inspectionId
+          ? { ...insp, signatureUri, syncStatus: 'pending' as const }
+          : insp,
+      ),
+    );
+    const repos = getRepos();
+    if (repos) {
+      repos.inspection.saveSignature(inspectionId, signatureUri).catch(console.warn);
+    }
+  }, [getRepos]);
+
   const concludeInspection = useCallback(
     (
       inspectionId: string,
@@ -562,6 +587,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       addEvidence,
       retryEvidenceUpload,
       addNonConformity,
+      saveSignature,
       concludeInspection,
       reopenForCorrection,
       syncNow,
@@ -572,7 +598,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     [
       inspections, isLoading, answers, evidences, nonConformities, reviewComments, syncOperations,
       startInspection, answerItem, addEvidence, retryEvidenceUpload, addNonConformity,
-      concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
+      saveSignature, concludeInspection, reopenForCorrection, syncNow, resetSession, isSyncing, lastSyncError,
     ],
   );
 

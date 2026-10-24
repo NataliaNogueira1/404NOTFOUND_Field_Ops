@@ -39,6 +39,7 @@ import {
   InspectionRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '../InspectionSyncService';
+import { stableUuidFromSeed } from '../uuid';
 import type { Evidence } from '@/features/fieldops/types';
 
 const TOKEN = 'test-token';
@@ -209,6 +210,13 @@ describe('PBI-044 — photo pending on upload failure', () => {
     const result = await service.pushPendingOperations(TOKEN);
 
     expect(result.sent).toBe(1);
+    expect(mockUpload).toHaveBeenCalledWith(TOKEN, expect.objectContaining({
+      inspectionId: INSPECTION_ID,
+      itemId: ITEM_ID,
+      capturedAtDevice: evidence.capturedAt,
+      operationId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab]/i),
+    }));
+    expect(mockUpload.mock.calls[0][1]).not.toHaveProperty('responseId');
     const stored = await evidenceRepo.getById(evidence.id);
     expect(stored?.syncStatus).toBe('synced');
     expect(stored?.lastError).toBeUndefined();
@@ -371,5 +379,42 @@ describe('PBI-044 — photo pending on upload failure', () => {
 
     const ops = (await queueRepo.getAll()).filter((o) => o.entityId === evidence.id);
     expect(ops).toHaveLength(1);
+  });
+
+  // Regression — a LEGACY evidence row enqueued before the operationId was added
+  // to the payload (d64ece8) must still upload: the send path derives a STABLE
+  // operationId from the evidence id, so the backend no longer rejects it with
+  // "operationId is required", and a resend never duplicates (same derived id).
+  it('derives a stable operationId for a legacy evidence row missing it', async () => {
+    mockUpload.mockResolvedValue({ status: 'APPLIED' });
+    // No answer dependency (responseId undefined) so the upload is eligible
+    // immediately, like a legacy row whose answer was already applied.
+    const evidence = buildEvidence({ id: 'ev-legacy-1', responseId: undefined });
+    await evidenceRepo.add(evidence);
+    // Simulate an OLD outbox row: payload without operationId.
+    await queueRepo.enqueue(
+      InspectionSyncService.evidenceOperationId(evidence.id),
+      'UPLOAD',
+      'evidence',
+      evidence.id,
+      {
+        inspectionId: evidence.inspectionId,
+        itemId: ITEM_ID,
+        uri: evidence.uri,
+        description: evidence.description,
+        capturedAt: evidence.capturedAt,
+        // no operationId — this is the legacy shape
+      },
+    );
+
+    await service.pushPendingOperations(TOKEN);
+
+    // The upload went out (not rejected for a missing operationId) with a valid
+    // UUID derived from the evidence id. Being derived from the id makes it
+    // stable: any resend of this photo maps to the same server operation
+    // (idempotent — RN-068), never duplicating.
+    const call = mockUpload.mock.calls[0][1] as { operationId: string };
+    expect(call.operationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab]/i);
+    expect(call.operationId).toBe(stableUuidFromSeed(evidence.id));
   });
 });

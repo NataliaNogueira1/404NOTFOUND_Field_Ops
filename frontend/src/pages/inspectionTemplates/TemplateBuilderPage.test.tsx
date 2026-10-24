@@ -31,10 +31,10 @@ describe('TemplateBuilderPage sections', () => {
     expect(await screen.findByRole('heading', { name: 'Seguranca' })).not.toBeNull()
     expect(screen.getByRole('heading', { name: 'Eletrica' })).not.toBeNull()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Adicionar secao' }))
-    await userEvent.type(screen.getByLabelText('Titulo da secao'), 'Funcionamento')
-    await userEvent.type(screen.getByLabelText('Descricao da secao'), 'Testes operacionais')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar secao' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar seção' }))
+    await userEvent.type(screen.getByLabelText('Título da seção'), 'Funcionamento')
+    await userEvent.type(screen.getByLabelText('Descrição da seção'), 'Testes operacionais')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar seção' }))
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenLastCalledWith(
@@ -75,16 +75,16 @@ describe('TemplateBuilderPage sections', () => {
     )
 
     await userEvent.click(screen.getByRole('button', { name: 'Editar Seguranca' }))
-    const title = screen.getByLabelText('Titulo da secao')
+    const title = screen.getByLabelText('Título da seção')
     await userEvent.clear(title)
     await userEvent.type(title, 'Seguranca editada')
-    await userEvent.type(screen.getByLabelText('Descricao da secao'), 'Nova descricao')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar secao' }))
+    await userEvent.type(screen.getByLabelText('Descrição da seção'), 'Nova descricao')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar seção' }))
     expect(await screen.findByRole('heading', { name: 'Seguranca editada' })).not.toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir Seguranca editada' }))
-    expect(screen.getByText('Esta acao tambem exclui os itens vinculados a secao.')).not.toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: 'Excluir secao' }))
+    expect(screen.getByText('Esta ação também exclui os itens vinculados à seção.')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Excluir seção' }))
     await waitFor(() =>
       expect(fetchMock).toHaveBeenLastCalledWith(
         expect.stringContaining('/sections/11'),
@@ -118,12 +118,12 @@ describe('TemplateBuilderPage sections', () => {
     renderBuilder()
 
     await screen.findByRole('heading', { name: 'Seguranca' })
-    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item a secao' })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item à seção' })[0])
     expect(screen.getAllByRole('option')).toHaveLength(7)
-    await userEvent.type(screen.getByLabelText('Titulo (pergunta)'), 'Estado da placa')
-    await userEvent.type(screen.getByLabelText('Descricao (ajuda)'), 'Verifique danos')
+    await userEvent.type(screen.getByLabelText('Título (pergunta)'), 'Estado da placa')
+    await userEvent.type(screen.getByLabelText('Descrição (ajuda)'), 'Verifique danos')
     await userEvent.selectOptions(screen.getByLabelText('Tipo de resposta'), 'SINGLE_CHOICE')
-    const options = screen.getAllByLabelText(/Opcao \d/)
+    const options = screen.getAllByLabelText(/Opção \d/)
     await userEvent.type(options[0], 'Legivel')
     await userEvent.type(options[1], 'Danificada')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar item' }))
@@ -147,7 +147,7 @@ describe('TemplateBuilderPage sections', () => {
       ),
     )
     expect(await screen.findByText('Estado da placa')).not.toBeNull()
-    expect(screen.getByText('Selecao unica')).not.toBeNull()
+    expect(screen.getByText('Seleção única')).not.toBeNull()
     expect(screen.getByText('Ordem 1')).not.toBeNull()
   })
 
@@ -175,10 +175,10 @@ describe('TemplateBuilderPage sections', () => {
     renderBuilder()
 
     await screen.findByRole('heading', { name: 'Seguranca' })
-    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item a secao' })[0])
-    await userEvent.type(screen.getByLabelText('Titulo (pergunta)'), 'Cabos eletricos integros?')
-    await userEvent.click(screen.getByLabelText('Observacao obrigatoria na falha'))
-    await userEvent.click(screen.getByLabelText('Evidencia obrigatoria na falha'))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Adicionar item à seção' })[0])
+    await userEvent.type(screen.getByLabelText('Título (pergunta)'), 'Cabos eletricos integros?')
+    await userEvent.click(screen.getByLabelText('Observação obrigatória na falha'))
+    await userEvent.click(screen.getByLabelText('Evidência obrigatória na falha'))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar item' }))
 
     await waitFor(() =>
@@ -199,9 +199,9 @@ describe('TemplateBuilderPage sections', () => {
         }),
       ),
     )
-    expect(await screen.findByText('Obrigatorio')).not.toBeNull()
-    expect(screen.getByText('Observacao na falha')).not.toBeNull()
-    expect(screen.getByText('Evidencia na falha')).not.toBeNull()
+    expect(await screen.findByText('Obrigatório')).not.toBeNull()
+    expect(screen.getByText('Observação na falha')).not.toBeNull()
+    expect(screen.getByText('Evidência na falha')).not.toBeNull()
   })
 
   it('persists item reordering inside its section', async () => {
@@ -283,7 +283,7 @@ describe('TemplateBuilderPage sections', () => {
 
     await screen.findByText('Item 1')
     await userEvent.click(screen.getByRole('button', { name: 'Publicar' }))
-    expect(screen.getByText('Ao publicar, a versao nao podera ser alterada. Continuar?')).not.toBeNull()
+    expect(screen.getByText('Ao publicar, a versão não poderá ser alterada. Continuar?')).not.toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Continuar e publicar' }))
 
     await waitFor(() =>
