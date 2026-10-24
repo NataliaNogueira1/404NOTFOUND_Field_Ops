@@ -2,6 +2,7 @@ package com.fieldops.sync.service;
 
 import com.fieldops.evidence.service.EvidenceSyncService;
 import com.fieldops.audit.service.InspectionAnswerSyncService;
+import com.fieldops.inspection.dto.CapturedLocation;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.service.MobileInspectionService;
 import com.fieldops.nonconformity.service.NonConformitySyncService;
@@ -11,6 +12,7 @@ import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.sync.dto.EvidenceCreatePayload;
 import com.fieldops.sync.dto.NonConformityCreatePayload;
 import com.fieldops.sync.dto.AnswerUpsertPayload;
+import com.fieldops.sync.dto.InspectionStatusPayload;
 import com.fieldops.sync.dto.SyncOperationRequest;
 import com.fieldops.sync.dto.SyncOperationResult;
 import com.fieldops.sync.dto.SyncPushRequest;
@@ -185,8 +187,19 @@ public class SyncBatchService {
                     "Unknown status: " + payload.get("status").asText());
         }
 
+        // The optional GPS location captured at the transition (PBI-045). Parsed via the
+        // typed DTO so a malformed/absent location never breaks the status transition.
+        CapturedLocation location;
+        try {
+            InspectionStatusPayload typed =
+                    objectMapper.treeToValue(payload, InspectionStatusPayload.class);
+            location = typed.location();
+        } catch (JsonProcessingException ex) {
+            return SyncOperationResult.failed(op.operationId(), "Invalid INSPECTION_STATUS payload");
+        }
+
         var response = mobileInspectionService.updateStatus(
-                inspectionId, op.operationId(), status, op.baseVersion(), technicianId);
+                inspectionId, op.operationId(), status, op.baseVersion(), technicianId, location);
         return response.applied()
                 ? SyncOperationResult.applied(op.operationId())
                 : SyncOperationResult.alreadyApplied(op.operationId());

@@ -10,8 +10,8 @@ describe('InspectionReviewPage review data', () => {
   it('renders an unanswered item and loads separate history on demand', async () => {
     const fetchMock = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith('/history') ? history : review), { headers: { 'Content-Type': 'application/json' } }))); vi.stubGlobal('fetch', fetchMock)
     render(<MemoryRouter initialEntries={['/app/inspections/1/review']}><Routes><Route path="/app/inspections/:id/review" element={<InspectionReviewPage />} /></Routes></MemoryRouter>)
-    expect(await screen.findByText(/Item nao respondido/)).toBeInTheDocument(); expect(screen.getByText('Sem evidencias associadas a este item.')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('tab', { name: /historico/i })); expect(await screen.findByText('versao antiga')).toBeInTheDocument()
+    expect(await screen.findByText(/Item nao respondido/)).toBeInTheDocument(); expect(screen.getByText('Sem evidências associadas a este item.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /histórico/i })); expect(await screen.findByText('versao antiga')).toBeInTheDocument()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/api\/v1\/inspections\/1\/answers\/history$/), expect.anything()))
   })
 })

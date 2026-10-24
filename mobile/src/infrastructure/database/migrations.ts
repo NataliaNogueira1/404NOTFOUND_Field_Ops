@@ -7,7 +7,26 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 interface Migration {
   version: number;
   description: string;
-  sql: string;
+  /** Static SQL to run, or a function for migrations that must inspect the schema. */
+  sql?: string;
+  run?: (db: SQLiteDatabase) => Promise<void>;
+}
+
+/**
+ * Adds a column to a table only when it is not already present. SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`, and a device may already carry the column from a
+ * schema created by an earlier app build, so we guard against the duplicate to
+ * keep the migration idempotent (otherwise init fails with "duplicate column").
+ */
+async function addColumnIfMissing(
+  db: SQLiteDatabase,
+  table: string,
+  column: string,
+  definition: string,
+): Promise<void> {
+  const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  if (columns.some((entry) => entry.name === column)) return;
+  await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
 }
 
 const migrations: Migration[] = [
@@ -200,6 +219,62 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_review_comments_inspection_item ON review_comments(inspection_id, item_id);
     `,
   },
+  {
+    version: 7,
+    description: 'PBI-086: store technician handwritten signature URI on inspection',
+    sql: `
+      -- signature_uri stores the SVG data URI (base64) or a local file path
+      -- of the technician's handwritten signature captured at conclusion.
+      -- signature_required mirrors the template's per-inspection setting; when
+      -- 1 the conclusion flow blocks until a non-empty signature is provided.
+      ALTER TABLE inspections ADD COLUMN signature_uri TEXT;
+      ALTER TABLE inspections ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 8,
+    description: 'PBI-045: persist inspection completion location (legacy completion_* columns)',
+    // Kept for devices that already applied this migration on develop. The app now
+    // standardises on the end_* columns (v9) that match the backend contract, but
+    // dropping columns in SQLite is destructive, so these legacy columns are left
+    // in place (nullable, unused) to avoid rewriting the table.
+    sql: `
+      ALTER TABLE inspections ADD COLUMN completion_latitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_longitude REAL;
+      ALTER TABLE inspections ADD COLUMN completion_accuracy REAL;
+    `,
+  },
+  {
+    version: 9,
+    description: 'PBI-045: store conclusion GPS location and capture timestamps on inspections',
+    // End-of-inspection location + capture timestamps (PBI-040 / PBI-045 / RN-062).
+    // These end_* columns are the canonical ones the app reads/writes and mirror
+    // the backend contract. Added defensively: a device may already carry end_*
+    // from an earlier build, so each column is only added when missing to stay
+    // idempotent (RN-059).
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'end_latitude', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'end_longitude', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'end_accuracy', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'start_captured_at', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'end_captured_at', 'TEXT');
+    },
+  },
+  {
+    version: 10,
+    description: 'Reconcile v3 outbox columns on devices with a drifted schema',
+    // Some devices recorded v3 as applied without actually gaining its columns
+    // (schema drift between earlier app builds), so enqueue fails with
+    // "sync_queue has no column named dependency_ids". Re-add every v3 column
+    // defensively; each is a no-op when already present (idempotent guard).
+    run: async (db) => {
+      await addColumnIfMissing(db, 'sync_queue', 'dependency_ids', "TEXT NOT NULL DEFAULT '[]'");
+      await addColumnIfMissing(db, 'evidences', 'operation_id', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'response_id', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'last_error', 'TEXT');
+      await addColumnIfMissing(db, 'evidences', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 /**
@@ -225,7 +300,11 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   for (const migration of migrations) {
     if (appliedVersions.has(migration.version)) continue;
 
-    await db.execAsync(migration.sql);
+    if (migration.run) {
+      await migration.run(db);
+    } else if (migration.sql) {
+      await db.execAsync(migration.sql);
+    }
     await db.runAsync(
       'INSERT INTO _migrations (version, description) VALUES (?, ?)',
       migration.version,

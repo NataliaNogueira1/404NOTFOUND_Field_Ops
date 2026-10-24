@@ -72,15 +72,17 @@ describe('LoginPage — dark theme (issue #172)', () => {
 
   it('tagline does not use hardcoded slate text colors', () => {
     renderLoginPage()
-    const tagline = screen.getByText(/transforme inspecoes de campo/i)
-    expect(tagline.className).not.toMatch(/text-slate-\d/)
+    // The phrase now rotates (PBI-274) and renders inside a keyed span; the
+    // color token lives on the containing paragraph (the aria-live region).
+    const tagline = screen.getByText(/transforme inspeções de campo/i).closest('[aria-live]')
+    expect(tagline?.className).not.toMatch(/text-slate-\d/)
   })
 
   it('tagline uses a semantic token class that adapts to dark mode', () => {
     renderLoginPage()
-    const tagline = screen.getByText(/transforme inspecoes de campo/i)
+    const tagline = screen.getByText(/transforme inspeções de campo/i).closest('[aria-live]')
     // text-muted is redefined under .dark in index.css
-    expect(tagline.className).toMatch(/text-muted/)
+    expect(tagline?.className).toMatch(/text-muted/)
   })
 
   it('AuthLayout outer wrapper uses semantic bg-app-bg', () => {
@@ -112,7 +114,7 @@ describe('LoginPage — dark theme (issue #172)', () => {
 
     expect(screen.getByRole('button', { name: /admin/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /supervisor/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /tecnico/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /técnico/i })).toBeInTheDocument()
   })
 
   it('admin quick-fill button populates the email field', async () => {

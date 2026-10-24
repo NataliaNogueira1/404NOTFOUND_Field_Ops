@@ -1,5 +1,6 @@
 package com.fieldops.inspection.service;
 
+import com.fieldops.inspection.dto.CapturedLocation;
 import com.fieldops.inspection.dto.MobileInspectionResponse;
 import com.fieldops.inspection.dto.MobileStatusUpdateResponse;
 import com.fieldops.inspection.mapper.MobileInspectionResponseMapper;
@@ -49,7 +50,8 @@ public class MobileInspectionService {
      */
     @Transactional
     public MobileStatusUpdateResponse updateStatus(Long inspectionId, UUID operationId,
-            InspectionStatus targetStatus, Long baseVersion, Long technicianId) {
+            InspectionStatus targetStatus, Long baseVersion, Long technicianId,
+            CapturedLocation location) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
 
@@ -77,11 +79,34 @@ public class MobileInspectionService {
         if (targetStatus == InspectionStatus.IN_PROGRESS && inspection.getStartedAt() == null) {
             inspection.setStartedAt(Instant.now());
         }
+        // Persist the one-shot GPS location captured at this transition (PBI-045): the
+        // start reading on IN_PROGRESS, the conclusion reading on SUBMITTED. Absent when
+        // the technician opted out or was denied the permission (RN-059).
+        applyLocation(inspection, targetStatus, location);
         inspectionRepository.save(inspection);
         idempotencyService.markProcessed(operationId, OP_TYPE_STATUS, inspection.getId(),
                 targetStatus.name());
 
         return MobileStatusUpdateResponse.applied(inspection.getId(), inspection.getStatus());
+    }
+
+    /** Stores the captured location on the start or end slot according to the target status. */
+    private void applyLocation(Inspection inspection, InspectionStatus targetStatus,
+            CapturedLocation location) {
+        if (location == null || !location.hasCoordinates()) {
+            return;
+        }
+        if (targetStatus == InspectionStatus.IN_PROGRESS) {
+            inspection.setStartLatitude(location.latitude());
+            inspection.setStartLongitude(location.longitude());
+            inspection.setStartAccuracy(location.accuracy());
+            inspection.setStartCapturedAt(location.capturedAt());
+        } else if (targetStatus == InspectionStatus.SUBMITTED) {
+            inspection.setEndLatitude(location.latitude());
+            inspection.setEndLongitude(location.longitude());
+            inspection.setEndAccuracy(location.accuracy());
+            inspection.setEndCapturedAt(location.capturedAt());
+        }
     }
 
     /**
