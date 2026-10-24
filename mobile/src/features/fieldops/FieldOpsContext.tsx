@@ -158,6 +158,13 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     const commentRepo = new ReviewCommentRepository(db);
     const sqRepo = new SyncQueueRepository(db);
 
+    // Reconcile each inspection's pending-sync state against the REAL outbox
+    // before hydrating the UI, so the home counter is correct on app open too —
+    // not only right after a sync. This heals values left stuck by an earlier
+    // build (e.g. the optimistic "5" from concludeInspection) whose operations
+    // have since left the queue.
+    await reconcilePendingSync(inspRepo, sqRepo);
+
     const dbInspections = await inspRepo.getAll();
     setInspections(dbInspections);
 
