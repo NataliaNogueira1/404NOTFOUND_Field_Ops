@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -13,6 +13,7 @@ import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
 import {
   getNotificationSettings,
   setNotificationsEnabled,
+  sendTestReminder,
   type InspectionReminderInput,
   type NotificationSettings,
 } from '@/infrastructure/notifications/localNotifications';
@@ -80,6 +81,17 @@ export default function ProfileScreen() {
     } finally {
       setIsTogglingNotifications(false);
     }
+  }
+
+  // DEV-only: fire a sample local notification in ~5s to verify the pipeline.
+  async function handleSendTestReminder() {
+    const scheduled = await sendTestReminder(5);
+    Alert.alert(
+      scheduled ? 'Notificação de teste agendada' : 'Não foi possível agendar',
+      scheduled
+        ? 'Você receberá um lembrete de teste em alguns segundos.'
+        : 'Verifique a permissão de notificações e se o app roda em um build nativo (não Expo Go).',
+    );
   }
 
   const notificationsEnabled = notifications?.enabled ?? false;
@@ -187,6 +199,15 @@ export default function ProfileScreen() {
               }}
             />
           </View>
+
+          {__DEV__ && notificationsSupported ? (
+            <Button
+              label="Enviar notificação de teste (5s)"
+              onPress={() => void handleSendTestReminder()}
+              variant="secondary"
+              fullWidth
+            />
+          ) : null}
         </Card>
 
         {/* Security settings */}

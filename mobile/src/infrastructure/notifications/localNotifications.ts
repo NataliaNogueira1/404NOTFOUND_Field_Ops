@@ -143,6 +143,46 @@ export async function setNotificationsEnabled(
   return getNotificationSettings();
 }
 
+/**
+ * DEV-only helper: fires a sample local reminder after a few seconds so the
+ * notification pipeline (permission, Android channel, tap-to-open) can be
+ * verified without waiting for a real 08:00/17:00 trigger. Not used in
+ * production flows.
+ *
+ * Returns `true` when the test notification was scheduled, `false` when the
+ * runtime does not support it or permission is missing.
+ */
+export async function sendTestReminder(seconds = 5): Promise<boolean> {
+  const notifications = loadNotifications();
+  if (!notifications) return false;
+
+  const granted = await requestNotificationPermission();
+  if (!granted) return false;
+
+  try {
+    await ensureAndroidChannel(notifications);
+    const channelId = Platform.OS === 'android' ? 'inspections' : undefined;
+
+    await notifications.scheduleNotificationAsync({
+      identifier: 'local-test-reminder',
+      content: {
+        title: '🔔 Teste de lembrete',
+        body: 'Esta é uma notificação local de teste do FieldOps.',
+        data: { test: true },
+      },
+      trigger: {
+        type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: Math.max(1, seconds),
+        ...(channelId ? { channelId } : {}),
+      },
+    });
+    return true;
+  } catch (err) {
+    console.warn('[localNotifications] Failed to schedule test reminder:', err);
+    return false;
+  }
+}
+
 // ─── Inspection input type ─────────────────────────────────────────────────────
 
 export interface InspectionReminderInput {
