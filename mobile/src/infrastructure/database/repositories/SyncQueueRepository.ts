@@ -196,6 +196,41 @@ export class SyncQueueRepository {
   }
 
   /**
+   * Rewrite an operation's baseVersion inside its JSON payload and move it back
+   * to 'pending' so the sync worker retries it with the fresh server version.
+   *
+   * Used to auto-reconcile a version CONFLICT (PBI-055): when start + conclusion
+   * are queued offline with a stale baseVersion, applying the start bumps the
+   * server version and the conclusion is rejected (local=0, server=1). Pulling
+   * the inspection refreshes the local serverVersion; this rewrites the queued
+   * conclusion with it so the resend applies. Idempotent on the backend via the
+   * stable operationId, so a resend never double-applies. attempts is bumped so
+   * the worker can cap retries and avoid an infinite loop.
+   */
+  async requeueWithBaseVersion(id: string, baseVersion: number): Promise<void> {
+    const row = await this.db.getFirstAsync<{ payload: string }>(
+      'SELECT payload FROM sync_queue WHERE id = ?',
+      id,
+    );
+    if (!row) return;
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(row.payload) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    payload.baseVersion = baseVersion;
+    await this.db.runAsync(
+      `UPDATE sync_queue
+         SET payload = ?, status = 'pending', last_error = NULL,
+             attempts = attempts + 1, updated_at = datetime('now')
+       WHERE id = ?`,
+      JSON.stringify(payload),
+      id,
+    );
+  }
+
+  /**
    * Move ALL failed operations back to pending so the next sync retries them.
    * Used by the "Tentar novamente" button on the sync screen when multiple
    * operations are stuck in error after a previous failed sync cycle.

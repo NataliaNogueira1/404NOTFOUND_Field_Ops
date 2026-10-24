@@ -407,6 +407,10 @@ export class InspectionSyncService {
 
       let sent = 0;
       let failed = 0;
+      // Tracks whether a CONFLICT was auto-reconciled this pass (version refreshed
+      // and operation re-queued). Counts as progress so the drain loop runs
+      // another pass to resend it, even if nothing else was sent.
+      let reconciled = 0;
       for (const operation of pending) {
         try {
           await this.syncQueueRepo.markInProgress(operation.id);
@@ -421,6 +425,17 @@ export class InspectionSyncService {
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           if (err instanceof VersionConflictError) {
+            // Auto-reconcile a stale-version conflict on an inspection transition
+            // (PBI-055): start+conclusion queued offline freeze baseVersion=0, so
+            // after the start bumps the server to v1 the conclusion is rejected
+            // (local=0, server=1). Pull the inspection to refresh the local
+            // serverVersion, rewrite the queued baseVersion and retry. Capped by
+            // attempts so a genuine, unresolvable conflict still ends terminal.
+            const reconciledOk = await this.tryReconcileConflict(token, operation);
+            if (reconciledOk) {
+              reconciled++;
+              continue;
+            }
             await this.syncQueueRepo.markConflict(operation.id, msg);
             allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
             continue;
@@ -444,12 +459,48 @@ export class InspectionSyncService {
       totalSent += sent;
       totalFailed += failed;
 
-      // If nothing was sent (all failed or conflicted), break to avoid
-      // an infinite loop — failed operations stay in the queue for retry.
-      if (sent === 0) break;
+      // Keep draining while real progress was made: either something was sent OR
+      // a conflict was reconciled and re-queued for another attempt. If neither
+      // happened, break to avoid an infinite loop (remaining ops stay for retry).
+      if (sent === 0 && reconciled === 0) break;
     }
 
     return { sent: totalSent, failed: totalFailed, errors: allErrors };
+  }
+
+  // Max automatic retries for a version-conflicted inspection transition before
+  // it is left as a terminal CONFLICT for the technician to resolve. One retry
+  // covers the common start→conclusion case; the cap prevents an infinite loop
+  // when the server keeps advancing for another reason.
+  private static readonly MAX_CONFLICT_RETRIES = 2;
+
+  /**
+   * Try to auto-reconcile a version CONFLICT for an inspection transition by
+   * pulling the fresh server version and re-queuing the operation with it.
+   * Returns true when the operation was re-queued for retry, false when it
+   * should be marked as a terminal conflict (non-transition op, retry cap
+   * reached, or the pull/refresh did not yield a usable version).
+   */
+  private async tryReconcileConflict(
+    token: string,
+    operation: { id: string; entityType: string; entityId: string; attempts: number },
+  ): Promise<boolean> {
+    if (operation.entityType !== 'inspection') return false;
+    if (operation.attempts >= InspectionSyncService.MAX_CONFLICT_RETRIES) return false;
+
+    try {
+      // Refresh the local serverVersion from the server (saveInspectionLocally
+      // stores serverVersion = apiInsp.version).
+      await this.pullInspection(token, operation.entityId);
+    } catch {
+      return false;
+    }
+
+    const fresh = await this.inspectionRepo.getById(operation.entityId);
+    if (!fresh || fresh.serverVersion === undefined) return false;
+
+    await this.syncQueueRepo.requeueWithBaseVersion(operation.id, fresh.serverVersion);
+    return true;
   }
 
   private async sendOperation(
