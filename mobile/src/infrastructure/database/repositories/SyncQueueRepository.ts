@@ -110,6 +110,34 @@ export class SyncQueueRepository {
   }
 
   /**
+   * Count still-pending operations grouped by the inspection they belong to.
+   *
+   * An operation's entity_id points at the entity itself (answer/evidence/nc id)
+   * or, for inspection transitions, at the inspection id. We resolve the owning
+   * inspection by LEFT JOINing each child table on entity_id and coalescing to
+   * the direct entity_id for inspection ops. Used to reconcile the per-inspection
+   * pendingSyncCount against the real outbox after a sync, so the home counter
+   * never stays stuck on a value that no longer matches the queue.
+   */
+  async countPendingByInspection(): Promise<Map<string, number>> {
+    const rows = await this.db.getAllAsync<{ owning_inspection_id: string; count: number }>(
+      `SELECT COALESCE(a.inspection_id, e.inspection_id, n.inspection_id, q.entity_id) AS owning_inspection_id,
+              COUNT(*) AS count
+         FROM sync_queue q
+         LEFT JOIN answers a          ON q.entity_type = 'answer'          AND q.entity_id = a.id
+         LEFT JOIN evidences e        ON q.entity_type = 'evidence'        AND q.entity_id = e.id
+         LEFT JOIN non_conformities n ON q.entity_type = 'non_conformity'  AND q.entity_id = n.id
+        WHERE q.status IN ('pending', 'error', 'in_progress', 'conflict')
+        GROUP BY owning_inspection_id`,
+    );
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.owning_inspection_id) counts.set(row.owning_inspection_id, row.count);
+    }
+    return counts;
+  }
+
+  /**
    * Mark an operation as successfully sent.
    */
   async markSent(id: string): Promise<void> {

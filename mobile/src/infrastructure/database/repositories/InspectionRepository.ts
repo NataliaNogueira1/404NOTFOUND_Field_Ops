@@ -305,6 +305,23 @@ export class InspectionRepository {
   }
 
   /**
+   * Reconcile an inspection's pending-sync state against the real outbox. Keeps
+   * the home "pending" counter honest: once the outbox has no operations left
+   * for this inspection, pending_sync_count goes to 0 and sync_status to
+   * 'synced', instead of staying stuck on a value set optimistically when the
+   * action was queued. Does not bump updated_at — this is a local UI
+   * reconciliation, not a change the server needs to hear about.
+   */
+  async setSyncState(id: string, pendingCount: number): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET pending_sync_count = ?, sync_status = ? WHERE id = ?`,
+      pendingCount,
+      pendingCount > 0 ? 'pending' : 'synced',
+      id,
+    );
+  }
+
+  /**
    * Persist the technician's handwritten signature for the given inspection
    * (PBI-086). The value is an SVG data URI (base64) produced by SignaturePad
    * and is stored alongside the inspection row so it survives offline restarts.

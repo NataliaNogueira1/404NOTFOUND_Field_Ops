@@ -80,6 +80,26 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
   }
 }
 
+// Reconciles every inspection's pending-sync state with the real outbox after a
+// sync cycle. The per-action pendingSyncCount is set optimistically when an
+// operation is queued (e.g. the fixed "5" on conclusion); once the queue is
+// drained by the sync, those values must drop back to 0 / 'synced'. Inspections
+// with no remaining queued operation are reset; the rest get their real count.
+async function reconcilePendingSync(
+  inspectionRepo: InspectionRepository,
+  syncQueueRepo: SyncQueueRepository,
+): Promise<void> {
+  const [inspections, pendingByInspection] = await Promise.all([
+    inspectionRepo.getAll(),
+    syncQueueRepo.countPendingByInspection(),
+  ]);
+  await Promise.all(
+    inspections.map((inspection) =>
+      inspectionRepo.setSyncState(inspection.id, pendingByInspection.get(inspection.id) ?? 0),
+    ),
+  );
+}
+
 // Friendly label for a queued operation shown on the sync screen. Photos get a
 // distinct label so a failed upload reads like "Foto: <id>" (PBI-044).
 function describeOperation(entityType: string, entityId: string): string {
@@ -527,9 +547,15 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
       if (result.errors.length > 0) {
         setLastSyncError(result.errors[0]);
       }
-      // Reload inspections from DB after sync
       const repos = getRepos();
-      if (repos) {
+      if (repos && db) {
+        // Reconcile each inspection's pending-sync state against the REAL outbox
+        // so the home counter never stays stuck on the optimistic value set when
+        // the action was queued (e.g. the fixed "5" from concludeInspection).
+        // After a successful sync the queue is drained, so most inspections map
+        // to 0 and flip back to 'synced'.
+        await reconcilePendingSync(repos.inspection, new SyncQueueRepository(db));
+        // Reload inspections from DB after sync (now carrying reconciled counts).
         const fresh = await repos.inspection.getAll();
         if (fresh.length > 0) setInspections(fresh);
       }
@@ -538,7 +564,7 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsSyncing(false);
     }
-  }, [getSyncService, getRepos, token]);
+  }, [getSyncService, getRepos, token, db]);
 
   const resetSession = useCallback(async () => {
     // Reset in-memory state
