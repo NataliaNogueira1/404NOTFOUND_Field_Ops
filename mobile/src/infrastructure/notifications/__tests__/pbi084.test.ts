@@ -142,6 +142,39 @@ describe('scheduleInspectionReminders', () => {
     expect(pre.getDate()).toBe(due.getDate() - 1 >= 0 ? due.getDate() - 1 : pre.getDate());
     expect(pre.getTime()).toBeLessThan(due.getTime());
   });
+
+  it('fires the due-day reminder at the inspection dueTime when provided', async () => {
+    await scheduleInspectionReminders(input({ dueTime: '14:30' }));
+
+    const dueCall = scheduleMock.mock.calls.find(
+      (c) => (c[0] as { identifier: string }).identifier === 'local-due-insp-1',
+    );
+    const due = new Date((dueCall![0] as { trigger: { date: Date } }).trigger.date);
+    expect(due.getHours()).toBe(14);
+    expect(due.getMinutes()).toBe(30);
+
+    // The pre-reminder stays at the fixed 17:00 early-warning, ignoring dueTime.
+    const preCall = scheduleMock.mock.calls.find(
+      (c) => (c[0] as { identifier: string }).identifier === 'local-pre-insp-1',
+    );
+    const pre = new Date((preCall![0] as { trigger: { date: Date } }).trigger.date);
+    expect(pre.getHours()).toBe(17);
+    expect(pre.getMinutes()).toBe(0);
+  });
+
+  it.each(['', '  ', 'invalid', '25:00', '12:99'])(
+    'falls back to 08:00 when dueTime is empty or malformed (%j)',
+    async (dueTime) => {
+      await scheduleInspectionReminders(input({ dueTime }));
+
+      const dueCall = scheduleMock.mock.calls.find(
+        (c) => (c[0] as { identifier: string }).identifier === 'local-due-insp-1',
+      );
+      const due = new Date((dueCall![0] as { trigger: { date: Date } }).trigger.date);
+      expect(due.getHours()).toBe(8);
+      expect(due.getMinutes()).toBe(0);
+    },
+  );
 });
 
 describe('cancelInspectionReminders', () => {

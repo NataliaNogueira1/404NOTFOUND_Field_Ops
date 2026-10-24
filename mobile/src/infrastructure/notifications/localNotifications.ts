@@ -97,7 +97,12 @@ const TERMINAL_STATUSES = new Set([
 
 // ─── Identifier helpers ────────────────────────────────────────────────────────
 
-/** Notification id for the "on the due day" reminder (fires at 08:00). */
+/** Default hour for the due-day reminder when the inspection has no `dueTime`. */
+const DEFAULT_DUE_HOUR = 8;
+/** Hour for the "day before" reminder (fixed early-warning at 17:00). */
+const PRE_REMINDER_HOUR = 17;
+
+/** Notification id for the "on the due day" reminder. */
 function dueDayId(inspectionId: string): string {
   return `local-due-${inspectionId}`;
 }
@@ -108,6 +113,24 @@ function preReminderId(inspectionId: string): string {
 }
 
 // ─── Schedule helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Parses an optional `HH:mm` time string.
+ * Returns `null` when empty/absent or malformed, so callers can fall back to a
+ * default hour. Accepts only valid 24h times (00:00–23:59).
+ */
+function parseDueTime(dueTime?: string): { hour: number; minute: number } | null {
+  if (!dueTime) return null;
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(dueTime.trim());
+  if (!match) return null;
+
+  const hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  return { hour, minute };
+}
 
 /**
  * Build a Date object for a specific time on a given `YYYY-MM-DD` date.
@@ -134,8 +157,10 @@ function buildTriggerDate(
 
 /**
  * Schedules up to two local reminders for a single inspection:
- *   1. "On the due day"  → fires at 08:00 on `dueDate`
- *   2. "1 day before"   → fires at 17:00 the day before `dueDate`
+ *   1. "On the due day"  → fires at the inspection's `dueTime` ('HH:mm') on
+ *                          `dueDate`, or at 08:00 when `dueTime` is absent/invalid.
+ *   2. "1 day before"   → fires at 17:00 the day before `dueDate` (fixed
+ *                          early-warning; independent of `dueTime`).
  *
  * - Only schedules for inspections in ASSIGNED or IN_PROGRESS status.
  * - Skips silently if the trigger date is already in the past.
@@ -162,8 +187,11 @@ export async function scheduleInspectionReminders(
     const channelId =
       Platform.OS === 'android' ? 'inspections' : undefined;
 
-    // ── 1. Due-day notification (08:00 on dueDate) ──────────────────────────
-    const dueDayTrigger = buildTriggerDate(inspection.dueDate, 8, 0);
+    // ── 1. Due-day notification (at the inspection's dueTime, else 08:00) ───
+    const dueTime = parseDueTime(inspection.dueTime);
+    const dueHour = dueTime?.hour ?? DEFAULT_DUE_HOUR;
+    const dueMinute = dueTime?.minute ?? 0;
+    const dueDayTrigger = buildTriggerDate(inspection.dueDate, dueHour, dueMinute);
     if (dueDayTrigger) {
       await notifications.scheduleNotificationAsync({
         identifier: dueDayId(inspection.id),
@@ -195,7 +223,7 @@ export async function scheduleInspectionReminders(
         String(dayBefore.getDate()).padStart(2, '0'),
       ].join('-');
 
-      const preTrigger = buildTriggerDate(dayBeforeStr, 17, 0);
+      const preTrigger = buildTriggerDate(dayBeforeStr, PRE_REMINDER_HOUR, 0);
       if (preTrigger) {
         await notifications.scheduleNotificationAsync({
           identifier: preReminderId(inspection.id),
