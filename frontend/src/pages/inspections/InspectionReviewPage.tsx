@@ -46,7 +46,7 @@ function Content({ review, comments, inspectionId, onCommentsChanged, onOpen }: 
   const counts = useMemo(() => review.sections.flatMap(section => section.items).reduce((value, item) => ({ total: value.total + 1, answered: value.answered + Number(item.answer !== null) }), { total: 0, answered: 0 }), [review]); const allPhotos = review.sections.flatMap(section => section.items.flatMap(item => item.evidences.map(evidence => photo(evidence, item.title))))
   return <>
     <section className="grid gap-4 md:grid-cols-5"><Summary label="Técnico" value={review.technicianName} /><Summary label="Cliente" value={review.clientName} /><Summary label="Local" value={review.siteName} /><Summary label="Prazo" value={formatDate(review.dueDate)} /><Summary label="Respostas" value={`${counts.answered}/${counts.total}`} /></section>
-    <section aria-label="Localizacao da inspecao" className="grid gap-4 md:grid-cols-2"><LocationCard label="Localizacao de inicio" location={review.startLocation} /><LocationCard label="Localizacao de conclusao" location={review.endLocation} /></section>
+    <section aria-label="Localização da inspeção" className="grid gap-4 md:grid-cols-2"><LocationCard label="Localização de início" location={review.startLocation} /><LocationCard label="Localização de conclusão" location={review.endLocation} /></section>
     {review.sections.length > 1 && <nav aria-label="Navegação por seção" className="flex flex-wrap gap-2"><span className="self-center text-sm font-medium text-muted">Ir para:</span>{review.sections.map(section => <a key={`${section.order}-${section.title}`} href={`#review-section-${section.order}`} className="focus-ring rounded-fieldops border border-border bg-surface px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary-light/20">{section.title}</a>)}</nav>}
     <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]"><div className="space-y-4">
       {review.sections.map(section => <Card key={`${section.order}-${section.title}`} id={`review-section-${section.order}`} className="scroll-mt-24 p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-semibold">{section.title}</h2><span className="text-sm text-muted">{section.items.filter(item => item.answer !== null).length}/{section.items.length}</span></div>
@@ -73,10 +73,10 @@ function LocationCard({ label, location }: { label: string; location: ReviewLoca
   return <Card className="p-4">
     <p className="text-xs font-medium text-muted">{label}</p>
     {!location
-      ? <p className="mt-1 text-sm text-muted">Localizacao nao registrada</p>
+      ? <p className="mt-1 text-sm text-muted">Localização não registrada</p>
       : <div className="mt-1 space-y-1">
           <p className="text-sm font-semibold">{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</p>
-          <p className="text-xs text-muted">{location.accuracy === null ? 'Precisao indisponivel' : `Precisao: ${Math.round(location.accuracy)} m`}{location.capturedAt ? ` · ${formatDate(location.capturedAt)}` : ''}</p>
+          <p className="text-xs text-muted">{location.accuracy === null ? 'Precisão indisponível' : `Precisão: ${Math.round(location.accuracy)} m`}{location.capturedAt ? ` · ${formatDate(location.capturedAt)}` : ''}</p>
           <a className="focus-ring inline-flex items-center gap-1 text-sm font-semibold text-primary" href={mapsUrl(location)} target="_blank" rel="noreferrer" aria-label={`Ver ${label.toLowerCase()} no mapa`}><MapPin size={15} />Ver no mapa</a>
         </div>}
   </Card>

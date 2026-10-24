@@ -35,17 +35,17 @@ describe('InspectionReviewPage location (PBI-045)', () => {
     expect(await screen.findByText('-23.501500, -47.452600')).toBeInTheDocument()
     expect(screen.getByText('-23.502100, -47.453100')).toBeInTheDocument()
     // Accuracy is rounded to whole metres.
-    expect(screen.getByText(/Precisao: 9 m/)).toBeInTheDocument()
-    expect(screen.getByText(/Precisao: 12 m/)).toBeInTheDocument()
+    expect(screen.getByText(/Precisão: 9 m/)).toBeInTheDocument()
+    expect(screen.getByText(/Precisão: 12 m/)).toBeInTheDocument()
 
-    const mapLink = screen.getByRole('link', { name: 'Ver localizacao de inicio no mapa' })
+    const mapLink = screen.getByRole('link', { name: 'Ver localização de início no mapa' })
     expect(mapLink).toHaveAttribute('href', 'https://www.google.com/maps?q=-23.5015,-47.4526')
   })
 
   it('renders an explicit "not registered" state when a location is absent (RN-059)', async () => {
     renderWith({ ...baseReview, startLocation: null, endLocation: null })
 
-    const notRegistered = await screen.findAllByText('Localizacao nao registrada')
+    const notRegistered = await screen.findAllByText('Localização não registrada')
     expect(notRegistered).toHaveLength(2)
     expect(screen.queryByRole('link', { name: /no mapa/ })).not.toBeInTheDocument()
   })
