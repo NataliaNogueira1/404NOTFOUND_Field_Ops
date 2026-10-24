@@ -72,7 +72,7 @@ export class EvidenceUploadClient {
     });
 
     if (result.status < 200 || result.status >= 300) {
-      throw new Error(`Upload falhou (API ${result.status}): ${result.body}`);
+      throw new Error(`Upload falhou (API ${result.status}): ${describeError(result.body)}`);
     }
 
     const data = parseResponse(result.body);
@@ -86,6 +86,31 @@ function parseResponse(body: string): { id?: number; checksum?: string } {
     return JSON.parse(body) as { id?: number; checksum?: string };
   } catch {
     return {};
+  }
+}
+
+/**
+ * Extract a readable message from the standardized backend ErrorResponse
+ * ({ code, message, fieldErrors }). Falls back to the raw body when it is not
+ * the expected JSON shape, so the sync screen shows the real cause instead of a
+ * truncated timestamp blob.
+ */
+function describeError(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      code?: string;
+      message?: string;
+      fieldErrors?: { field: string; message: string }[];
+    };
+    const fields = parsed.fieldErrors?.length
+      ? ` (${parsed.fieldErrors.map((f) => `${f.field}: ${f.message}`).join(', ')})`
+      : '';
+    if (parsed.code || parsed.message) {
+      return `${parsed.code ?? ''} ${parsed.message ?? ''}${fields}`.trim();
+    }
+    return body;
+  } catch {
+    return body;
   }
 }
 
