@@ -1,4 +1,4 @@
-import { apiRequest } from '@/api/client'
+import { apiRequest, ApiError } from '@/api/client'
 import { UserRole, type User } from '@/types/domain'
 
 export type BackendRole = 'TECHNICIAN' | 'SUPERVISOR' | 'ADMINISTRATOR'
@@ -43,5 +43,24 @@ export const authApi = {
   },
   me() {
     return apiRequest<BackendUser>('/api/v1/auth/me')
+  },
+  /**
+   * Requests a self-service password-reset e-mail.
+   *
+   * The server is intentionally silent — it always returns 204 whether or not
+   * the address is registered. A 404 from the backend is also treated as
+   * success here to avoid leaking whether an e-mail exists.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    try {
+      await apiRequest<void>('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      })
+    } catch (error) {
+      // 404 = server chose to stay silent on unknown addresses → treat as success.
+      if (error instanceof ApiError && error.status === 404) return
+      throw error
+    }
   },
 }
