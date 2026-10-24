@@ -10,12 +10,35 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: demo
-      - key: DATABASE_URL
+      # Inject the managed Postgres credentials as discrete values. Spring builds the
+      # JDBC URL from DB_HOST/DB_PORT/DB_NAME in application.yml, so we must NOT pass the
+      # raw connectionString (postgresql://user:pass@host/db): the PostgreSQL JDBC driver
+      # does not read user/password embedded in the URL and would treat "user:pass@host"
+      # as the hostname and fail (issue #204).
+      - key: DB_HOST
         fromDatabase:
           name: fieldops-demo-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: fieldops-demo-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: fieldops-demo-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: fieldops-demo-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: fieldops-demo-db
+          property: password
       - key: JWT_SECRET
         generateValue: true
+      # Must list explicit public origins (never "*"): CORS runs with allowCredentials(true),
+      # which is invalid combined with a wildcard origin (issue #204, gap A3).
       - key: CORS_ALLOWED_ORIGINS
         sync: false
 
