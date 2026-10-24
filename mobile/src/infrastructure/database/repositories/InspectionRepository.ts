@@ -7,6 +7,18 @@ import type {
   TemplateItem,
 } from '@/features/fieldops/types';
 
+/**
+ * One-shot GPS reading persisted with a start/conclusion transition (PBI-045).
+ * Kept as a local shape so the repository does not depend on the location hook.
+ * All coordinate fields are optional because capturing is optional (RN-059).
+ */
+interface DeviceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: string;
+}
+
 // Snapshot section/item ids are unique only within a template. Scoping them to the
 // inspection keeps the global TEXT PRIMARY KEY unique when several inspections share
 // the same template, and keeps answers/evidences pointing at the right item.
@@ -44,9 +56,11 @@ interface InspectionRow {
   start_latitude: number | null;
   start_longitude: number | null;
   start_accuracy: number | null;
-  completion_latitude: number | null;
-  completion_longitude: number | null;
-  completion_accuracy: number | null;
+  start_captured_at: string | null;
+  end_latitude: number | null;
+  end_longitude: number | null;
+  end_accuracy: number | null;
+  end_captured_at: string | null;
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
@@ -260,7 +274,7 @@ export class InspectionRepository {
   async markStartedWithDevice(
     id: string,
     startedAtDevice: string,
-    location: { latitude: number; longitude: number; accuracy?: number } | null,
+    location: DeviceLocation | null,
   ): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections SET
@@ -269,6 +283,7 @@ export class InspectionRepository {
          start_latitude = ?,
          start_longitude = ?,
          start_accuracy = ?,
+         start_captured_at = ?,
          sync_status = 'pending',
          updated_at = datetime('now')
        WHERE id = ?`,
@@ -276,6 +291,7 @@ export class InspectionRepository {
       location?.latitude ?? null,
       location?.longitude ?? null,
       location?.accuracy ?? null,
+      location?.capturedAt ?? null,
       id,
     );
   }
@@ -284,6 +300,23 @@ export class InspectionRepository {
     await this.db.runAsync(
       `UPDATE inspections SET status = 'SUBMITTED', completed_at = datetime('now'),
        progress = 100, sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
+      id,
+    );
+  }
+
+  /**
+   * Reconcile an inspection's pending-sync state against the real outbox. Keeps
+   * the home "pending" counter honest: once the outbox has no operations left
+   * for this inspection, pending_sync_count goes to 0 and sync_status to
+   * 'synced', instead of staying stuck on a value set optimistically when the
+   * action was queued. Does not bump updated_at — this is a local UI
+   * reconciliation, not a change the server needs to hear about.
+   */
+  async setSyncState(id: string, pendingCount: number): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE inspections SET pending_sync_count = ?, sync_status = ? WHERE id = ?`,
+      pendingCount,
+      pendingCount > 0 ? 'pending' : 'synced',
       id,
     );
   }
@@ -316,20 +349,33 @@ export class InspectionRepository {
     );
   }
 
-  /** Persist the device completion timestamp and optional foreground GPS reading. */
+  /**
+   * Mark an inspection as submitted (concluded) and, optionally, store the GPS
+   * location captured at conclusion time (PBI-040 / PBI-045). Location may be
+   * null when permission was denied (RN-059) — the inspection still concludes.
+   */
   async markSubmittedWithDevice(
     id: string,
-    completedAtDevice: string,
-    location: { latitude: number; longitude: number; accuracy?: number } | null,
+    endedAtDevice: string,
+    location: DeviceLocation | null,
   ): Promise<void> {
     await this.db.runAsync(
-      `UPDATE inspections SET status = 'SUBMITTED', completed_at = ?,
-       completion_latitude = ?, completion_longitude = ?, completion_accuracy = ?,
-       progress = 100, sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`,
-      completedAtDevice,
+      `UPDATE inspections SET
+         status = 'SUBMITTED',
+         completed_at = ?,
+         end_latitude = ?,
+         end_longitude = ?,
+         end_accuracy = ?,
+         end_captured_at = ?,
+         progress = 100,
+         sync_status = 'pending',
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      endedAtDevice,
       location?.latitude ?? null,
       location?.longitude ?? null,
       location?.accuracy ?? null,
+      location?.capturedAt ?? null,
       id,
     );
   }
@@ -473,9 +519,9 @@ export class InspectionRepository {
     startLatitude: row.start_latitude ?? undefined,
     startLongitude: row.start_longitude ?? undefined,
     startAccuracy: row.start_accuracy ?? undefined,
-    completionLatitude: row.completion_latitude ?? undefined,
-    completionLongitude: row.completion_longitude ?? undefined,
-    completionAccuracy: row.completion_accuracy ?? undefined,
+    endLatitude: row.end_latitude ?? undefined,
+    endLongitude: row.end_longitude ?? undefined,
+    endAccuracy: row.end_accuracy ?? undefined,
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,

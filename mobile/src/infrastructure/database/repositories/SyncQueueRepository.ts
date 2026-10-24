@@ -110,6 +110,41 @@ export class SyncQueueRepository {
   }
 
   /**
+   * Count still-pending operations grouped by the inspection they belong to.
+   *
+   * An operation's entity_id points at the entity itself (answer/evidence/nc id)
+   * or, for inspection transitions, at the inspection id. We resolve the owning
+   * inspection by LEFT JOINing each child table on entity_id and coalescing to
+   * the direct entity_id for inspection ops. Used to reconcile the per-inspection
+   * pendingSyncCount against the real outbox after a sync, so the home counter
+   * never stays stuck on a value that no longer matches the queue.
+   *
+   * Counts the SAME statuses as {@link countPending} ('pending', 'error') so the
+   * inspection card agrees with the sync screen's pending count. A 'conflict' is
+   * a terminal state awaiting the technician's resolution, surfaced separately on
+   * the sync screen — it must NOT make the card read "pending upload", otherwise
+   * the two indicators disagree (card: pending; sync screen: 0 pending + N
+   * conflicts). 'in_progress' is transient during an active sync, not a backlog.
+   */
+  async countPendingByInspection(): Promise<Map<string, number>> {
+    const rows = await this.db.getAllAsync<{ owning_inspection_id: string; count: number }>(
+      `SELECT COALESCE(a.inspection_id, e.inspection_id, n.inspection_id, q.entity_id) AS owning_inspection_id,
+              COUNT(*) AS count
+         FROM sync_queue q
+         LEFT JOIN answers a          ON q.entity_type = 'answer'          AND q.entity_id = a.id
+         LEFT JOIN evidences e        ON q.entity_type = 'evidence'        AND q.entity_id = e.id
+         LEFT JOIN non_conformities n ON q.entity_type = 'non_conformity'  AND q.entity_id = n.id
+        WHERE q.status IN ('pending', 'error')
+        GROUP BY owning_inspection_id`,
+    );
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.owning_inspection_id) counts.set(row.owning_inspection_id, row.count);
+    }
+    return counts;
+  }
+
+  /**
    * Mark an operation as successfully sent.
    */
   async markSent(id: string): Promise<void> {
@@ -156,6 +191,41 @@ export class SyncQueueRepository {
   async markPending(id: string): Promise<void> {
     await this.db.runAsync(
       "UPDATE sync_queue SET status = 'pending', last_error = NULL, updated_at = datetime('now') WHERE id = ?",
+      id,
+    );
+  }
+
+  /**
+   * Rewrite an operation's baseVersion inside its JSON payload and move it back
+   * to 'pending' so the sync worker retries it with the fresh server version.
+   *
+   * Used to auto-reconcile a version CONFLICT (PBI-055): when start + conclusion
+   * are queued offline with a stale baseVersion, applying the start bumps the
+   * server version and the conclusion is rejected (local=0, server=1). Pulling
+   * the inspection refreshes the local serverVersion; this rewrites the queued
+   * conclusion with it so the resend applies. Idempotent on the backend via the
+   * stable operationId, so a resend never double-applies. attempts is bumped so
+   * the worker can cap retries and avoid an infinite loop.
+   */
+  async requeueWithBaseVersion(id: string, baseVersion: number): Promise<void> {
+    const row = await this.db.getFirstAsync<{ payload: string }>(
+      'SELECT payload FROM sync_queue WHERE id = ?',
+      id,
+    );
+    if (!row) return;
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(row.payload) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    payload.baseVersion = baseVersion;
+    await this.db.runAsync(
+      `UPDATE sync_queue
+         SET payload = ?, status = 'pending', last_error = NULL,
+             attempts = attempts + 1, updated_at = datetime('now')
+       WHERE id = ?`,
+      JSON.stringify(payload),
       id,
     );
   }

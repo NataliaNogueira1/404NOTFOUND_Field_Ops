@@ -90,9 +90,21 @@ interface ApiItem {
 /** Operation types accepted by the backend sync applicators (PBI-051, #223). */
 type SyncPushType = 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
 
+/**
+ * One-shot GPS reading sent with a start/conclusion transition (PBI-045).
+ * Mirrors the backend {@code CapturedLocation}. Null/omitted when the technician
+ * opted out or was denied the permission (RN-059).
+ */
+interface SyncLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: string;
+}
+
 /** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.). */
 type SyncPushPayload =
-  | { inspectionId: string; status: string }
+  | { inspectionId: string; status: string; location?: SyncLocation | null }
   | { inspectionId: string; itemId: string; value: string; observation?: string }
   | { inspectionId: string; itemId: string; title: string; description: string; severity: string };
 
@@ -395,6 +407,10 @@ export class InspectionSyncService {
 
       let sent = 0;
       let failed = 0;
+      // Tracks whether a CONFLICT was auto-reconciled this pass (version refreshed
+      // and operation re-queued). Counts as progress so the drain loop runs
+      // another pass to resend it, even if nothing else was sent.
+      let reconciled = 0;
       for (const operation of pending) {
         try {
           await this.syncQueueRepo.markInProgress(operation.id);
@@ -409,6 +425,17 @@ export class InspectionSyncService {
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           if (err instanceof VersionConflictError) {
+            // Auto-reconcile a stale-version conflict on an inspection transition
+            // (PBI-055): start+conclusion queued offline freeze baseVersion=0, so
+            // after the start bumps the server to v1 the conclusion is rejected
+            // (local=0, server=1). Pull the inspection to refresh the local
+            // serverVersion, rewrite the queued baseVersion and retry. Capped by
+            // attempts so a genuine, unresolvable conflict still ends terminal.
+            const reconciledOk = await this.tryReconcileConflict(token, operation);
+            if (reconciledOk) {
+              reconciled++;
+              continue;
+            }
             await this.syncQueueRepo.markConflict(operation.id, msg);
             allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
             continue;
@@ -432,12 +459,48 @@ export class InspectionSyncService {
       totalSent += sent;
       totalFailed += failed;
 
-      // If nothing was sent (all failed or conflicted), break to avoid
-      // an infinite loop — failed operations stay in the queue for retry.
-      if (sent === 0) break;
+      // Keep draining while real progress was made: either something was sent OR
+      // a conflict was reconciled and re-queued for another attempt. If neither
+      // happened, break to avoid an infinite loop (remaining ops stay for retry).
+      if (sent === 0 && reconciled === 0) break;
     }
 
     return { sent: totalSent, failed: totalFailed, errors: allErrors };
+  }
+
+  // Max automatic retries for a version-conflicted inspection transition before
+  // it is left as a terminal CONFLICT for the technician to resolve. One retry
+  // covers the common start→conclusion case; the cap prevents an infinite loop
+  // when the server keeps advancing for another reason.
+  private static readonly MAX_CONFLICT_RETRIES = 2;
+
+  /**
+   * Try to auto-reconcile a version CONFLICT for an inspection transition by
+   * pulling the fresh server version and re-queuing the operation with it.
+   * Returns true when the operation was re-queued for retry, false when it
+   * should be marked as a terminal conflict (non-transition op, retry cap
+   * reached, or the pull/refresh did not yield a usable version).
+   */
+  private async tryReconcileConflict(
+    token: string,
+    operation: { id: string; entityType: string; entityId: string; attempts: number },
+  ): Promise<boolean> {
+    if (operation.entityType !== 'inspection') return false;
+    if (operation.attempts >= InspectionSyncService.MAX_CONFLICT_RETRIES) return false;
+
+    try {
+      // Refresh the local serverVersion from the server (saveInspectionLocally
+      // stores serverVersion = apiInsp.version).
+      await this.pullInspection(token, operation.entityId);
+    } catch {
+      return false;
+    }
+
+    const fresh = await this.inspectionRepo.getById(operation.entityId);
+    if (!fresh || fresh.serverVersion === undefined) return false;
+
+    await this.syncQueueRepo.requeueWithBaseVersion(operation.id, fresh.serverVersion);
+    return true;
   }
 
   private async sendOperation(
@@ -535,7 +598,7 @@ export class InspectionSyncService {
   private async pushInspectionStatus(
     token: string,
     inspectionId: string,
-    payload: { operationId?: string; status: string; baseVersion?: number },
+    payload: { operationId?: string; status: string; baseVersion?: number; location?: SyncLocation | null },
   ): Promise<void> {
     // Tolerate a missing baseVersion instead of throwing. Legacy outbox rows
     // enqueued before PBI-055 (server version tracking) have no baseVersion;
@@ -551,7 +614,10 @@ export class InspectionSyncService {
           type: 'INSPECTION_STATUS',
           baseVersion: payload.baseVersion ?? 0,
           dependencyIds: [],
-          payload: { inspectionId, status: payload.status },
+          // Carry the one-shot GPS location so the server persists it with the
+          // transition (PBI-045). `?? null` keeps the field present and explicit
+          // when the technician skipped or was denied the capture (RN-059).
+          payload: { inspectionId, status: payload.status, location: payload.location ?? null },
         },
       ],
     };
@@ -857,28 +923,55 @@ export class InspectionSyncService {
 
   /**
    * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
-   * carrying the device timestamp and the optional start location (PBI-034).
+   * carrying the device timestamp and the optional start location (PBI-034). The
+   * location now travels in the batch payload and is persisted server-side
+   * (PBI-045); it is null when the technician opted out or was denied (RN-059).
    */
   async enqueueTransition(
     inspectionId: string,
     input: {
       status: string;
       startedAtDevice: string;
-      location: { latitude: number; longitude: number; accuracy?: number } | null;
+      location: SyncLocation | null;
     },
   ): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
     const id = `transition-${inspectionId}-${Date.now()}`;
     // operationId is the server-side idempotency key (PBI-052): a stable UUID kept
     // in the payload so a resend of this same outbox row never applies twice.
-    // startedAtDevice/location are kept locally for now; the batch endpoint only
-    // consumes {inspectionId, status} today — location persistence is PBI-045.
     await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
       operationId: randomUuidV4(),
       status: input.status,
       baseVersion: inspection.serverVersion ?? 0,
       startedAtDevice: input.startedAtDevice,
       location: input.location,
+    });
+  }
+
+  /**
+   * Enqueue an inspection CONCLUSION transition (IN_PROGRESS → SUBMITTED) into
+   * the outbox, carrying the device timestamp and the optional conclusion
+   * location (PBI-040 / PBI-045). Location is null when the technician was
+   * denied or opted out of the capture (RN-059).
+   */
+  async enqueueConclusion(
+    inspectionId: string,
+    input: {
+      endedAtDevice: string;
+      location: SyncLocation | null;
+    },
+  ): Promise<void> {
+    const inspection = await this.requireInspection(inspectionId);
+    const id = `conclusion-${inspectionId}-${Date.now()}`;
+    await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
+      operationId: randomUuidV4(),
+      status: 'SUBMITTED',
+      baseVersion: inspection.serverVersion ?? 0,
+      endedAtDevice: input.endedAtDevice,
+      location: input.location,
+      // Relay the technician's signature captured at conclusion (PBI-086) so it
+      // is not lost now that the conclusion uses its own outbox operation.
+      ...(inspection.signatureUri ? { signatureUri: inspection.signatureUri } : {}),
     });
   }
 

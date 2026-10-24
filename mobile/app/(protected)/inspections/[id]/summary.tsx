@@ -29,9 +29,9 @@ export default function SummaryScreen() {
     useFieldOps();
   const location = useLocation();
   const { template } = useInspectionTemplate(id);
-
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [concluding, setConcluding] = useState(false);
 
   // ─── Signature state ─────────────────────────────────────────────────────
 
@@ -116,10 +116,20 @@ export default function SummaryScreen() {
   }
 
   async function conclude() {
-    const captured = await location.capture();
-    concludeInspection(id, { completedAtDevice: new Date().toISOString(), location: captured });
-    setConfirm(false);
-    router.replace('/(protected)/(tabs)/sync');
+    if (concluding) return;
+    setConcluding(true);
+    try {
+      // One-shot GPS capture at conclusion (PBI-040 / PBI-045). If the permission
+      // is denied or the reading fails, `capture()` returns null and we conclude
+      // without a location — the flow is never blocked (RN-059).
+      const endedAtDevice = new Date().toISOString();
+      const captured = await location.capture();
+      concludeInspection(id, { endedAtDevice, location: captured });
+      setConfirm(false);
+      router.replace('/(protected)/(tabs)/sync');
+    } finally {
+      setConcluding(false);
+    }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -226,12 +236,13 @@ export default function SummaryScreen() {
               </View>
             )}
 
-            <Button label="Concluir inspeção" onPress={conclude} fullWidth />
+            <Button label="Concluir inspeção" onPress={conclude} loading={concluding} fullWidth />
             <Button
               label="Cancelar"
               onPress={() => setConfirm(false)}
               variant="ghost"
               fullWidth
+              disabled={concluding}
             />
           </Card>
         </View>

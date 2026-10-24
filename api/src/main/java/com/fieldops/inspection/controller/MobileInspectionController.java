@@ -77,7 +77,9 @@ public class MobileInspectionController {
     public ResponseEntity<MobileStatusUpdateResponse> updateStatus(@PathVariable Long id,
             @Valid @RequestBody MobileStatusUpdateRequest request,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(
-                service.updateStatus(id, request.operationId(), request.status(), request.baseVersion(), user.getId()));
+        // This single-status endpoint carries no location; the batch /sync/push path
+        // is the one that transports the captured GPS location (PBI-045).
+        return ResponseEntity.ok(service.updateStatus(id, request.operationId(), request.status(),
+                request.baseVersion(), user.getId(), null));
     }
 }

@@ -15,6 +15,8 @@ function reviewWithEvidences(): InspectionReview {
     technicianName: 'Ana',
     dueDate: '2026-01-01',
     progress: 100,
+    startLocation: null,
+    endLocation: null,
     nonConformities: [],
     sections: [
       {
