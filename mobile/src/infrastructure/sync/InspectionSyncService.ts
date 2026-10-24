@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
-import { randomUuidV4 } from './uuid';
+import { randomUuidV4, stableUuidFromSeed } from './uuid';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -490,7 +490,9 @@ export class InspectionSyncService {
       uri?: string;
       description?: string;
       capturedAt: string;
-      operationId: string;
+      // Optional: legacy outbox rows enqueued before the operationId was added
+      // to the evidence payload (d64ece8) have no value here.
+      operationId?: string;
     },
   ): Promise<void> {
     // Prefer the freshest URI from the DB (retry reuses the persisted file).
@@ -500,13 +502,26 @@ export class InspectionSyncService {
       throw new Error('Evidence has no local file to upload.');
     }
 
+    // A legacy row may lack operationId, which the backend requires
+    // (VALIDATION_ERROR "operationId is required"). Derive a STABLE id from the
+    // evidence id so every resend of this photo maps to the same server
+    // operation and never duplicates (RN-068). New rows keep their own id.
+    const operationId = payload.operationId ?? stableUuidFromSeed(evidenceId);
+
+    // The backend also requires capturedAtDevice; fall back to the stored
+    // evidence capture time, then to "now", so a legacy row missing it in the
+    // payload still uploads instead of failing validation.
+    const capturedAtDevice = payload.capturedAt ?? evidence?.capturedAt ?? new Date().toISOString();
+
+    // Unscope defensively at send time too: legacy rows persisted a scoped
+    // itemId that the backend cannot parse as a Long. Idempotent for new rows.
     await evidenceUploadClient.upload(token, {
       inspectionId: payload.inspectionId,
-      itemId: payload.itemId,
+      itemId: unscopeItemId(payload.itemId),
       localUri,
       description: payload.description,
-      capturedAtDevice: payload.capturedAt,
-      operationId: payload.operationId,
+      capturedAtDevice,
+      operationId,
     });
   }
 
