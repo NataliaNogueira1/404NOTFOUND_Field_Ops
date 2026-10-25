@@ -135,6 +135,13 @@ O merge não representa automaticamente autoria de implementação. A avaliaçã
 ## Documentos de avaliação relacionados
 
 - [Escopo e rubrica oficiais do FieldOps](../requisitos/fieldops-requisitos-rubrica.md)
+- [Matriz de rastreabilidade (PBI ↔ issue ↔ PR ↔ develop ↔ teste ↔ aceite)](matriz-rastreabilidade.md)
+- [Resposta à auditoria da IA do professor](resposta-auditoria-ia.md)
+- [Evidências de execução E2E (a preencher)](evidencias-e2e.md)
+- [Segurança de dependências — npm audit (a preencher)](seguranca-dependencias.md)
+- [Roteiro de demonstração E2E](demo-runbook.md)
+- [Registro de testes](test-results.md)
+- [Limitações conhecidas](known-limitations.md)
 - [Auditoria técnica final](auditorias/auditoria-final-fieldops.md)
 - [Plano coletivo de conclusão](plano-100-pontos-equipe.md)
 - [Auditoria diagnóstica da IA do professor](auditorias/auditoria-ia-professor.md)
