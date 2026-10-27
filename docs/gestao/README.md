@@ -9,6 +9,7 @@ Artefatos de gestão do **Projeto FieldOps** produzidos para a disciplina de Ges
 | [`organograma.md`](./organograma.md) | Estrutura hierárquica do projeto e principais responsáveis (organograma em Mermaid). |
 | [`matriz-raci.md`](./matriz-raci.md) | Matriz de responsabilidades (RACI) com 48 cards de todas as áreas (Backend, Web, Mobile, Nuvem/Gestão). |
 | [`plano-de-comunicacao.md`](./plano-de-comunicacao.md) | Plano de gerenciamento das comunicações: descrição, frequência, canal, público, proprietário, formato e momento. |
+| [`relatorio-final-cap5-gerenciamento-custos.md`](./relatorio-final-cap5-gerenciamento-custos.md) | Capítulo 5 (Gerenciamento dos Custos) do Relatório Final, itens 5.1 e 5.2, adaptado do orçamento em `aula05-orcamento-custos.md` ao template do professor. |
 
 ## Base utilizada
 
