@@ -9,12 +9,12 @@
  *   - Enfileiramento na outbox para envio ao servidor na sincronização
  */
 
-import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Button, Card, SignaturePad } from '@/design-system';
+import { Button, Card, SignaturePad, SignaturePreview, type SignatureValue } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
@@ -35,8 +35,13 @@ export default function SummaryScreen() {
 
   // ─── Signature state ─────────────────────────────────────────────────────
 
-  /** SVG data URI produced by SignaturePad, or null when the canvas is empty. */
-  const [signatureUri, setSignatureUri] = useState<string | null>(null);
+  /**
+   * Captured signature, or null when the canvas is empty. Holds the SVG data URI
+   * (for persistence/sync) and the raw strokes (for a faithful on-device preview
+   * — the native <Image> cannot render the SVG data URI in Expo Go, PBI-322).
+   */
+  const [signature, setSignature] = useState<SignatureValue | null>(null);
+  const signatureUri = signature?.dataUri ?? null;
 
   // Whether this inspection requires a signature before conclusion.
   // Defaults to false; the server can send signatureRequired=true via the template.
@@ -48,10 +53,10 @@ export default function SummaryScreen() {
 
   // Persist the signature to SQLite whenever it changes (auto-save pattern —
   // same as answerItem). The canvas calls this on every finger-up event.
-  function handleSignatureChange(uri: string | null) {
-    setSignatureUri(uri);
-    if (uri) {
-      saveSignature(id, uri);
+  function handleSignatureChange(value: SignatureValue | null) {
+    setSignature(value);
+    if (value) {
+      saveSignature(id, value.dataUri);
     }
   }
 
@@ -181,21 +186,17 @@ export default function SummaryScreen() {
           />
 
           {/* Prévia da assinatura capturada */}
-          {signatureUri && (
+          {signature && (
             <View style={styles.previewContainer}>
               <Text style={[styles.previewLabel, { color: c.textSecondary }]}>
                 Prévia da assinatura:
               </Text>
-              <View
-                style={[styles.previewBox, { borderColor: c.border, backgroundColor: c.surface }]}
-              >
-                <Image
-                  source={{ uri: signatureUri }}
-                  style={styles.previewImage}
-                  resizeMode="contain"
-                  accessibilityLabel="Prévia da assinatura capturada"
-                />
-              </View>
+              <SignaturePreview
+                strokes={signature.strokes}
+                sourceWidth={signature.width}
+                sourceHeight={signature.height}
+                height={80}
+              />
               <Text style={[styles.previewConfirm, { color: c.success }]}>
                 ✓ Assinatura capturada
               </Text>
@@ -222,15 +223,16 @@ export default function SummaryScreen() {
             </Text>
 
             {/* Prévia compacta da assinatura no modal de confirmação */}
-            {signatureUri && (
+            {signature && (
               <View style={styles.modalPreview}>
                 <Text style={[styles.previewLabel, { color: c.textSecondary }]}>
                   Assinatura confirmada:
                 </Text>
-                <Image
-                  source={{ uri: signatureUri }}
-                  style={styles.modalPreviewImage}
-                  resizeMode="contain"
+                <SignaturePreview
+                  strokes={signature.strokes}
+                  sourceWidth={signature.width}
+                  sourceHeight={signature.height}
+                  height={60}
                   accessibilityLabel="Assinatura do técnico"
                 />
               </View>
@@ -343,16 +345,6 @@ const styles = StyleSheet.create({
   // Preview
   previewContainer: { gap: Spacing.xs },
   previewLabel: { fontSize: FontSize.sm },
-  previewBox: {
-    borderWidth: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    height: 80,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
   previewConfirm: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
@@ -361,10 +353,5 @@ const styles = StyleSheet.create({
   // Modal preview
   modalPreview: {
     gap: Spacing.xs,
-  },
-  modalPreviewImage: {
-    width: '100%',
-    height: 60,
-    borderRadius: 6,
   },
 });
