@@ -113,7 +113,7 @@ const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
             type="button"
             aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
             onClick={() => setVisible((v) => !v)}
-            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted hover:text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted/60 hover:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
           >
             {visible ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
