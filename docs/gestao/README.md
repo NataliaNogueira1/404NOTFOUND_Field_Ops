@@ -10,6 +10,7 @@ Artefatos de gestão do **Projeto FieldOps** produzidos para a disciplina de Ges
 | [`matriz-raci.md`](./matriz-raci.md) | Matriz de responsabilidades (RACI) com 48 cards de todas as áreas (Backend, Web, Mobile, Nuvem/Gestão). |
 | [`plano-de-comunicacao.md`](./plano-de-comunicacao.md) | Plano de gerenciamento das comunicações: descrição, frequência, canal, público, proprietário, formato e momento. |
 | [`relatorio-final-cap5-gerenciamento-custos.md`](./relatorio-final-cap5-gerenciamento-custos.md) | Capítulo 5 (Gerenciamento dos Custos) do Relatório Final, itens 5.1 e 5.2, adaptado do orçamento em `aula05-orcamento-custos.md` ao template do professor. |
+| [`relatorio-final-cap7-gerenciamento-recursos-humanos.md`](./relatorio-final-cap7-gerenciamento-recursos-humanos.md) | Capítulo 7 (Gerenciamento dos Recursos Humanos) do Relatório Final, itens 7.1 e 7.2, consolidando `organograma.md` e `matriz-raci.md` no template do professor. |
 
 ## Base utilizada
 
