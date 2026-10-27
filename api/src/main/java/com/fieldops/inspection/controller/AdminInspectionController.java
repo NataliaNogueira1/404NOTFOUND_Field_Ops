@@ -157,11 +157,12 @@ public class AdminInspectionController {
             @RequestParam(required = false) String technicianName,
             @RequestParam(required = false) String clientName,
             @RequestParam(required = false) Priority priority,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Boolean overdue,
             @RequestParam(required = false) Boolean review,
             Pageable pageable) {
         return ResponseEntity.ok(listService.listInspections(name, status, technicianName, clientName,
-                priority, dueDate, overdue, review, pageable));
+                priority, from, to, overdue, review, pageable));
     }
 }

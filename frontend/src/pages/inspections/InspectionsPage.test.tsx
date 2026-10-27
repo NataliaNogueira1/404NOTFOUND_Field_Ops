@@ -117,6 +117,23 @@ describe('InspectionsPage', () => {
     )
   })
 
+  it('envia o intervalo de datas da listagem como from e to', async () => {
+    const fetchMock = vi.fn(() => emptyPage())
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <MemoryRouter initialEntries={['/app/inspections?from=2026-10-10&to=2026-10-20']}>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/inspections\?.*from=2026-10-10.*to=2026-10-20/),
+        expect.anything(),
+      )
+    })
+  })
+
   it('cancela uma inspeção via API com o motivo informado e recarrega a lista', async () => {
     let cancelBody: Record<string, unknown> | undefined
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
