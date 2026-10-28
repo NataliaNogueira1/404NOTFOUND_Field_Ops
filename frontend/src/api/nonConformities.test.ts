@@ -17,6 +17,7 @@ function reviewWithEvidences(): InspectionReview {
     progress: 100,
     startLocation: null,
     endLocation: null,
+    cancellation: null,
     nonConformities: [],
     sections: [
       {

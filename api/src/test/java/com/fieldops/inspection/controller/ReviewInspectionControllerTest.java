@@ -274,6 +274,37 @@ class ReviewInspectionControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // #262: the detail (review) endpoint exposes the cancellation audit so the Web UI can render it.
+    @Test
+    void reviewExposesCancellationAuditForCanceledInspection() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.CANCELED);
+        inspection.setCanceledAt(Instant.parse("2026-09-15T12:00:00Z"));
+        inspection.setCanceledBy(supervisor);
+        inspection.setCanceledReason("Equipamento descomissionado, nao sera mais inspecionado.");
+        inspectionRepository.save(inspection);
+
+        mockMvc.perform(get("/api/v1/inspections/{id}/review", inspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+                .andExpect(jsonPath("$.cancellation.reason")
+                        .value("Equipamento descomissionado, nao sera mais inspecionado."))
+                .andExpect(jsonPath("$.cancellation.canceledBy").value(supervisor.getName()))
+                .andExpect(jsonPath("$.cancellation.canceledAt").value("2026-09-15T12:00:00Z"));
+    }
+
+    // #262: the block must not appear for inspections in any other state.
+    @Test
+    void reviewOmitsCancellationForNonCanceledInspection() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.UNDER_REVIEW);
+
+        mockMvc.perform(get("/api/v1/inspections/{id}/review", inspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UNDER_REVIEW"))
+                .andExpect(jsonPath("$.cancellation").isEmpty());
+    }
+
     @Test
     void reviewReturnsLatestAnswersAndOnlyItemScopedEvidenceAndNonConformities() throws Exception {
         Inspection inspectionA = saveInspection(InspectionStatus.UNDER_REVIEW);

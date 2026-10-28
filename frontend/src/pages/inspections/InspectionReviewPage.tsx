@@ -1,7 +1,7 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, FileText, Loader2, MapPin, XCircle } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Ban, CheckCircle2, FileText, Loader2, MapPin, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { inspectionReviewApi, type InspectionReview, type ReviewEvidence, type ReviewComment, type ReviewLocation } from '@/api/inspectionReview'
+import { inspectionReviewApi, type InspectionReview, type ReviewEvidence, type ReviewComment, type ReviewLocation, type ReviewCancellation } from '@/api/inspectionReview'
 import { ApiError } from '@/api/client'
 import { SeverityBadge, StatusBadge } from '@/components/badges/Badge'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
@@ -39,7 +39,7 @@ export function InspectionReviewPage() {
   const { review } = state; const allowed = review.status === 'UNDER_REVIEW'; const canBeginReview = review.status === 'SUBMITTED'
   async function beginReview() { if (pending) return; setPending(true); try { await inspectionReviewApi.beginReview(id); setToast('Revisão iniciada.'); await load() } catch (error) { setToast(error instanceof ApiError ? error.message : 'Não foi possível iniciar a revisão.') } finally { setPending(false) } }
   async function decide(action: 'approve' | 'reject') { if (pending) return; setPending(true); try { if (action === 'approve') await inspectionReviewApi.approve(id); else await inspectionReviewApi.reject(id, reason); setApproveOpen(false); setRejectOpen(false); setReason(''); setToast(action === 'approve' ? 'Inspeção aprovada.' : 'Inspeção reprovada.'); await load() } catch (error) { setToast(error instanceof ApiError ? error.message : 'Não foi possível registrar a decisão.') } finally { setPending(false) } }
-  return <div className="space-y-6"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/inspections"><ArrowLeft size={16} />Inspeções</Link><h1 className="text-2xl font-semibold">Revisão da inspeção</h1><p className="text-sm text-muted">{review.title}{review.equipmentName ? ` - ${review.equipmentName}` : ''}</p></div><div className="flex gap-2"><Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}><FileText size={17} />Relatório PDF</Button>{canBeginReview && <Button disabled={pending} onClick={() => void beginReview()}>Iniciar revisão</Button>}<Button disabled={!allowed || pending} onClick={() => setApproveOpen(true)}><CheckCircle2 size={17} />Aprovar</Button><Button variant="danger" disabled={!allowed || pending} onClick={() => setRejectOpen(true)}><XCircle size={17} />Reprovar</Button></div></div>{!allowed && !canBeginReview && <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">Esta inspeção está em {review.status} e não pode receber uma nova decisão de revisão.</Card>}<div className="flex gap-1 border-b border-border" role="tablist"><Tab active={tab === 'review'} onClick={() => setTab('review')}>Revisão</Tab><Tab active={tab === 'history'} onClick={() => setTab('history')}>Histórico de respostas</Tab><Tab active={tab === 'audit'} onClick={() => setTab('audit')}>Auditoria</Tab></div>{tab === 'history' ? <AnswerHistoryTab inspectionId={id} /> : tab === 'audit' ? <AuditTimeline inspectionId={id} /> : <Content review={review} comments={state.comments} inspectionId={id} onCommentsChanged={load} onOpen={(list, selected) => void openEvidence(list, selected)} />}<Lightbox photos={photos} initialIndex={index} onClose={() => setIndex(-1)} /><ConfirmDialog open={approveOpen} title="Aprovar inspeção?" description="A decisão será registrada e a inspeção passará para aprovada." confirmLabel={pending ? 'Aprovando...' : 'Aprovar inspeção'} confirmDisabled={pending} onCancel={() => setApproveOpen(false)} onConfirm={() => void decide('approve')} /><Modal open={rejectOpen} title="Reprovar inspeção" onClose={() => setRejectOpen(false)} footer={<><Button variant="secondary" disabled={pending} onClick={() => setRejectOpen(false)}>Cancelar</Button><Button variant="danger" disabled={pending || reason.trim().length < 10} onClick={() => void decide('reject')}>{pending ? 'Enviando...' : 'Confirmar reprovação'}</Button></>}><Textarea label="Motivo da reprovação" id="reject-reason" value={reason} error={reason.length > 0 && reason.trim().length < 10 ? 'Informe pelo menos 10 caracteres.' : undefined} onChange={event => setReason(event.target.value)} /></Modal><Toast show={Boolean(toast)} message={toast} /></div>
+  return <div className="space-y-6"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/inspections"><ArrowLeft size={16} />Inspeções</Link><h1 className="text-2xl font-semibold">Revisão da inspeção</h1><p className="text-sm text-muted">{review.title}{review.equipmentName ? ` - ${review.equipmentName}` : ''}</p></div><div className="flex gap-2"><Button variant="secondary" onClick={() => navigate(`/app/inspections/${id}/report`)}><FileText size={17} />Relatório PDF</Button>{canBeginReview && <Button disabled={pending} onClick={() => void beginReview()}>Iniciar revisão</Button>}<Button disabled={!allowed || pending} onClick={() => setApproveOpen(true)}><CheckCircle2 size={17} />Aprovar</Button><Button variant="danger" disabled={!allowed || pending} onClick={() => setRejectOpen(true)}><XCircle size={17} />Reprovar</Button></div></div>{review.status === 'CANCELED' && <CancellationNotice cancellation={review.cancellation} />}{!allowed && !canBeginReview && <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">Esta inspeção está em {review.status} e não pode receber uma nova decisão de revisão.</Card>}<div className="flex gap-1 border-b border-border" role="tablist"><Tab active={tab === 'review'} onClick={() => setTab('review')}>Revisão</Tab><Tab active={tab === 'history'} onClick={() => setTab('history')}>Histórico de respostas</Tab><Tab active={tab === 'audit'} onClick={() => setTab('audit')}>Auditoria</Tab></div>{tab === 'history' ? <AnswerHistoryTab inspectionId={id} /> : tab === 'audit' ? <AuditTimeline inspectionId={id} /> : <Content review={review} comments={state.comments} inspectionId={id} onCommentsChanged={load} onOpen={(list, selected) => void openEvidence(list, selected)} />}<Lightbox photos={photos} initialIndex={index} onClose={() => setIndex(-1)} /><ConfirmDialog open={approveOpen} title="Aprovar inspeção?" description="A decisão será registrada e a inspeção passará para aprovada." confirmLabel={pending ? 'Aprovando...' : 'Aprovar inspeção'} confirmDisabled={pending} onCancel={() => setApproveOpen(false)} onConfirm={() => void decide('approve')} /><Modal open={rejectOpen} title="Reprovar inspeção" onClose={() => setRejectOpen(false)} footer={<><Button variant="secondary" disabled={pending} onClick={() => setRejectOpen(false)}>Cancelar</Button><Button variant="danger" disabled={pending || reason.trim().length < 10} onClick={() => void decide('reject')}>{pending ? 'Enviando...' : 'Confirmar reprovação'}</Button></>}><Textarea label="Motivo da reprovação" id="reject-reason" value={reason} error={reason.length > 0 && reason.trim().length < 10 ? 'Informe pelo menos 10 caracteres.' : undefined} onChange={event => setReason(event.target.value)} /></Modal><Toast show={Boolean(toast)} message={toast} /></div>
 }
 
 function Content({ review, comments, inspectionId, onCommentsChanged, onOpen }: { review: InspectionReview; comments: ReviewComment[]; inspectionId: string; onCommentsChanged: () => Promise<void>; onOpen: (photos: LightboxPhoto[], index: number) => void }) {
@@ -84,3 +84,34 @@ function LocationCard({ label, location }: { label: string; location: ReviewLoca
 // Google Maps query URL for a captured coordinate pair (PBI-045).
 function mapsUrl(location: ReviewLocation): string { return `https://www.google.com/maps?q=${location.latitude},${location.longitude}` }
 function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={cn('focus-ring -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors', active ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text')}>{children}</button> }
+
+// Cancellation audit for a CANCELED inspection (#262): shows the reason, who canceled it and when.
+// Rendered only while status is CANCELED; each field degrades gracefully when the backend omits it.
+function CancellationNotice({ cancellation }: { cancellation: ReviewCancellation | null }) {
+  return <Card role="alert" aria-label="Justificativa de cancelamento" className="border-danger/40 bg-danger-light/10 p-4">
+    <div className="flex items-center gap-2 text-danger-dark">
+      <Ban size={18} aria-hidden />
+      <h2 className="text-base font-semibold">Inspeção cancelada</h2>
+    </div>
+    <dl className="mt-3 space-y-2 text-sm">
+      <div>
+        <dt className="text-xs font-medium text-muted">Motivo</dt>
+        <dd className="mt-0.5 whitespace-pre-line">{cancellation?.reason?.trim() ? cancellation.reason : 'Motivo não informado'}</dd>
+      </div>
+      <div className="flex flex-wrap gap-x-8 gap-y-2">
+        <div>
+          <dt className="text-xs font-medium text-muted">Cancelada por</dt>
+          <dd className="mt-0.5 font-semibold">{cancellation?.canceledBy?.trim() ? cancellation.canceledBy : 'Usuário não identificado'}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-muted">Data do cancelamento</dt>
+          <dd className="mt-0.5 font-semibold">{cancellation?.canceledAt ? formatDateTime(cancellation.canceledAt) : 'Data não registrada'}</dd>
+        </div>
+      </div>
+    </dl>
+  </Card>
+}
+function formatDateTime(value: string): string {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('pt-BR')
+}

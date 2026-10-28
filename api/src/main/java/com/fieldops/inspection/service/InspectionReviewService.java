@@ -7,6 +7,7 @@ import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.dto.InspectionReviewResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.nonconformity.model.NonConformity;
@@ -67,7 +68,20 @@ public class InspectionReviewService {
                         .toList())).toList();
         return new InspectionReviewResponse(inspection.getId(), inspection.getTitle(), inspection.getStatus(), inspection.getPriority(),
                 inspection.getClientName(), inspection.getSiteName(), inspection.getEquipmentName(), inspection.getTechnician().getName(),
-                inspection.getDueDate(), inspection.getProgress(), startLocation(inspection), endLocation(inspection), sections, allNcs);
+                inspection.getDueDate(), inspection.getProgress(), startLocation(inspection), endLocation(inspection),
+                cancellation(inspection), sections, allNcs);
+    }
+
+    /**
+     * Cancellation audit (reason, actor name, timestamp) for the detail screen (#262). Returns null
+     * unless the inspection is CANCELED, so the UI only renders the block in that state.
+     */
+    private InspectionReviewResponse.Cancellation cancellation(Inspection inspection) {
+        if (inspection.getStatus() != InspectionStatus.CANCELED || inspection.getCanceledAt() == null) {
+            return null;
+        }
+        String canceledBy = inspection.getCanceledBy() == null ? null : inspection.getCanceledBy().getName();
+        return new InspectionReviewResponse.Cancellation(inspection.getCanceledReason(), canceledBy, inspection.getCanceledAt());
     }
 
     /** Start-of-inspection GPS reading, or null when it was not captured (PBI-045 / RN-059). */
