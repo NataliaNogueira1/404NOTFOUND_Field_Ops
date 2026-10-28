@@ -12,6 +12,7 @@ Artefatos de gestão do **Projeto FieldOps** produzidos para a disciplina de Ges
 | [`relatorio-final-cap5-gerenciamento-custos.md`](./relatorio-final-cap5-gerenciamento-custos.md) | Capítulo 5 (Gerenciamento dos Custos) do Relatório Final, itens 5.1 e 5.2, adaptado do orçamento em `aula05-orcamento-custos.md` ao template do professor. |
 | [`relatorio-final-cap7-gerenciamento-recursos-humanos.md`](./relatorio-final-cap7-gerenciamento-recursos-humanos.md) | Capítulo 7 (Gerenciamento dos Recursos Humanos) do Relatório Final, itens 7.1 e 7.2, consolidando `organograma.md` e `matriz-raci.md` no template do professor. |
 | [`relatorio-final-cap8-gerenciamento-comunicacoes.md`](./relatorio-final-cap8-gerenciamento-comunicacoes.md) | Capítulo 8 (Gerenciamento das Comunicações) do Relatório Final, itens 8.1 e 8.2, adaptado do `plano-de-comunicacao.md` ao template do professor. |
+| [`relatorio-final-cap9-gerenciamento-riscos.md`](./relatorio-final-cap9-gerenciamento-riscos.md) | Capítulo 9 (Gerenciamento dos Riscos) do Relatório Final, itens 9.1 e 9.2, consolidando os riscos reais do projeto (Ishikawa/Pareto, cronograma e escalada) no template do professor. |
 
 ## Base utilizada
 
