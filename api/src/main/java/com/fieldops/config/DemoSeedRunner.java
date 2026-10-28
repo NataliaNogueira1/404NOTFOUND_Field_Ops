@@ -50,8 +50,9 @@ import java.util.List;
 
 /**
  * Creates a coherent, reproducible demonstration dataset (PBI-066 / #86): a client, a site,
- * an equipment (with unique QR code), a published inspection template and one inspection
- * assigned to the demo technician. It reuses the dev users created by
+ * an equipment (with unique QR code), a published inspection template and at least two
+ * inspections in every lifecycle state (#258) assigned to the demo technician. It reuses the
+ * dev users created by
  * {@link DevUsersBootstrapRunner} (hence {@code @Order} after it) and the domain services, so
  * every business rule is honoured.
  *
@@ -217,136 +218,132 @@ public class DemoSeedRunner implements ApplicationRunner {
     }
 
     /**
-     * Seeds a coherent set of seven demonstration inspections for the technician, varying priority
-     * and due date so the mobile and admin lists show a realistic mix. One of them is canceled
-     * through the real {@link InspectionService#cancel} flow to exhibit a terminal state, and one
-     * is driven all the way to REJECTED (PBI-062 / #80) so the technician can exercise the
-     * "receive a rejected inspection for correction" flow out of the box.
+     * Seeds a coherent demonstration dataset with at least two inspections in every lifecycle
+     * state (#258): ASSIGNED, IN_PROGRESS, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED and
+     * CANCELED. Every inspection is created through the real {@link InspectionService} scheduling
+     * flow (so each one starts ASSIGNED with a frozen checklist), and each terminal/review state
+     * is then reached with the genuine domain transitions wherever one exists:
+     * <ul>
+     *   <li>{@link InspectionService#beginReview} drives SUBMITTED to UNDER_REVIEW;</li>
+     *   <li>{@link InspectionService#approve} / {@link InspectionService#reject} produce APPROVED
+     *       / REJECTED (populating reviewer, timestamp, reason and the audit trail);</li>
+     *   <li>{@link InspectionService#cancel} produces CANCELED (reason, actor and audit).</li>
+     * </ul>
+     * IN_PROGRESS and SUBMITTED have no server-side domain transition (they are owned by the
+     * mobile execution/submit flow), so for those two states the status is set directly on the
+     * persisted entity, scoped to the seed, mirroring the pre-existing approach.
      *
-     * @return the number of inspections created
+     * <p>The whole method is idempotent via the client-document guard in {@link #run}, so
+     * restarting the app does not duplicate any of these inspections.
+     *
+     * @return the number of inspections created and the id of the first one (for the answer history)
      */
     private SeededInspections seedInspections(Long templateVersionId, Long clientId, Long siteId,
             Long equipmentId, Long technicianId, Long supervisorId) {
-        record SeedInspection(String title, Priority priority, int dueInDays, String instructions) {
+        record SeedInspection(InspectionStatus target, String title, Priority priority, int dueInDays,
+                String instructions) {
         }
 
+        // Two inspections per lifecycle state (#258). Priority and due date vary so the admin and
+        // mobile lists show a realistic mix across states.
         List<SeedInspection> plan = List.of(
-                new SeedInspection("Inspecao Preventiva - Compressor de Ar XPTO 500",
-                        Priority.MEDIUM, 7,
-                        "Verificar condicao da bateria e nivel de oleo com atencao especial."),
-                new SeedInspection("Inspecao de Seguranca - Compressor de Ar XPTO 500",
-                        Priority.HIGH, 2,
-                        "Priorizar verificacao das protecoes e do botao de emergencia."),
-                new SeedInspection("Inspecao Corretiva - Compressor de Ar XPTO 500",
-                        Priority.CRITICAL, 1,
-                        "Equipamento com ruido anormal reportado; inspecionar antes de liberar."),
-                new SeedInspection("Inspecao de Rotina - Compressor de Ar XPTO 500",
-                        Priority.LOW, 14,
-                        "Checklist mensal padrao, sem urgencia."),
-                new SeedInspection("Inspecao Pos-Manutencao - Compressor de Ar XPTO 500",
-                        Priority.MEDIUM, 4,
-                        "Confirmar parametros de operacao apos troca de filtro."),
-                new SeedInspection("Inspecao Cancelada - Compressor de Ar XPTO 500",
-                        Priority.LOW, 10,
-                        "Agendamento duplicado; sera cancelado para demonstracao."),
-                new SeedInspection("Inspecao Reprovada - Compressor de Ar XPTO 500",
-                        Priority.HIGH, 5,
-                        "Enviada com evidencia insuficiente; sera reprovada para correcao."),
-                new SeedInspection("Inspecao Enviada - Compressor de Ar XPTO 500",
-                        Priority.MEDIUM, 3,
-                        "Concluida pelo tecnico; aguardando o supervisor iniciar a revisao."),
-                new SeedInspection("Inspecao Em Revisao - Compressor de Ar XPTO 500",
-                        Priority.HIGH, 3,
-                        "Em revisao pelo supervisor; pronta para aprovar/reprovar e comentar por item."));
-
-        int canceledIndex = plan.size() - 4;
-        int rejectedIndex = plan.size() - 3;
-        int submittedIndex = plan.size() - 2;
-        int underReviewIndex = plan.size() - 1;
+                new SeedInspection(InspectionStatus.ASSIGNED, "Inspecao Preventiva - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 7, "Verificar condicao da bateria e nivel de oleo com atencao especial."),
+                new SeedInspection(InspectionStatus.ASSIGNED, "Inspecao de Rotina - Compressor de Ar XPTO 500",
+                        Priority.LOW, 14, "Checklist mensal padrao, sem urgencia."),
+                new SeedInspection(InspectionStatus.IN_PROGRESS, "Inspecao Corretiva - Compressor de Ar XPTO 500",
+                        Priority.CRITICAL, 1, "Equipamento com ruido anormal; execucao em andamento pelo tecnico."),
+                new SeedInspection(InspectionStatus.IN_PROGRESS, "Inspecao de Seguranca - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 2, "Protecoes e botao de emergencia sendo verificados no campo."),
+                new SeedInspection(InspectionStatus.SUBMITTED, "Inspecao Enviada - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 3, "Concluida pelo tecnico; aguardando o supervisor iniciar a revisao."),
+                new SeedInspection(InspectionStatus.SUBMITTED, "Inspecao Pos-Manutencao - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 4, "Enviada apos troca de filtro; aguardando revisao do supervisor."),
+                new SeedInspection(InspectionStatus.UNDER_REVIEW, "Inspecao Em Revisao - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 3, "Em revisao pelo supervisor; pronta para aprovar/reprovar e comentar por item."),
+                new SeedInspection(InspectionStatus.UNDER_REVIEW, "Inspecao Em Analise - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 6, "Sob analise do supervisor antes da decisao final."),
+                new SeedInspection(InspectionStatus.APPROVED, "Inspecao Aprovada - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 8, "Revisada e aprovada; sem pendencias."),
+                new SeedInspection(InspectionStatus.APPROVED, "Inspecao Aprovada (Rotina) - Compressor de Ar XPTO 500",
+                        Priority.LOW, 12, "Checklist de rotina revisado e aprovado."),
+                new SeedInspection(InspectionStatus.REJECTED, "Inspecao Reprovada - Compressor de Ar XPTO 500",
+                        Priority.HIGH, 5, "Enviada com evidencia insuficiente; sera reprovada para correcao."),
+                new SeedInspection(InspectionStatus.REJECTED, "Inspecao Reprovada (Medidas) - Compressor de Ar XPTO 500",
+                        Priority.CRITICAL, 2, "Medicoes fora da faixa; reprovada para nova coleta."),
+                new SeedInspection(InspectionStatus.CANCELED, "Inspecao Cancelada - Compressor de Ar XPTO 500",
+                        Priority.LOW, 10, "Agendamento duplicado; sera cancelado para demonstracao."),
+                new SeedInspection(InspectionStatus.CANCELED, "Inspecao Cancelada (Reagendada) - Compressor de Ar XPTO 500",
+                        Priority.MEDIUM, 9, "Cancelada por reagendamento com o cliente."));
 
         Long firstInspectionId = null;
-        Long canceledId = null;
-        Long rejectedId = null;
-        Long submittedId = null;
-        Long underReviewId = null;
-        for (int index = 0; index < plan.size(); index++) {
-            SeedInspection seed = plan.get(index);
+        for (SeedInspection seed : plan) {
             Long inspectionId = inspectionService.createInspection(new CreateInspectionRequest(
                     seed.title(), templateVersionId, clientId, siteId, equipmentId, technicianId,
                     seed.priority(), LocalDate.now().plusDays(seed.dueInDays()), null,
                     seed.instructions()), supervisorId).id();
-            if (index == 0) {
+            if (firstInspectionId == null) {
                 firstInspectionId = inspectionId;
             }
-            if (index == canceledIndex) {
-                canceledId = inspectionId;
-            }
-            if (index == rejectedIndex) {
-                rejectedId = inspectionId;
-            }
-            if (index == submittedIndex) {
-                submittedId = inspectionId;
-            }
-            if (index == underReviewIndex) {
-                underReviewId = inspectionId;
-            }
-        }
-
-        // Cancel one to showcase a terminal state in the admin listing.
-        if (canceledId != null) {
-            inspectionService.cancel(canceledId,
-                    "Agendamento duplicado identificado durante o planejamento.", supervisorId);
-        }
-
-        // Reject one so the technician has a rejected inspection to correct (PBI-062 / #80).
-        if (rejectedId != null) {
-            rejectInspection(rejectedId, supervisorId);
-        }
-
-        // Leave one in SUBMITTED so the supervisor can exercise "Iniciar revisao" (#237),
-        // and one already in UNDER_REVIEW so approve/reject and per-item review comments (#151)
-        // can be tested without any manual setup.
-        if (submittedId != null) {
-            advanceStatus(submittedId, InspectionStatus.SUBMITTED);
-        }
-        if (underReviewId != null) {
-            advanceStatus(underReviewId, InspectionStatus.UNDER_REVIEW);
+            driveToTargetStatus(inspectionId, seed.target(), supervisorId);
         }
 
         return new SeededInspections(plan.size(), firstInspectionId);
     }
 
     /**
-     * Drives a freshly created ASSIGNED inspection all the way to REJECTED so the demo dataset
-     * includes a rejected inspection the technician can correct (PBI-062 / #80).
-     *
-     * <p>The approve/reject domain flow only accepts an inspection that is already
-     * {@code UNDER_REVIEW} ({@link InspectionService#reject}), and no domain method currently
-     * moves an inspection from {@code SUBMITTED} to {@code UNDER_REVIEW} (that transition is
-     * tracked as a separate backend task). To keep this limited to the demo seed and still honour
-     * the real rejection logic (reason, reviewer and audit event), the status is advanced to
-     * {@code UNDER_REVIEW} directly on the persisted entity here, then rejected through the
-     * service so {@code rejectionReason}/{@code reviewedBy}/{@code reviewedAt} and the audit
-     * trail are populated exactly as in production.
+     * Moves a freshly created ASSIGNED inspection to its demonstration target status, preferring
+     * real domain transitions. ASSIGNED needs nothing. IN_PROGRESS/SUBMITTED are set on the
+     * persisted entity (no server-side domain transition exists; they belong to the mobile
+     * execution/submit flow). UNDER_REVIEW, APPROVED, REJECTED and CANCELED go through the genuine
+     * {@link InspectionService} methods so reviewer/actor, reason, timestamp and audit events are
+     * populated exactly as in production.
      */
-    private void rejectInspection(Long inspectionId, Long supervisorId) {
-        Inspection inspection = inspectionRepository.findById(inspectionId).orElseThrow();
-        inspection.setStatus(InspectionStatus.UNDER_REVIEW);
-        inspectionRepository.save(inspection);
-
-        inspectionService.reject(inspectionId,
-                "Evidencia fotografica do item de carcaca esta ilegivel; refazer a foto e reenviar.",
-                supervisorId);
+    private void driveToTargetStatus(Long inspectionId, InspectionStatus target, Long supervisorId) {
+        switch (target) {
+            case ASSIGNED -> {
+                // Already ASSIGNED after creation; nothing to do.
+            }
+            case IN_PROGRESS -> setStatusDirectly(inspectionId, InspectionStatus.IN_PROGRESS);
+            case SUBMITTED -> setStatusDirectly(inspectionId, InspectionStatus.SUBMITTED);
+            case UNDER_REVIEW -> {
+                setStatusDirectly(inspectionId, InspectionStatus.SUBMITTED);
+                inspectionService.beginReview(inspectionId, supervisorId);
+            }
+            case APPROVED -> {
+                moveToUnderReview(inspectionId, supervisorId);
+                inspectionService.approve(inspectionId,
+                        "Revisao concluida: todos os itens conformes.", supervisorId);
+            }
+            case REJECTED -> {
+                moveToUnderReview(inspectionId, supervisorId);
+                inspectionService.reject(inspectionId,
+                        "Evidencia fotografica do item de carcaca esta ilegivel; refazer a foto e reenviar.",
+                        supervisorId);
+            }
+            case CANCELED -> inspectionService.cancel(inspectionId,
+                    "Agendamento duplicado identificado durante o planejamento.", supervisorId);
+            default -> throw new IllegalArgumentException("Unsupported seed target status: " + target);
+        }
     }
 
     /**
-     * Advances a freshly created ASSIGNED inspection to the given review-stage status on the
-     * persisted entity, scoped to the demo seed. The mobile submit and the "begin review"
-     * transition are driven by separate flows in production; here the status is set directly so
-     * the demo dataset ships an inspection ready for the supervisor to review (SUBMITTED to test
-     * "Iniciar revisao", UNDER_REVIEW to test approve/reject and per-item review comments).
+     * Brings a freshly created ASSIGNED inspection to UNDER_REVIEW using the real begin-review
+     * transition, so the subsequent approve/reject runs through the genuine domain flow. The
+     * SUBMITTED step is set directly on the entity because the mobile submit has no server-side
+     * counterpart; begin-review itself is the real {@link InspectionService#beginReview}.
      */
-    private void advanceStatus(Long inspectionId, InspectionStatus status) {
+    private void moveToUnderReview(Long inspectionId, Long supervisorId) {
+        setStatusDirectly(inspectionId, InspectionStatus.SUBMITTED);
+        inspectionService.beginReview(inspectionId, supervisorId);
+    }
+
+    /**
+     * Sets the inspection status directly on the persisted entity, scoped to the demo seed. Used
+     * only for IN_PROGRESS and SUBMITTED, which are produced by the mobile execution/submit flow
+     * and have no server-side domain transition.
+     */
+    private void setStatusDirectly(Long inspectionId, InspectionStatus status) {
         Inspection inspection = inspectionRepository.findById(inspectionId).orElseThrow();
         inspection.setStatus(status);
         inspectionRepository.save(inspection);
