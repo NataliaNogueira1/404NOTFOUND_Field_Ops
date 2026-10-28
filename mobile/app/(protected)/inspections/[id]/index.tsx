@@ -213,19 +213,22 @@ function ActionButtons({
           size="lg"
         />
       );
+    case InspectionStatus.SUBMITTED:
+    case InspectionStatus.UNDER_REVIEW:
     case InspectionStatus.APPROVED:
+      // #273/#277: the technician can open the filled checklist in read-only mode to review
+      // answers, observations and review comments, without reopening or editing the inspection.
       return (
         <Button
-          label="✓ Aprovada"
-          onPress={() => {}}
+          label="👁 Visualizar checklist"
+          onPress={() => router.push(`/(protected)/inspections/${inspection.id}/checklist`)}
           variant="secondary"
-          disabled
           fullWidth
           size="lg"
         />
       );
     default:
-      // SUBMITTED / UNDER_REVIEW / DRAFT / CANCELED — read-only, no primary action.
+      // DRAFT / CANCELED — no checklist to review.
       return null;
   }
 }

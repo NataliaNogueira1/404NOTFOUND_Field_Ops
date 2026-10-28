@@ -51,10 +51,11 @@ function renderCard(
   item: TemplateItem,
   onAnswer: (value: ChecklistValue, observation?: string) => void,
   answer?: ChecklistAnswer,
+  readOnly?: boolean,
 ): Promise<RenderResult> {
   const ui: ReactElement = (
     <ThemeProvider>
-      <ChecklistItemCardWithProps item={item} onAnswer={onAnswer} answer={answer} />
+      <ChecklistItemCardWithProps item={item} onAnswer={onAnswer} answer={answer} readOnly={readOnly} />
     </ThemeProvider>
   );
   return render(ui);
@@ -65,10 +66,12 @@ function ChecklistItemCardWithProps({
   item,
   onAnswer,
   answer,
+  readOnly,
 }: {
   item: TemplateItem;
   onAnswer: (value: ChecklistValue, observation?: string) => void;
   answer?: ChecklistAnswer;
+  readOnly?: boolean;
 }): ReactElement {
   return (
     <ChecklistItemCard
@@ -78,6 +81,7 @@ function ChecklistItemCardWithProps({
       answer={answer}
       evidences={[]}
       onAnswer={onAnswer}
+      readOnly={readOnly}
     />
   );
 }
@@ -198,6 +202,92 @@ describe('ChecklistItemCard', () => {
       await fireEvent(observation, 'blur');
 
       expect(onAnswer).toHaveBeenCalledWith('CONFORME', 'Pequeno desgaste na pintura');
+    });
+  });
+
+  // #273/#277: the technician can open the filled checklist for SUBMITTED/UNDER_REVIEW/APPROVED
+  // inspections in read-only mode — the saved answer and observation are visible, but nothing is
+  // editable and no save is ever triggered.
+  describe('read-only (#273/#277)', () => {
+    const answeredConformity: ChecklistAnswer = {
+      itemId: 'item-1',
+      value: 'CONFORME',
+      observation: 'Tudo certo na vistoria',
+      savedAt: '2026-01-01T00:00:00Z',
+    };
+
+    it('shows the saved answer and hides the non-selected options', async () => {
+      const { getByText, queryByText } = await renderCard(
+        makeItem({ responseType: ResponseType.CONFORMITY }),
+        jest.fn(),
+        answeredConformity,
+        true,
+      );
+
+      // Only the chosen option remains visible; the alternatives are not rendered.
+      expect(getByText('Conforme')).toBeTruthy();
+      expect(queryByText('Não conforme')).toBeNull();
+      expect(queryByText('N/A')).toBeNull();
+    });
+
+    it('does not call onAnswer when a locked option is tapped', async () => {
+      const onAnswer = jest.fn();
+      const { getByText } = await renderCard(
+        makeItem({ responseType: ResponseType.CONFORMITY }),
+        onAnswer,
+        answeredConformity,
+        true,
+      );
+
+      await fireEvent.press(getByText('Conforme'));
+
+      expect(onAnswer).not.toHaveBeenCalled();
+    });
+
+    it('shows the saved observation but keeps the field non-editable', async () => {
+      const { getByDisplayValue } = await renderCard(
+        makeItem({ responseType: ResponseType.CONFORMITY }),
+        jest.fn(),
+        answeredConformity,
+        true,
+      );
+
+      const observation = getByDisplayValue('Tudo certo na vistoria');
+      expect(observation.props.editable).toBe(false);
+    });
+
+    it('hides the "Adicionar foto" button on a non-conformity in read-only mode', async () => {
+      const failureAnswer: ChecklistAnswer = {
+        itemId: 'item-1',
+        value: 'NAO_CONFORME',
+        observation: 'Vazamento identificado',
+        savedAt: '2026-01-01T00:00:00Z',
+      };
+      const { queryByText } = await renderCard(
+        makeItem({ responseType: ResponseType.CONFORMITY, requireEvidenceOnFailure: true }),
+        jest.fn(),
+        failureAnswer,
+        true,
+      );
+
+      expect(queryByText('Adicionar foto')).toBeNull();
+    });
+
+    it('keeps the number input non-editable while showing its saved value', async () => {
+      const numberAnswer: ChecklistAnswer = {
+        itemId: 'item-1',
+        value: 42,
+        savedAt: '2026-01-01T00:00:00Z',
+      };
+      const { getByDisplayValue } = await renderCard(
+        makeItem({ responseType: ResponseType.NUMBER }),
+        jest.fn(),
+        numberAnswer,
+        true,
+      );
+
+      const input = getByDisplayValue('42');
+      expect(input.props.editable).toBe(false);
     });
   });
 });
