@@ -1,4 +1,5 @@
 ﻿import { forwardRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -86,9 +87,50 @@ const DateInput = forwardRef<HTMLInputElement, InputProps>(
 )
 DateInput.displayName = 'DateInput'
 
+/**
+ * `type="password"` input with a visibility toggle button.
+ * Clicking the eye icon switches the input between `password` and `text`
+ * so the user can verify what they typed without clearing the field.
+ */
+const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ({ className, error, id, label, type: _type, ...props }, ref) => {
+    const [visible, setVisible] = useState(false)
+
+    return (
+      <Field id={id} label={label} error={error}>
+        <div className="relative">
+          <input
+            id={id}
+            ref={ref}
+            type={visible ? 'text' : 'password'}
+            className={cn(inputClassName(error, className), 'pr-10')}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? `${id}-error` : undefined}
+            {...props}
+          />
+          <button
+            type="button"
+            aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
+            onClick={() => setVisible((v) => !v)}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted/60 hover:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
+          >
+            {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+      </Field>
+    )
+  },
+)
+PasswordInput.displayName = 'PasswordInput'
+
 export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   if (props.type === 'date') {
     return <DateInput {...props} ref={ref} />
+  }
+
+  if (props.type === 'password') {
+    return <PasswordInput {...props} ref={ref} />
   }
 
   const { className, error, id, label, ...rest } = props
