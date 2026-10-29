@@ -12,6 +12,7 @@ import {
   SyncQueueRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '@/infrastructure/sync';
+import { rescheduleAllReminders, cancelInspectionReminders } from '@/infrastructure/notifications/localNotifications';
 
 import {
   InspectionStatus,
@@ -80,7 +81,7 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
   try {
     const syncService = new InspectionSyncService(db);
     console.log('[FieldOps] Pulling inspections from API...');
-    const result = await syncService.pullInspections(token);
+    const result = await syncService.pullInspections(token, rescheduleAllReminders);
     console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
   } catch (apiError) {
     console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
@@ -515,6 +516,11 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         // conclusion location (PBI-040 / PBI-045).
         sync.enqueueConclusion(inspectionId, { endedAtDevice, location }).catch(console.warn);
       }
+      // Cancel the local deadline reminders immediately on conclusion, without
+      // waiting for the next sync (PBI-084). Works fully offline — the inspection
+      // is now SUBMITTED so it must no longer alert the technician. Fire-and-forget:
+      // a notification failure must never block the conclusion flow.
+      cancelInspectionReminders(inspectionId).catch(console.warn);
     },
     [getRepos, getSyncService],
   );
@@ -588,7 +594,9 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     setLastSyncError(null);
     try {
-      const result = await sync.fullSync(token);
+      // Pass rescheduleAllReminders as the onAfterPull callback so that every
+      // full sync cycle updates local deadline notifications (PBI-084).
+      const result = await sync.fullSync(token, rescheduleAllReminders);
       if (result.errors.length > 0) {
         setLastSyncError(result.errors[0]);
       }

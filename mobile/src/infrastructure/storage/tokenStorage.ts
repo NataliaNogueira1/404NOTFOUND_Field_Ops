@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESS_TOKEN_KEY = 'fieldops_access_token';
 const REFRESH_TOKEN_KEY = 'fieldops_refresh_token';
 const BIOMETRIC_ENABLED_KEY = 'fieldops_biometric_enabled';
+const NOTIFICATIONS_ENABLED_KEY = 'fieldops_notifications_enabled';
 
 /**
  * On native (iOS/Android) we use SecureStore.
@@ -64,5 +65,27 @@ export const biometricStorage = {
 
   async disable(): Promise<void> {
     await store.setItem(BIOMETRIC_ENABLED_KEY, 'false');
+  },
+};
+
+// ─── Local notifications preference (PBI-084) ────────────────────────────────────
+
+export const notificationsStorage = {
+  /**
+   * Returns whether the user opted in to local deadline reminders.
+   * Defaults to `true` (enabled) when no preference was ever saved, matching
+   * the behavior of asking for OS permission right after login.
+   */
+  async isEnabled(): Promise<boolean> {
+    const value = await store.getItem(NOTIFICATIONS_ENABLED_KEY);
+    return value !== 'false';
+  },
+
+  async enable(): Promise<void> {
+    await store.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+  },
+
+  async disable(): Promise<void> {
+    await store.setItem(NOTIFICATIONS_ENABLED_KEY, 'false');
   },
 };
