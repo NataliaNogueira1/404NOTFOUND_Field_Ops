@@ -118,14 +118,20 @@ describe('InspectionsPage — exportação CSV', () => {
   })
 
   it('chama exportCsv com filtros mapeados e clientId resolvido pela API real', async () => {
-    mountFetch()
+    const fetchMock = mountFetch()
     setSessionUser(adminUser())
     const exportSpy = vi.spyOn(adminCatalogApi, 'exportCsv').mockResolvedValue()
 
-    renderPage('/app/inspections?status=ASSIGNED&clientName=Industria+Modelo&dueDateFrom=2026-09-01&dueDateTo=2026-09-30')
+    renderPage('/app/inspections?status=ASSIGNED&clientName=Industria+Modelo&from=2026-09-01&to=2026-09-30')
 
     // Aguarda os clientes carregarem para que o nome → id esteja disponível.
     await screen.findByRole('option', { name: 'Industria Modelo' })
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/inspections\?.*from=2026-09-01.*to=2026-09-30/),
+        expect.anything(),
+      )
+    })
     await userEvent.click(await screen.findByRole('button', { name: /exportar csv/i }))
 
     await waitFor(() => expect(exportSpy).toHaveBeenCalledTimes(1))
@@ -142,7 +148,7 @@ describe('InspectionsPage — exportação CSV', () => {
     setSessionUser(adminUser())
     const exportSpy = vi.spyOn(adminCatalogApi, 'exportCsv').mockResolvedValue()
 
-    renderPage('/app/inspections?dueDateFrom=2026-09-04')
+    renderPage('/app/inspections?from=2026-09-04')
 
     await screen.findByRole('button', { name: /exportar csv/i })
     await userEvent.click(screen.getByRole('button', { name: /exportar csv/i }))
