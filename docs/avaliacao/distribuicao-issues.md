@@ -23,8 +23,8 @@
 
 | Pessoa | Commits | Total de issues | Novas | Prévias |
 |--------|--------:|:---------------:|:-----:|:-------:|
-| Caroline Arruda | 21 | 11 | 6 | 5 |
-| Ian Lucas | 29 | 7 | 4 | 3 |
+| Caroline Arruda | 21 | 12 | 7 | 5 |
+| Ian Lucas | 29 | 8 | 5 | 3 |
 | Andressa Bartolomeu | 36 | 8 | 4 | 4 |
 | Felipe (Cutiur) | 39 | 7 | 2 (1 compart.) | 5 |
 | Júlia Paes | 47 | 4 | 2 | 2 |
@@ -65,15 +65,21 @@
   Estender o `DemoSeedRunner` para gerar ≥2 inspeções em cada estado (ASSIGNED, IN_PROGRESS,
   SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELED), de forma idempotente e usando os
   fluxos reais de domínio. P1, Size M.
-- **#262 — Exibir justificativa de cancelamento na tela de detalhes da inspeção** _(In progress)_
+- ✅ **#262 — Exibir justificativa de cancelamento na tela de detalhes da inspeção** _(Closed)_
   Mostrar o motivo, quem cancelou e quando (`canceledReason/By/At`) na tela de detalhes
   quando a inspeção está CANCELADA; o bloco não deve aparecer em outros estados. P1, Size S.
 - **#263 — Integrar página de detalhes do cliente com a API real** _(In review)_
   Trocar os dados mock (`@/mocks/domain`) da página de detalhe do cliente por
   `GET /api/v1/clients/{id}`, com estados de loading/erro/vazio. P1, Size S.
-- **#273 — Mobile: visualizar inspeção após envio (estado ENVIADA/APROVADA)** _(In review)_
+- ✅ **#273 — Mobile: visualizar inspeção após envio (estado ENVIADA/APROVADA)** _(Closed)_
   Garantir que inspeções SUBMITTED/APPROVED apareçam na listagem e sejam navegáveis em
   modo somente-leitura (sem botão de ação), funcionando offline via SQLite.
+- **#338 — Exibir motivo de cancelamento na tela de detalhes para o técnico** _(Open)_
+  Exibir o motivo de cancelamento também na visão do técnico no mobile/portal, não apenas
+  na visão admin.
+- **#336 — Adicionar coluna ID na visualização de inspeções no web admin** _(Open)_
+  Exibir a coluna ID (UUID abreviado com tooltip) na tabela de inspeções para os perfis
+  supervisor, admin e técnico no web admin. `frontend`, `ux`, `sprint-3`.
 
 ## Ian Lucas — 29 commits — 7 issues (4 novas + 3 prévias)
 
@@ -90,7 +96,7 @@
   Distribuição CloudFront como frente única: origem S3 (default, com cache) + origem EC2
   (`/api/*`, sem cache, repassa `Authorization`). HTTPS em `*.cloudfront.net`, fallback
   SPA. Risco nº1 do Teste 01. Depende de: #306 e #311.
-- **#89 — PBI-069: Build e publicação do painel web admin** _(Ready; issue fechada)_
+- ✅ **#89 — PBI-069: Build e publicação do painel web admin** _(Closed)_
   Gerar build estático do painel publicável em qualquer servidor estático, com URL da API
   por variável de ambiente e funcionando com a API de demonstração. P0.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
@@ -99,6 +105,9 @@
 - **#147 — PBI-084: Notificações locais de prazo** _(In progress)_
   Notificações locais no mobile (offline, via `expo-notifications`) agendadas a partir do
   `dueDate` das inspeções, com lembrete, reagendamento após sync e tratamento de permissão. P1.
+- **#337 — Adicionar exibição do ID da inspeção no mobile** _(Open)_
+  Exibir o ID da inspeção (UUID abreviado) nas telas de listagem e detalhes no app mobile
+  para os perfis técnico, supervisor e admin, sem quebrar o layout. `mobile`, `ux`, `sprint-3`.
 
 ## Andressa Bartolomeu — 36 commits — 8 issues (4 novas + 4 prévias)
 
@@ -143,12 +152,24 @@
   Ajustar o `EvidenceUploadClient` ao contrato real do endpoint de upload (arquivo +
   metadados + `operationId`), tirando a foto do estado PENDING, com retry e sem duplicar.
   Depende do endpoint backend #221.
-- **#260 — Resolver vulnerabilidades do npm audit no web** _(Ready)_
+- ✅ **#260 — Resolver vulnerabilidades do npm audit no web** _(Closed)_
   Eliminar as vulnerabilidades do `npm audit` no `frontend/` (bump major do `jspdf`/`jspdf-autotable`
   + fixes não-major), sem quebrar build, testes nem a geração de PDF. P1, Size M.
-- **#265 — Adicionar toggle de visibilidade no campo de senha do login web** _(In review)_
+- ✅ **#265 — Adicionar toggle de visibilidade no campo de senha do login web** _(Closed)_
   Adicionar botão de olho (`Eye`/`EyeOff` do lucide-react já instalado) no componente `Input`
   para alternar mostrar/ocultar senha, acessível e sem nova dependência. P1, Size XS.
+- **#332 — Exibir mensagem de modo offline abaixo da barra nativa no mobile** _(Open)_
+  Exibir banner/indicador de modo offline posicionado abaixo da status bar nativa, sem
+  sobrepor conteúdo.
+- **#333 — Corrigir teclado sobrepondo label e campo de número no mobile** _(Open)_
+  Corrigir o layout para que o teclado não cubra o label e o campo de entrada numérica
+  durante o preenchimento do checklist.
+- **#334 — Exibir assinatura na visualização do checklist e no review pelo supervisor** _(Open)_
+  Renderizar a assinatura capturada na visualização do checklist concluído e na tela de
+  revisão do supervisor/admin.
+- **#335 — Upgrade do Expo SDK 57 para 58 no mobile** _(Open, compartilhada com Rodrigo Soares)_
+  Atualizar o SDK do Expo de 57 para 58, ajustando dependências nativas e resolvendo
+  breaking changes.
 
 ## Júlia Paes — 47 commits — 4 issues (2 novas + 2 prévias)
 
@@ -222,10 +243,13 @@
 - **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
   Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
+- **#335 — Upgrade do Expo SDK 57 para 58 no mobile** _(Open, compartilhada com Felipe)_
+  Atualizar o SDK do Expo de 57 para 58, ajustando dependências nativas e resolvendo
+  breaking changes.
 
 ## Lucas Miguel — 68 commits — 9 issues (4 novas + 5 prévias)
 
-- **#278 — Unificar filtro de data da listagem de inspeções para intervalo from/to**
+- ✅ **#278 — Unificar filtro de data da listagem de inspeções para intervalo from/to** _(Closed)_
   Trocar o parâmetro `dueDate` (data exata) por `from`/`to` (intervalo inclusivo,
   opcional) no backend (`AdminInspectionController`/`AdminCatalogListService`) e no front
   (`adminCatalog.ts`/`InspectionsPage.tsx`), alinhando listagem e CSV. Atualizar testes
@@ -257,10 +281,6 @@
   Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
 
-## Natália Nogueira — 245 commits — 0 issues
-
-Responsável pela aprovação dos pull requests.
-
 ---
 
 ## Observações
@@ -269,8 +289,12 @@ Responsável pela aprovação dos pull requests.
   deste documento; a lista de issues abertas sem assignee sempre teve 28 itens).
 - **Issue compartilhada:** #320 é responsabilidade conjunta de **Felipe + Rodrigo**
   (contabilizada uma vez no total de 28, mas aparece nas duas seções).
+- **Issue compartilhada:** #335 é responsabilidade conjunta de **Felipe + Rodrigo**
+  (adicionada após a distribuição inicial; não contabilizada no total de 28).
 - **Dependências de infra AWS:** a trilha é acoplada
   (#305 → #306 → #307/#309/#315; #312 depende de #306 + #311; #313/#314/#316 dependem de
   várias). Com a redistribuição, ela ficou espalhada entre Ian, Marcela e Lucas
   — precisa de coordenação entre eles para não travar.
 - **Issues de fechamento (#316 e #320):** dependem de quase tudo pronto; deixar para o final.
+- **Issues extras (pós-distribuição):** #332, #333, #334 (Felipe), #338 (Caroline) e #336 (Caroline), #337 (Ian) foram
+  atribuídas depois da distribuição inicial e não entram na contagem das 28.
