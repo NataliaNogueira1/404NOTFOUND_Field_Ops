@@ -10,9 +10,12 @@ import java.util.List;
 public record InspectionReviewResponse(Long id, String title, InspectionStatus status, Priority priority,
         String clientName, String siteName, String equipmentName, String technicianName, LocalDate dueDate,
         Integer progress, Location startLocation, Location endLocation,
+        Cancellation cancellation,
         List<Section> sections, List<NonConformity> nonConformities) {
     /** One-shot GPS reading shown in the review (PBI-045). Null when not captured (RN-059). */
     public record Location(Double latitude, Double longitude, Double accuracy, Instant capturedAt) {}
+    /** Cancellation audit shown on the detail screen only when the inspection is CANCELED (#262). */
+    public record Cancellation(String reason, String canceledBy, Instant canceledAt) {}
     public record Section(String title, Integer order, List<Item> items) {}
     public record Item(Long snapshotId, String code, String title, String description, String responseType,
             boolean required, String answer, String observation, Instant answeredAt, String answeredBy,

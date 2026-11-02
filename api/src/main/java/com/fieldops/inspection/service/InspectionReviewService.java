@@ -7,6 +7,7 @@ import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.dto.InspectionReviewResponse;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.nonconformity.model.NonConformity;
@@ -45,7 +46,10 @@ public class InspectionReviewService {
     /** Returns every frozen checklist item, with its latest answer and item-scoped evidence/NCs. */
     @Transactional(readOnly = true)
     public InspectionReviewResponse getReview(Long inspectionId) {
-        Inspection inspection = inspectionRepository.findById(inspectionId)
+        // Use the review-specific query so canceledBy and reviewedBy are JOIN FETCHed inside
+        // the open transaction — plain findById leaves them as uninitialised LAZY proxies,
+        // which resolve to null after the session closes (open-in-view is off). (#262)
+        Inspection inspection = inspectionRepository.findByIdForReview(inspectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
         List<InspectionItemSnapshot> snapshots = snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspectionId);
         Map<Long, InspectionResponseHistory> answers = latestAnswers(inspectionId);
@@ -67,7 +71,20 @@ public class InspectionReviewService {
                         .toList())).toList();
         return new InspectionReviewResponse(inspection.getId(), inspection.getTitle(), inspection.getStatus(), inspection.getPriority(),
                 inspection.getClientName(), inspection.getSiteName(), inspection.getEquipmentName(), inspection.getTechnician().getName(),
-                inspection.getDueDate(), inspection.getProgress(), startLocation(inspection), endLocation(inspection), sections, allNcs);
+                inspection.getDueDate(), inspection.getProgress(), startLocation(inspection), endLocation(inspection),
+                cancellation(inspection), sections, allNcs);
+    }
+
+    /**
+     * Cancellation audit (reason, actor name, timestamp) for the detail screen (#262). Returns null
+     * unless the inspection is CANCELED, so the UI only renders the block in that state.
+     */
+    private InspectionReviewResponse.Cancellation cancellation(Inspection inspection) {
+        if (inspection.getStatus() != InspectionStatus.CANCELED || inspection.getCanceledAt() == null) {
+            return null;
+        }
+        String canceledBy = inspection.getCanceledBy() == null ? null : inspection.getCanceledBy().getName();
+        return new InspectionReviewResponse.Cancellation(inspection.getCanceledReason(), canceledBy, inspection.getCanceledAt());
     }
 
     /** Start-of-inspection GPS reading, or null when it was not captured (PBI-045 / RN-059). */
