@@ -46,7 +46,10 @@ public class InspectionReviewService {
     /** Returns every frozen checklist item, with its latest answer and item-scoped evidence/NCs. */
     @Transactional(readOnly = true)
     public InspectionReviewResponse getReview(Long inspectionId) {
-        Inspection inspection = inspectionRepository.findById(inspectionId)
+        // Use the review-specific query so canceledBy and reviewedBy are JOIN FETCHed inside
+        // the open transaction — plain findById leaves them as uninitialised LAZY proxies,
+        // which resolve to null after the session closes (open-in-view is off). (#262)
+        Inspection inspection = inspectionRepository.findByIdForReview(inspectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
         List<InspectionItemSnapshot> snapshots = snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspectionId);
         Map<Long, InspectionResponseHistory> answers = latestAnswers(inspectionId);

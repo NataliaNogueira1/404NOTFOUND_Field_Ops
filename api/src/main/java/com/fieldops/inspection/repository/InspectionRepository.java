@@ -11,8 +11,25 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface InspectionRepository extends JpaRepository<Inspection, Long>, JpaSpecificationExecutor<Inspection> {
+
+    /**
+     * Loads a single inspection with all to-one associations required by the review endpoint eager,
+     * so {@code canceledBy} and {@code reviewedBy} are resolved inside the open transaction and
+     * do not trigger a {@code LazyInitializationException} after the session closes (open-in-view
+     * is off). (#262)
+     */
+    @Query("""
+        SELECT i FROM Inspection i
+        JOIN FETCH i.technician
+        JOIN FETCH i.supervisor
+        LEFT JOIN FETCH i.canceledBy
+        LEFT JOIN FETCH i.reviewedBy
+        WHERE i.id = :id
+    """)
+    Optional<Inspection> findByIdForReview(@Param("id") Long id);
 
     @Query("""
         SELECT i FROM Inspection i
