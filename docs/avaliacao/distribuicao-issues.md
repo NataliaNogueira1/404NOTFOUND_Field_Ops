@@ -23,8 +23,8 @@
 
 | Pessoa | Commits | Total de issues | Novas | Prévias |
 |--------|--------:|:---------------:|:-----:|:-------:|
-| Caroline Arruda | 21 | 11 | 6 | 5 |
-| Ian Lucas | 29 | 7 | 4 | 3 |
+| Caroline Arruda | 21 | 12 | 7 | 5 |
+| Ian Lucas | 29 | 8 | 5 | 3 |
 | Andressa Bartolomeu | 36 | 8 | 4 | 4 |
 | Felipe (Cutiur) | 39 | 7 | 2 (1 compart.) | 5 |
 | Júlia Paes | 47 | 4 | 2 | 2 |
@@ -77,6 +77,9 @@
 - **#338 — Exibir motivo de cancelamento na tela de detalhes para o técnico** _(Open)_
   Exibir o motivo de cancelamento também na visão do técnico no mobile/portal, não apenas
   na visão admin.
+- **#336 — Adicionar coluna ID na visualização de inspeções no web admin** _(Open)_
+  Exibir a coluna ID (UUID abreviado com tooltip) na tabela de inspeções para os perfis
+  supervisor, admin e técnico no web admin. `frontend`, `ux`, `sprint-3`.
 
 ## Ian Lucas — 29 commits — 7 issues (4 novas + 3 prévias)
 
@@ -102,6 +105,9 @@
 - **#147 — PBI-084: Notificações locais de prazo** _(In progress)_
   Notificações locais no mobile (offline, via `expo-notifications`) agendadas a partir do
   `dueDate` das inspeções, com lembrete, reagendamento após sync e tratamento de permissão. P1.
+- **#337 — Adicionar exibição do ID da inspeção no mobile** _(Open)_
+  Exibir o ID da inspeção (UUID abreviado) nas telas de listagem e detalhes no app mobile
+  para os perfis técnico, supervisor e admin, sem quebrar o layout. `mobile`, `ux`, `sprint-3`.
 
 ## Andressa Bartolomeu — 36 commits — 8 issues (4 novas + 4 prévias)
 
@@ -275,10 +281,6 @@
   Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
 
-## Natália Nogueira — 245 commits — 0 issues
-
-Responsável pela aprovação dos pull requests.
-
 ---
 
 ## Observações
@@ -294,5 +296,5 @@ Responsável pela aprovação dos pull requests.
   várias). Com a redistribuição, ela ficou espalhada entre Ian, Marcela e Lucas
   — precisa de coordenação entre eles para não travar.
 - **Issues de fechamento (#316 e #320):** dependem de quase tudo pronto; deixar para o final.
-- **Issues extras (pós-distribuição):** #332, #333, #334 (Felipe) e #338 (Caroline) foram
+- **Issues extras (pós-distribuição):** #332, #333, #334 (Felipe), #338 (Caroline) e #336 (Caroline), #337 (Ian) foram
   atribuídas depois da distribuição inicial e não entram na contagem das 28.
