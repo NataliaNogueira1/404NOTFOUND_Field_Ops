@@ -61,6 +61,49 @@ export function RejectionBanner({
   );
 }
 
+const readOnlyConfig: Record<string, { icon: string; title: string; description: string; bg: string; border: string; textColor: string }> = {
+  SUBMITTED: {
+    icon: '📤',
+    title: 'Inspeção enviada',
+    description: 'Esta inspeção foi enviada ao servidor e aguarda revisão do supervisor. Os dados estão em modo somente-leitura.',
+    bg: '#EFF6FF',
+    border: '#93C5FD',
+    textColor: '#1E40AF',
+  },
+  UNDER_REVIEW: {
+    icon: '🔍',
+    title: 'Em revisão',
+    description: 'Esta inspeção está sendo revisada pelo supervisor. Os dados estão em modo somente-leitura.',
+    bg: '#FFFBEB',
+    border: '#FCD34D',
+    textColor: '#92400E',
+  },
+  APPROVED: {
+    icon: '✅',
+    title: 'Inspeção aprovada',
+    description: 'Esta inspeção foi aprovada pelo supervisor. Os dados estão em modo somente-leitura e protegidos contra alterações.',
+    bg: '#F0FDF4',
+    border: '#86EFAC',
+    textColor: '#166534',
+  },
+};
+
+export function ReadOnlyBanner({ status }: { status: InspectionStatus }) {
+  const config = readOnlyConfig[status];
+  if (!config) return null;
+  return (
+    <View
+      style={[styles.readOnly, { backgroundColor: config.bg, borderColor: config.border }]}
+      accessibilityRole="alert"
+    >
+      <Text style={[styles.readOnlyTitle, { color: config.textColor }]}>
+        {config.icon} {config.title}
+      </Text>
+      <Text style={[styles.readOnlyBody, { color: config.textColor }]}>{config.description}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 999, backgroundColor: Colors.gray100, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 999, backgroundColor: Colors.primary },
@@ -73,4 +116,7 @@ const styles = StyleSheet.create({
   rejectionLabel: { fontWeight: FontWeight.semibold, color: Colors.dangerDark },
   rejectionItems: { marginTop: Spacing.xs, gap: 2 },
   rejectionMeta: { fontSize: FontSize.xs, color: Colors.dangerDark, marginTop: 2 },
+  readOnly: { borderWidth: 1, borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
+  readOnlyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  readOnlyBody: { fontSize: FontSize.sm, lineHeight: 20 },
 });

@@ -3,12 +3,19 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ChecklistItemCard, ProgressBar, SectionHeader } from '@/components/fieldops';
+import { ChecklistItemCard, ProgressBar, ReadOnlyBanner, SectionHeader } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
-import { useFieldOps } from '@/features/fieldops';
+import { InspectionStatus, useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
+
+// Inspection states whose checklist is viewable but never editable (#273/#277).
+const READ_ONLY_STATUSES: InspectionStatus[] = [
+  InspectionStatus.SUBMITTED,
+  InspectionStatus.UNDER_REVIEW,
+  InspectionStatus.APPROVED,
+];
 
 export default function ChecklistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +26,10 @@ export default function ChecklistScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
+  // Lock the whole checklist when the inspection is in a reviewed state. Derived from the
+  // inspection's own status (not a route flag) so a submitted/approved inspection can never be
+  // edited, even if the screen is reached directly. Works offline from the local snapshot.
+  const readOnly = inspection ? READ_ONLY_STATUSES.includes(inspection.status) : false;
 
   const allItems = useMemo(() => (template ? template.sections.flatMap((section) => section.items) : []), [template]);
   const hasChecklist = Boolean(template && allItems.length > 0);
@@ -81,6 +92,8 @@ export default function ChecklistScreen() {
           {template.sections.length} seções / {total} itens
         </Text>
 
+        {readOnly && inspection ? <ReadOnlyBanner status={inspection.status} /> : null}
+
         <Card style={styles.card}>
           <ProgressBar value={inspection?.progress ?? 0} />
           <View style={styles.progressRow}>
@@ -109,6 +122,7 @@ export default function ChecklistScreen() {
                 onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
                 onRetryEvidence={retryEvidenceUpload}
                 reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
+                readOnly={readOnly}
               />
             ))}
           </View>
@@ -120,12 +134,21 @@ export default function ChecklistScreen() {
           fullWidth
           size="lg"
         />
-        <Button
-          label="Não conformidades"
-          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
-          variant="secondary"
-          fullWidth
-        />
+        {readOnly ? (
+          <Button
+            label="Voltar aos detalhes"
+            onPress={() => router.back()}
+            variant="secondary"
+            fullWidth
+          />
+        ) : (
+          <Button
+            label="Não conformidades"
+            onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
+            variant="secondary"
+            fullWidth
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

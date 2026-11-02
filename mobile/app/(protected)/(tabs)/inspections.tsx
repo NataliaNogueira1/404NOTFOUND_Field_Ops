@@ -67,10 +67,25 @@ export default function InspectionsScreen() {
         />
         <Text style={[styles.filterLabel, { color: c.textSecondary }]}>Estado</Text>
         <ChipRow
-          values={['Todas', InspectionStatus.ASSIGNED, InspectionStatus.IN_PROGRESS, InspectionStatus.REJECTED, InspectionStatus.SUBMITTED]}
+          values={[
+            'Todas',
+            InspectionStatus.ASSIGNED,
+            InspectionStatus.IN_PROGRESS,
+            InspectionStatus.SUBMITTED,
+            InspectionStatus.UNDER_REVIEW,
+            InspectionStatus.APPROVED,
+            InspectionStatus.REJECTED,
+          ]}
           selected={status}
           onSelect={(value) => setStatus(value as typeof status)}
-          labels={{ ASSIGNED: 'Atribuída', IN_PROGRESS: 'Em andamento', REJECTED: 'Reprovada', SUBMITTED: 'Enviada' }}
+          labels={{
+            ASSIGNED: 'Atribuída',
+            IN_PROGRESS: 'Em andamento',
+            SUBMITTED: 'Enviada',
+            UNDER_REVIEW: 'Em revisão',
+            APPROVED: 'Aprovada',
+            REJECTED: 'Reprovada',
+          }}
         />
         <Text style={[styles.filterLabel, { color: c.textSecondary }]}>Prioridade</Text>
         <ChipRow

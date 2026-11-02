@@ -22,9 +22,15 @@ interface ChecklistItemProps {
   /** Retry a failed photo upload, reusing the existing file (PBI-044). */
   onRetryEvidence?: (evidenceId: string) => void;
   reviewComments?: ReviewComment[];
+  /**
+   * Read-only view (#273/#277): renders the saved answer, observation, review comments and
+   * evidence exactly as the correction flow, but locks every control so a technician can review
+   * a SUBMITTED/UNDER_REVIEW/APPROVED inspection without editing or triggering any save.
+   */
+  readOnly?: boolean;
 }
 
-export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence, reviewComments = [] }: ChecklistItemProps) {
+export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence, reviewComments = [], readOnly = false }: ChecklistItemProps) {
   const router = useRouter();
   const c = useThemeColors();
   const [text, setText] = useState(answer?.value?.toString() ?? '');
@@ -86,6 +92,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
         onText={handleTextChange}
         onTextBlur={handleTextBlur}
         onAnswer={handleSelect}
+        readOnly={readOnly}
       />
       {isFailure ? (
         <View style={[styles.failureBox, { borderColor: c.danger, backgroundColor: c.dangerLight }]}>
@@ -95,13 +102,18 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
             value={observation}
             onChangeText={handleObservationChange}
             onBlur={handleObservationBlur}
+            editable={!readOnly}
             placeholder="Descreva a falha encontrada"
             placeholderTextColor={c.textSecondary}
             style={[styles.input, styles.textArea, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]}
             multiline
           />
-          <Text style={[styles.label, { color: c.textSecondary }]}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
-          <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
+          {readOnly ? null : (
+            <>
+              <Text style={[styles.label, { color: c.textSecondary }]}>Evidência{item.requireEvidenceOnFailure ? ' obrigatória' : ''}</Text>
+              <Button label="Adicionar foto" onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)} variant="secondary" />
+            </>
+          )}
         </View>
       ) : answer !== undefined ? (
         <View style={[styles.observationBox, { borderColor: c.border, backgroundColor: c.surface }]}>
@@ -110,6 +122,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
             value={observation}
             onChangeText={handleObservationChange}
             onBlur={handleObservationBlur}
+            editable={!readOnly}
             placeholder="Adicione uma observação sobre este item"
             placeholderTextColor={c.textSecondary}
             style={[styles.input, styles.textArea, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]}
@@ -120,11 +133,11 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
       {evidences.length > 0 ? (
         <View style={styles.evidenceRow}>
           {evidences.map((evidence) => (
-            <EvidenceThumb key={evidence.id} evidence={evidence} onRetry={onRetryEvidence} />
+            <EvidenceThumb key={evidence.id} evidence={evidence} onRetry={readOnly ? undefined : onRetryEvidence} />
           ))}
         </View>
       ) : null}
-      <SaveStatusIndicator status={saveStatus} />
+      {readOnly ? null : <SaveStatusIndicator status={saveStatus} />}
     </Card>
   );
 }
@@ -172,25 +185,27 @@ function EvidenceThumb({ evidence, onRetry }: { evidence: Evidence; onRetry?: (e
   );
 }
 
-function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
+function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOnly = false }: {
   item: TemplateItem;
   value?: ChecklistValue;
   text: string;
   onText: (value: string) => void;
   onTextBlur: () => void;
   onAnswer: (value: ChecklistValue) => void;
+  readOnly?: boolean;
 }) {
   const c = useThemeColors();
   const inputStyle = { borderColor: c.border, backgroundColor: c.surface, color: c.text };
-  if (item.responseType === ResponseType.CONFORMITY) return <Segmented options={[['CONFORME', 'Conforme'], ['NAO_CONFORME', 'Não conforme'], ['NA', 'N/A']]} value={value} onSelect={onAnswer} />;
-  if (item.responseType === ResponseType.BOOLEAN) return <Segmented options={[[true, 'Sim'], [false, 'Não']]} value={value} onSelect={onAnswer} />;
-  if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} />;
-  if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} />;
+  if (item.responseType === ResponseType.CONFORMITY) return <Segmented options={[['CONFORME', 'Conforme'], ['NAO_CONFORME', 'Não conforme'], ['NA', 'N/A']]} value={value} onSelect={onAnswer} readOnly={readOnly} />;
+  if (item.responseType === ResponseType.BOOLEAN) return <Segmented options={[[true, 'Sim'], [false, 'Não']]} value={value} onSelect={onAnswer} readOnly={readOnly} />;
+  if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} readOnly={readOnly} />;
+  if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} readOnly={readOnly} />;
   if (item.responseType === ResponseType.NUMBER) return (
     <TextInput
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      editable={!readOnly}
       keyboardType="numeric"
       placeholder="Informe o valor"
       placeholderTextColor={c.textSecondary}
@@ -202,6 +217,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      editable={!readOnly}
       placeholder="Digite a resposta"
       placeholderTextColor={c.textSecondary}
       style={[styles.input, inputStyle]}
@@ -213,6 +229,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      editable={!readOnly}
       placeholder="Digite a resposta"
       placeholderTextColor={c.textSecondary}
       style={[styles.input, styles.textArea, inputStyle]}
@@ -228,14 +245,19 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer }: {
   );
 }
 
-function Segmented({ options, value, onSelect }: { options: Array<[ChecklistValue, string]>; value?: ChecklistValue; onSelect: (value: ChecklistValue) => void }) {
+function Segmented({ options, value, onSelect, readOnly = false }: { options: Array<[ChecklistValue, string]>; value?: ChecklistValue; onSelect: (value: ChecklistValue) => void; readOnly?: boolean }) {
   const c = useThemeColors();
-  return <View style={styles.segmented}>{options.map(([optionValue, label]) => {
+  // In read-only mode only the previously selected option stays visible; the others are hidden so
+  // the saved answer reads clearly, and the chip is non-interactive.
+  const visible = readOnly ? options.filter(([optionValue]) => value === optionValue) : options;
+  return <View style={styles.segmented}>{visible.map(([optionValue, label]) => {
     const active = value === optionValue;
     return (
       <Pressable
         key={`${optionValue}`}
-        onPress={() => onSelect(optionValue)}
+        onPress={readOnly ? undefined : () => onSelect(optionValue)}
+        disabled={readOnly}
+        accessibilityState={{ disabled: readOnly, selected: active }}
         style={[styles.option, { borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryLight : c.surface }]}
       >
         <Text style={[styles.optionText, { color: active ? c.primaryDark : c.textSecondary }]}>{label}</Text>
@@ -244,7 +266,7 @@ function Segmented({ options, value, onSelect }: { options: Array<[ChecklistValu
   })}</View>;
 }
 
-function DateInput({ value, onSelect }: { value?: string; onSelect: (value: ChecklistValue) => void }) {
+function DateInput({ value, onSelect, readOnly = false }: { value?: string; onSelect: (value: ChecklistValue) => void; readOnly?: boolean }) {
   const c = useThemeColors();
   const [showPicker, setShowPicker] = useState(false);
   const currentDate = value ? new Date(value + 'T00:00:00') : new Date();
@@ -255,7 +277,12 @@ function DateInput({ value, onSelect }: { value?: string; onSelect: (value: Chec
 
   return (
     <View>
-      <Pressable onPress={() => setShowPicker(true)} style={[styles.dateButton, { borderColor: c.border, backgroundColor: c.surface }]}>
+      <Pressable
+        onPress={readOnly ? undefined : () => setShowPicker(true)}
+        disabled={readOnly}
+        accessibilityState={{ disabled: readOnly }}
+        style={[styles.dateButton, { borderColor: c.border, backgroundColor: c.surface }]}
+      >
         <Text style={[styles.dateButtonText, { color: formattedDate ? c.text : c.textSecondary }]}>
           {formattedDate ?? 'Selecionar data'}
         </Text>
