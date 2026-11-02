@@ -25,7 +25,7 @@ const cancelable = [
   InspectionStatus.SUBMITTED,
   InspectionStatus.UNDER_REVIEW,
 ]
-const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority', 'dueDateFrom', 'dueDateTo', 'overdue', 'review']
+const filterNames = ['name', 'status', 'technicianName', 'clientName', 'priority', 'from', 'to', 'overdue', 'review']
 
 export function InspectionsPage() {
   const navigate = useNavigate()
@@ -38,8 +38,8 @@ export function InspectionsPage() {
   const technicianName = list.value('technicianName')
   const clientName = list.value('clientName')
   const priority = list.value('priority') as Priority | ''
-  const dueDateFrom = list.value('dueDateFrom')
-  const dueDateTo = list.value('dueDateTo')
+  const from = list.value('from')
+  const to = list.value('to')
   const overdue = list.value('overdue') === 'true'
   const review = list.value('review') === 'true'
 
@@ -93,8 +93,8 @@ export function InspectionsPage() {
         technicianName,
         clientName,
         priority,
-        dueDateFrom,
-        dueDateTo,
+        from,
+        to,
         overdue,
         review,
         page: list.page,
@@ -114,8 +114,7 @@ export function InspectionsPage() {
   }, [
     clientName,
     debouncedQuery,
-    dueDateFrom,
-    dueDateTo,
+    from,
     list.page,
     list.size,
     list.sort,
@@ -124,6 +123,7 @@ export function InspectionsPage() {
     review,
     status,
     technicianName,
+    to,
   ])
 
   useEffect(() => {
@@ -180,8 +180,8 @@ export function InspectionsPage() {
 
       await adminCatalogApi.exportCsv({
         status,
-        from: dueDateFrom,
-        to: dueDateTo,
+        from,
+        to,
         clientId: matchedClient ? Number(matchedClient.id) : undefined,
       })
     } catch (error) {
@@ -336,16 +336,16 @@ export function InspectionsPage() {
           label="De"
           id="period-from"
           type="date"
-          value={dueDateFrom}
-          onChange={(event) => list.update('dueDateFrom', event.target.value)}
+          value={from}
+          onChange={(event) => list.update('from', event.target.value)}
         />
         <Input
           label="Até"
           id="period-to"
           type="date"
-          value={dueDateTo}
-          min={dueDateFrom || undefined}
-          onChange={(event) => list.update('dueDateTo', event.target.value)}
+          value={to}
+          min={from || undefined}
+          onChange={(event) => list.update('to', event.target.value)}
         />
         <label className="mt-7 flex items-center gap-2 text-sm">
           <input

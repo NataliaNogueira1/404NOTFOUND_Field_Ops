@@ -45,13 +45,18 @@ public class AdminCatalogListService {
         return templateRepository.findAll(templateFilters(name, status), pageable).map(this::templateSummary);
     }
 
-    /** Lists admin inspections with database-backed operational filters. */
+    /**
+     * Lists admin inspections with database-backed operational filters.
+     *
+     * <p>The optional due-date bounds are inclusive and use the same {@code from}/{@code to}
+     * contract as the inspection export.</p>
+     */
     @Transactional(readOnly = true)
     public Page<AdminInspectionSummary> listInspections(String name, InspectionStatus status,
-            String technicianName, String clientName, Priority priority, LocalDate dueDate,
+            String technicianName, String clientName, Priority priority, LocalDate from, LocalDate to,
             Boolean overdue, Boolean review, Pageable pageable) {
         Specification<Inspection> filters = inspectionFilters(name, status, technicianName, clientName,
-                priority, dueDate, overdue, review);
+                priority, from, to, overdue, review);
         return inspectionRepository.findAll(filters, pageable).map(this::inspectionSummary);
     }
 
@@ -69,7 +74,7 @@ public class AdminCatalogListService {
     }
 
     private Specification<Inspection> inspectionFilters(String name, InspectionStatus status,
-            String technicianName, String clientName, Priority priority, LocalDate dueDate,
+            String technicianName, String clientName, Priority priority, LocalDate from, LocalDate to,
             Boolean overdue, Boolean review) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -83,7 +88,8 @@ public class AdminCatalogListService {
                 predicates.add(builder.equal(builder.lower(root.get("clientName")), clientName.toLowerCase(Locale.ROOT)));
             }
             if (priority != null) predicates.add(builder.equal(root.get("priority"), priority));
-            if (dueDate != null) predicates.add(builder.equal(root.get("dueDate"), dueDate));
+            if (from != null) predicates.add(builder.greaterThanOrEqualTo(root.get("dueDate"), from));
+            if (to != null) predicates.add(builder.lessThanOrEqualTo(root.get("dueDate"), to));
             if (Boolean.TRUE.equals(overdue)) {
                 predicates.add(builder.lessThan(root.get("dueDate"), LocalDate.now()));
                 predicates.add(builder.not(root.get("status").in(TERMINAL_STATUSES)));
