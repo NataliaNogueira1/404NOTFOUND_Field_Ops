@@ -7,29 +7,39 @@ import { SeverityBadge } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Severity, useFieldOps } from '@/features/fieldops';
+import { criticalNonConformityRequiresEvidence } from '@/features/fieldops/nonConformityValidation';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 export default function NonConformitiesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useThemeColors();
-  const { nonConformities, addNonConformity } = useFieldOps();
+  const { nonConformities, evidences, addNonConformity } = useFieldOps();
   const { template } = useInspectionTemplate(id);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity>(Severity.MEDIUM);
   const [itemId, setItemId] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const items = template?.sections.flatMap((section) => section.items) ?? [];
   const list = nonConformities.filter((nc) => nc.inspectionId === id);
 
   function save() {
     if (!itemId || !title) return;
-    addNonConformity({ inspectionId: id, itemId, title, description, severity, evidenceCount: 0 });
+    const evidenceCount = evidences.filter(
+      (evidence) => evidence.inspectionId === id && evidence.itemId === itemId,
+    ).length;
+    if (criticalNonConformityRequiresEvidence(severity, evidenceCount)) {
+      setValidationError('Uma não conformidade crítica exige uma evidência no item selecionado.');
+      return;
+    }
+    addNonConformity({ inspectionId: id, itemId, title, description, severity, evidenceCount });
     setOpen(false);
     setTitle('');
     setDescription('');
+    setValidationError('');
   }
 
   return (
@@ -49,13 +59,14 @@ export default function NonConformitiesScreen() {
             </Card>
           );
         })}
-        <Button label="Nova não conformidade" onPress={() => setOpen(true)} fullWidth size="lg" />
+        <Button label="Nova não conformidade" onPress={() => { setValidationError(''); setOpen(true); }} fullWidth size="lg" />
       </ScrollView>
 
       <Modal visible={open} transparent animationType="slide">
         <View style={styles.backdrop}>
           <Card style={styles.modal}>
             <Text style={[styles.modalTitle, { color: c.text }]}>Nova não conformidade</Text>
+            {validationError ? <Text accessibilityRole="alert" style={[styles.error, { color: Colors.danger }]}>{validationError}</Text> : null}
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -101,7 +112,7 @@ export default function NonConformitiesScreen() {
               ))}
             </ScrollView>
             <Button label="Salvar" onPress={save} fullWidth />
-            <Button label="Cancelar" onPress={() => setOpen(false)} variant="ghost" fullWidth />
+            <Button label="Cancelar" onPress={() => { setValidationError(''); setOpen(false); }} variant="ghost" fullWidth />
           </Card>
         </View>
       </Modal>
@@ -123,6 +134,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderRadius: 10, borderWidth: 1, padding: Spacing.md },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
   label: { fontWeight: FontWeight.semibold },
+  error: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: { minHeight: 40, borderRadius: 999, borderWidth: 1, paddingHorizontal: Spacing.md, justifyContent: 'center' },
   chipText: { fontWeight: FontWeight.semibold },
