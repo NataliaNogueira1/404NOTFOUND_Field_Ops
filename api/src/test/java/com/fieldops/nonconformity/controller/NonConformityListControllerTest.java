@@ -5,8 +5,14 @@ import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.Priority;
+import com.fieldops.inspection.model.TemplateItem;
+import com.fieldops.inspection.model.TemplateSection;
+import com.fieldops.inspection.model.ResponseType;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateItemRepository;
+import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.nonconformity.model.NonConformity;
 import com.fieldops.nonconformity.model.NonConformitySeverity;
 import com.fieldops.nonconformity.model.NonConformityStatus;
@@ -33,6 +39,8 @@ import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -73,6 +81,8 @@ class NonConformityListControllerTest {
     private User supervisor;
     private User technician;
     private InspectionTemplate template;
+    @Autowired private TemplateItemRepository itemRepository;
+    @Autowired private TemplateSectionRepository sectionRepository;
     private Inspection acmeInspection;
     private Inspection globexInspection;
 
@@ -102,6 +112,8 @@ class NonConformityListControllerTest {
     private void cleanState() {
         nonConformityRepository.deleteAll();
         inspectionRepository.deleteAll();
+        itemRepository.deleteAll();
+        sectionRepository.deleteAll();
         templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -229,6 +241,58 @@ class NonConformityListControllerTest {
                 .andExpect(jsonPath("$.content[0].updatedAt").doesNotExist());
     }
 
+    @Test
+    void supervisorReadsAndDeletesANonConformity() throws Exception {
+        NonConformity nonConformity = nonConformityRepository.findAll().getFirst();
+        String token = obtainToken("sup@fieldops.com");
+
+        mockMvc.perform(get("/api/v1/non-conformities/{id}", nonConformity.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(nonConformity.getId().intValue()))
+                .andExpect(jsonPath("$.title").value(nonConformity.getTitle()));
+
+        mockMvc.perform(delete("/api/v1/non-conformities/{id}", nonConformity.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/non-conformities/{id}", nonConformity.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createAndUpdateValidateTheirRequestBodies() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+        Long id = nonConformityRepository.findAll().getFirst().getId();
+
+        mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mockMvc.perform(put("/api/v1/non-conformities/{id}", id).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void supervisorCreatesAndUpdatesNonConformity() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+        Long itemId = acmeInspection.getItemSnapshots().getFirst().getSourceTemplateItemId();
+        String body = "{\"inspectionId\":" + acmeInspection.getId() + ",\"itemId\":" + itemId
+                + ",\"title\":\"New issue\",\"description\":\"Details\",\"severity\":\"HIGH\",\"status\":\"OPEN\"}";
+        MvcResult created = mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andReturn();
+        Integer id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(put("/api/v1/non-conformities/{id}", id).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body.replace("New issue", "Closed issue").replace("OPEN", "CLOSED")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Closed issue"))
+                .andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
     // --- fixtures ---
 
     private User persistUser(String email, Role role) {
@@ -262,6 +326,9 @@ class NonConformityListControllerTest {
         inspection.setStatus(InspectionStatus.UNDER_REVIEW);
         inspection.setPriority(Priority.MEDIUM);
         inspection.setDueDate(LocalDate.now().plusDays(1));
+        TemplateSection section = new TemplateSection(); section.setTemplate(template); section.setTitle("Section"); section.setDisplayOrder(1); section = sectionRepository.save(section);
+        TemplateItem item = new TemplateItem(); item.setSection(section); item.setQuestion("Question"); item.setResponseType(ResponseType.BOOLEAN); item.setRequired(true); item.setDisplayOrder(1); item = itemRepository.save(item);
+        inspection.addItemSnapshot(InspectionItemSnapshot.from(inspection, section, item));
         return inspectionRepository.save(inspection);
     }
 
