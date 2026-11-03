@@ -6,6 +6,7 @@ import { ClientStatus, clientsApi, type ManagedClient } from '@/api/clients'
 import { usersApi } from '@/api/users'
 import { authSession } from '@/auth/session'
 import { PriorityBadge, StatusBadge } from '@/components/badges/Badge'
+import { InspectionIdCell } from '@/components/inspections/InspectionIdCell'
 import { Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
@@ -192,6 +193,11 @@ export function InspectionsPage() {
   }
 
   const columns: Column<AdminInspectionSummary>[] = [
+    {
+      header: 'ID',
+      sortKey: 'id',
+      cell: (item) => <InspectionIdCell id={item.id} />,
+    },
     {
       header: 'Inspeção',
       sortKey: 'title',
