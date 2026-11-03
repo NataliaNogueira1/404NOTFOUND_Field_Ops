@@ -1,9 +1,12 @@
 package com.fieldops.nonconformity.controller;
 
 import com.fieldops.nonconformity.dto.NonConformityResponse;
+import com.fieldops.nonconformity.dto.NonConformityRequest;
 import com.fieldops.nonconformity.model.NonConformitySeverity;
 import com.fieldops.nonconformity.model.NonConformityStatus;
 import com.fieldops.nonconformity.service.NonConformityQueryService;
+import com.fieldops.nonconformity.service.NonConformityManagementService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -11,8 +14,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,9 +34,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class NonConformityController {
 
     private final NonConformityQueryService nonConformityQueryService;
+    private final NonConformityManagementService managementService;
 
-    public NonConformityController(NonConformityQueryService nonConformityQueryService) {
+    public NonConformityController(NonConformityQueryService nonConformityQueryService,
+            NonConformityManagementService managementService) {
         this.nonConformityQueryService = nonConformityQueryService;
+        this.managementService = managementService;
     }
 
     @Operation(summary = "List non-conformities with optional filters and pagination")
@@ -41,5 +53,27 @@ public class NonConformityController {
             @RequestParam(required = false) NonConformityStatus status,
             Pageable pageable) {
         return ResponseEntity.ok(nonConformityQueryService.list(inspectionId, client, severity, status, pageable));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<NonConformityResponse> get(@PathVariable Long id) {
+        return ResponseEntity.ok(managementService.get(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<NonConformityResponse> create(@Valid @RequestBody NonConformityRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(managementService.create(request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<NonConformityResponse> update(@PathVariable Long id,
+            @Valid @RequestBody NonConformityRequest request) {
+        return ResponseEntity.ok(managementService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        managementService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

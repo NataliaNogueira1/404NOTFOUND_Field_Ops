@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface InspectionEvidenceRepository extends JpaRepository<InspectionEvidence, Long> {
 
+    boolean existsByInspectionIdAndItemSnapshotId(Long inspectionId, Long itemSnapshotId);
+
     @Query("""
         SELECT evidence FROM InspectionEvidence evidence
         LEFT JOIN FETCH evidence.itemSnapshot snapshot

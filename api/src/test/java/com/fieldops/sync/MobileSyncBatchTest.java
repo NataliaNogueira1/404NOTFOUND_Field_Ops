@@ -389,6 +389,24 @@ class MobileSyncBatchTest {
     }
 
     @Test
+    void rejectsCriticalNonConformityWithoutEvidenceForItsItem() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.IN_PROGRESS);
+        Long itemId = snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId())
+                .getFirst().getSourceTemplateItemId();
+
+        mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + obtainToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operations\":[" + nonConformityOperation(UUID.randomUUID(), inspection.getId(),
+                                itemId, null, "CRITICAL") + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.results[0].detail").value("CRITICAL non-conformity requires evidence for item: "
+                        + itemId));
+
+        assertThat(nonConformityRepository.count()).isZero();
+    }
+
+    @Test
     void doesNotDuplicateNonConformityWhenOperationIsResent() throws Exception {
         Inspection inspection = saveInspection(InspectionStatus.IN_PROGRESS);
         Long itemId = snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId())
@@ -455,11 +473,16 @@ class MobileSyncBatchTest {
     }
 
     private String nonConformityOperation(UUID operationId, Long inspectionId, Long itemId, UUID dependencyId) {
+        return nonConformityOperation(operationId, inspectionId, itemId, dependencyId, "HIGH");
+    }
+
+    private String nonConformityOperation(UUID operationId, Long inspectionId, Long itemId, UUID dependencyId,
+            String severity) {
         String dependencies = dependencyId == null ? "[]" : "[\"" + dependencyId + "\"]";
         return "{\"operationId\":\"" + operationId + "\",\"type\":\"NON_CONFORMITY_CREATE\",\"dependencyIds\":"
                 + dependencies + ",\"baseVersion\":0,\"payload\":{\"inspectionId\":" + inspectionId
                 + ",\"itemId\":" + itemId + ",\"title\":\"Damaged panel\",\"description\":"
-                + "\"Panel cover is corroded\",\"severity\":\"HIGH\"}}";
+                + "\"Panel cover is corroded\",\"severity\":\"" + severity + "\"}}";
     }
 
     private User persistUser(String email, Role role) {

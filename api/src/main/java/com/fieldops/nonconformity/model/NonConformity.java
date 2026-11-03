@@ -69,6 +69,15 @@ public class NonConformity {
         return nonConformity;
     }
 
+    /** Applies an administrative correction while preserving the original report timestamp. */
+    public void update(String title, String description, NonConformitySeverity severity, NonConformityStatus status) {
+        this.title = title;
+        this.description = description;
+        this.severity = severity;
+        this.status = status;
+        this.closedAt = status == NonConformityStatus.CLOSED ? Instant.now() : null;
+    }
+
     public Long getId() { return id; }
     public Inspection getInspection() { return inspection; }
     public InspectionItemSnapshot getInspectionItemSnapshot() { return inspectionItemSnapshot; }
