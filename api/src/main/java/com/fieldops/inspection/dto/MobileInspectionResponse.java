@@ -34,6 +34,12 @@ public record MobileInspectionResponse(
         String rejectionReason,
         String rejectedBy,
         String rejectedAt,
+        /** Reason the inspection was canceled — only populated when status is CANCELED (#338). */
+        String canceledReason,
+        /** Name of the admin/supervisor who canceled the inspection (#338). */
+        String canceledBy,
+        /** When the inspection was canceled (ISO 8601) (#338). */
+        String canceledAt,
         Long version,
         TemplateDto template,
         List<ReviewCommentDto> reviewComments
