@@ -61,6 +61,44 @@ export function RejectionBanner({
   );
 }
 
+/** Formats an ISO timestamp as a localized pt-BR date+time, falling back to the raw value. */
+function formatCancellationDate(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('pt-BR');
+}
+
+/**
+ * Cancellation audit shown on the technician's detail screen when the inspection is
+ * CANCELED (#338): reason, who canceled it and when — the same information the
+ * supervisor already sees. Mirrors {@link RejectionBanner}; each field renders only
+ * when present so a missing value degrades gracefully.
+ */
+export function CancellationBanner({
+  reason,
+  canceledBy,
+  canceledAt,
+}: {
+  reason?: string;
+  canceledBy?: string;
+  canceledAt?: string;
+}) {
+  return (
+    <View style={styles.rejection} accessibilityRole="alert">
+      <Text style={styles.rejectionTitle}>🚫 Inspeção cancelada</Text>
+      <Text style={styles.rejectionBody}>
+        <Text style={styles.rejectionLabel}>Motivo: </Text>
+        {reason ?? 'Motivo não informado'}
+      </Text>
+      <Text style={styles.rejectionMeta}>
+        Cancelada por: {canceledBy ?? 'Usuário não identificado'}
+      </Text>
+      <Text style={styles.rejectionMeta}>
+        Data: {canceledAt ? formatCancellationDate(canceledAt) : 'Data não registrada'}
+      </Text>
+    </View>
+  );
+}
+
 const readOnlyConfig: Record<string, { icon: string; title: string; description: string; bg: string; border: string; textColor: string }> = {
   SUBMITTED: {
     icon: '📤',
