@@ -12,6 +12,7 @@ import {
 import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, PriorityBadge, StatusBadge } from '@/components/badges/Badge'
+import { CancellationNotice } from '@/components/inspections/CancellationNotice'
 import { Select } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -21,6 +22,7 @@ import { Input } from '@/components/ui/Input'
 import { LoadingState } from '@/components/ui/LoadingState'
 import { authSession } from '@/auth/session'
 import { type TechnicianInspection } from '@/api/mobileInspections'
+import { useTechnicianInspectionDetail } from '@/hooks/useTechnicianInspectionDetail'
 import { useTechnicianInspections } from '@/hooks/useTechnicianInspections'
 import { InspectionStatus, Priority, ResponseType, type TemplateItem } from '@/types/domain'
 import { formatDate } from '@/utils/formatDate'
@@ -211,15 +213,33 @@ function InspectionsList({ inspections }: { inspections: TechnicianInspection[] 
 }
 
 export function TechnicianInspectionDetailsPage() {
-  const { state, reload, id } = useInspection()
+  // Fetch by id (not from the active list): a CANCELED inspection is absent from the
+  // list pull, so the detail must come from GET /mobile/inspections/{id} for the
+  // technician to read the cancellation reason/author/date (#338).
+  const { id = '' } = useParams()
+  const { state, reload } = useTechnicianInspectionDetail(id)
   return (
     <div className="space-y-6">
       <BackLink to="/technician/inspections" label="Minhas inspeções" />
-      <InspectionAsync state={state} reload={reload} id={id}>
+      <InspectionDetailAsync state={state} reload={reload}>
         {(inspection) => <DetailsContent inspection={inspection} />}
-      </InspectionAsync>
+      </InspectionDetailAsync>
     </div>
   )
+}
+
+function InspectionDetailAsync({
+  state,
+  reload,
+  children,
+}: {
+  state: ReturnType<typeof useTechnicianInspectionDetail>['state']
+  reload: () => void
+  children: (inspection: TechnicianInspection) => React.ReactNode
+}) {
+  if (state.type === 'loading') return <LoadingState label="Carregando inspeção..." />
+  if (state.type === 'error') return <ErrorState message={state.message} onRetry={reload} />
+  return <>{children(state.inspection)}</>
 }
 
 function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
@@ -268,9 +288,11 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-4">
           {isCanceled && (
-            <Card className="border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark">
-              Esta inspeção foi cancelada pelo Admin/Supervisor e não pode ser iniciada ou continuada.
-            </Card>
+            <CancellationNotice
+              reason={inspection.canceledReason}
+              canceledBy={inspection.canceledBy}
+              canceledAt={inspection.canceledAt}
+            />
           )}
           {inspection.status === InspectionStatus.REJECTED && inspection.rejectionReason && (
             <Card className="border-warning/40 bg-warning/10 p-4 text-sm text-warning-dark">
