@@ -53,6 +53,12 @@ interface ApiInspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Reason the inspection was canceled — present only when CANCELED (#338). */
+  canceledReason?: string;
+  /** Who canceled the inspection (admin/supervisor name) (#338). */
+  canceledBy?: string;
+  /** When the inspection was canceled (ISO date/time) (#338). */
+  canceledAt?: string;
   version: number;
   template: ApiTemplate;
   reviewComments?: ApiReviewComment[];
@@ -337,6 +343,11 @@ export class InspectionSyncService {
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
+      // #338: bring the cancellation audit down so the technician sees why the
+      // inspection was canceled (reason, author, date) on the detail screen.
+      canceledReason: apiInsp.canceledReason,
+      canceledBy: apiInsp.canceledBy,
+      canceledAt: apiInsp.canceledAt,
       serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,
