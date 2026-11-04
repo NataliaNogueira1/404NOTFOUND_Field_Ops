@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
+  CancellationBanner,
   InspectionStatusBadge,
   PriorityBadge,
   ProgressBar,
@@ -128,6 +129,14 @@ export default function InspectionDetailsScreen() {
             rejectedBy={inspection.rejectedBy}
             rejectedAt={inspection.rejectedAt}
             items={inspectionNCs.map((nc) => nc.title)}
+          />
+        ) : null}
+
+        {inspection.status === InspectionStatus.CANCELED ? (
+          <CancellationBanner
+            reason={inspection.canceledReason}
+            canceledBy={inspection.canceledBy}
+            canceledAt={inspection.canceledAt}
           />
         ) : null}
 

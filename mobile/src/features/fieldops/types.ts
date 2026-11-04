@@ -59,6 +59,12 @@ export interface Inspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Reason the inspection was CANCELED by the admin/supervisor (#338). */
+  canceledReason?: string;
+  /** Who canceled the inspection (admin/supervisor name) (#338). */
+  canceledBy?: string;
+  /** When the inspection was canceled (ISO date/time) (#338). */
+  canceledAt?: string;
   /**
    * SVG data URI (base64) or local file path of the technician's handwritten
    * signature captured at conclusion (PBI-086).

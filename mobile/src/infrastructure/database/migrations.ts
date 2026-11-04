@@ -275,6 +275,19 @@ const migrations: Migration[] = [
       await addColumnIfMissing(db, 'evidences', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 11,
+    description: '#338: store cancellation audit (reason, canceler name, timestamp) pulled from the server',
+    // Mirrors the rejection metadata (v2) so the technician sees why the inspection
+    // was canceled — reason, who canceled it and when — on the detail screen, the
+    // same audit the supervisor already gets. Added defensively: a device may
+    // already carry these columns from an earlier build (idempotent guard).
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'canceled_reason', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'canceled_by', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'canceled_at', 'TEXT');
+    },
+  },
 ];
 
 /**
