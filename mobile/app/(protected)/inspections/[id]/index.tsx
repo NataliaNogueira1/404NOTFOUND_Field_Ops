@@ -12,7 +12,7 @@ import {
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
-import { InspectionStatus, useFieldOps } from '@/features/fieldops';
+import { formatInspectionId, InspectionStatus, useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useDatabase } from '@/infrastructure/database/DatabaseProvider';
 import { InspectionRepository } from '@/infrastructure/database/repositories';
@@ -139,6 +139,7 @@ export default function InspectionDetailsScreen() {
 
         <Card style={styles.card}>
           <Text style={[styles.section, { color: c.text }]}>📋 Informações</Text>
+          <Row label="ID" value={formatInspectionId(inspection.id)} />
           <Row label="Cliente" value={clientName} />
           <Row label="Local" value={siteName} />
           <Row label="Equipamento" value={equipmentName} />
