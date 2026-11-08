@@ -164,6 +164,6 @@ A técnica analítica das partes interessadas classifica o engajamento **atual (
   adotados pela equipe (relatório quinzenal ao cliente, demonstrações por sprint,
   coordenação técnica semanal e acompanhamento do backlog no board).
 - O engajamento dos **fornecedores** conecta-se ao gerenciamento das aquisições e ao
-  risco de indisponibilidade de nuvem/API do registro de riscos do projeto.
+  risco de indisponibilidade dos serviços de nuvem/API.
 - A classificação e as estratégias são revisadas ao longo do projeto, ajustando o
   engajamento conforme novas partes interessadas surgem ou mudam de posição na rede.
