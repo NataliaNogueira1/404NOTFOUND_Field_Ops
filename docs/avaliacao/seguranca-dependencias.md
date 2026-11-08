@@ -79,6 +79,9 @@ Foram realizadas **duas rodadas**: a contagem inicial (antes de qualquer ação)
   ```
 - Data/hora: **2026-11-08 13:35 (BRT)**
 - Build após correções: ✅ `npm run build` · ✅ `npm run test`
+- Issue [#260](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/260)
+  segue aberta (comentário com a reavaliação); correção restante em
+  [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347).
 - Evidência JSON salva em: `docs/avaliacao/evidencias/npm-audit-web-pos-fix.json`
 
 > **Nota sobre a contagem "1 crítica":** o npm conta internamente a `critical` como
@@ -119,13 +122,15 @@ Foram realizadas **duas rodadas**: a contagem inicial (antes de qualquer ação)
 - Data/hora: **2026-11-08 13:35 (BRT)**
 - Build após correções: ⬜ `npm run build:apk` — requer EAS / ambiente de CI; não
   executado localmente. Build anterior (APK gerado em sprint, issue #68) validado.
-- Testes: ⬜ — ambiente Jest/Expo não configurado nesta máquina para execução local.
+- Testes: ✅ `npx jest --ci` — 15 suítes, 141 testes passando (2026-11-08, Node 24,
+  `npm ci --ignore-scripts`). Na primeira execução 1 suíte falhou ao rodar; na seguinte
+  todas passaram. O `npm ci` completo falha no build nativo do `better-sqlite3` com
+  Node 24 (o projeto usa Node 22, ver `mobile/.nvmrc`).
 - Evidência JSON salva em: `docs/avaliacao/evidencias/npm-audit-mobile-pos-fix.json`
 
-> **Nota sobre issue #259 (CLOSED):** a issue foi fechada mas as vulnerabilidades
-> persistem, pois fechar a issue não corrige a dependência. Os 24 itens remanescentes
-> são detalhados na seção 3. Recomenda-se reabrir ou criar nova issue de
-> acompanhamento se houver capacidade de tratar as vulnerabilidades de alta severidade.
+> **Nota sobre issue #259:** a issue estava fechada mas as vulnerabilidades persistem,
+> pois fechar a issue não corrige a dependência. Ela foi **reaberta** em 2026-11-08 com
+> comentário apontando os 24 itens remanescentes (detalhados na seção 3).
 
 ---
 
@@ -136,7 +141,7 @@ quebra de build documentada.
 
 | Pacote | Sev. | Fix disponível | Decisão | Justificativa |
 |---|:---:|---|---|---|
-| `dompurify` ≤ 3.4.16 (Web) | Alta / Crítica | Sim — `--force` (bump `jspdf` 4.x) | **Aceitar temporariamente** | O `jspdf@4.x` é um major com mudanças de API; a geração de PDF (`generateInspectionPdf.ts`) precisa ser migrada e testada antes de atualizar. Risco mitigado: `dompurify` é usado exclusivamente no fluxo de geração de PDF server-side (não exposto diretamente ao usuário final no portal web). Ação futura: abrir issue para migrar `jspdf` para 4.x. |
+| `dompurify` ≤ 3.4.16 (Web) | Alta / Crítica | Sim — `--force` (bump `jspdf` 4.x) | **Aceitar temporariamente** | O `jspdf@4.x` é um major com mudanças de API; a geração de PDF (`frontend/src/utils/generateInspectionPdf.ts`) precisa ser migrada e testada antes de atualizar. Atenção: `jspdf` roda **no navegador** (portal web), portanto a cadeia `jspdf` → `dompurify` faz parte do bundle do frontend. O risco é reduzido porque o PDF é gerado a partir de dados da própria inspeção, sem renderizar HTML arbitrário de terceiros, mas a aceitação é **temporária**. Acompanhamento: issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347) (migrar `jspdf` para 4.x). |
 | `minimatch` 7–11 (Web e Mobile) | Moderada | Sim — `--force` (bump `eslint` 9.x) | **Aceitar temporariamente** | Pacote de toolchain de lint (dev dependency). Não integra o bundle de produção nem o runtime da aplicação. O `eslint@9.x` exige migração de configuração (flat config) — fora do escopo imediato. Sem impacto em produção. |
 | `decode-uri-component` (Mobile) | Alta | Sim — `--force` | **Aceitar temporariamente** | Dependência transitiva de `expo-router`; o upgrade forçado pode quebrar a navegação do app. Sem fix compatível disponível — requer upgrade do `expo-router` pelo mantenedor Expo. Sem superfície de ataque direta: o valor não é controlado por entrada do usuário final. |
 | `deepmerge` (Mobile) | Alta | Sim — `--force` | **Aceitar temporariamente** | Dependência transitiva de `jest` / `jest-expo` (dev dependency). Não compõe o bundle da aplicação; afeta apenas o ambiente de testes. Risco de exploração em produção: nulo. |
