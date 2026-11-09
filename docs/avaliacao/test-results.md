@@ -179,7 +179,28 @@ conflito. A suíte roda verde nessa combinação.
 1 low) — todas toolchain de build/test. Detalhes em
 [`mobile/docs/security-audit-residual-risk.md`](../../mobile/docs/security-audit-residual-risk.md).
 
-**Validação em dispositivo (Android, Expo Go 58):** login e navegação confirmados no SDK
-58. Demais recursos nativos (checklist, assinatura, câmera/galeria, SQLite após reabrir,
-QR, GPS, notificações, sync offline→online) e iOS seguem pendentes de validação manual —
-ver checklist no PR #345.
+**Validação em dispositivo (Android físico, Expo Go 58.0.5, API local em Docker):**
+
+| Item | Resultado | Observação |
+|---|:--:|---|
+| Login e navegação | OK | |
+| Sincronização (download) | OK | 4 inspeções baixadas, 0 erros |
+| Checklist (responder e concluir) | OK | |
+| GPS (início e conclusão) | OK | |
+| Câmera e galeria (evidências) | OK | |
+| Assinatura | OK com aviso | Aviso de desenvolvimento: `notify` chama o `setState` do pai dentro do updater de `setStrokes` (`SignaturePad.tsx`). Código anterior ao upgrade. |
+| SQLite (fechar e reabrir o app) | OK | Dados persistem |
+| Notificações | Parcial | Permissão OK. O agendamento de lembretes falha no Expo Go Android (`getNotificationChannelAsync` com NullPointerException, capturado e registrado como `WARN`). Validar com development build. |
+| Scanner QR | Não testado | O equipamento de demonstração não tem QR cadastrado. |
+| Offline → online | Não testado | Ver observação abaixo. |
+| iOS | Não validado | Sem dispositivo ou simulador disponível. |
+
+Observação sobre sincronização: ao concluir a inspeção 3, o app enfileirou duas
+operações `SUBMITTED` com `operationId` diferentes. O servidor aplicou a primeira e
+rejeitou a segunda (`Illegal transition from SUBMITTED to SUBMITTED`), sem duplicar
+dados. As duas ficaram como falha na tela de sincronização. O fluxo de conclusão e de
+sync não foi alterado por este upgrade, então é um defeito anterior, a tratar em
+issue separada.
+
+Ambiente: o Expo Go precisou de login no CLI (`npx expo login`) para carregar o bundle
+sem estourar o timeout do modo anônimo.
