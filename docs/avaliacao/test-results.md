@@ -153,3 +153,33 @@ Observação Mobile: na primeira execução 1 suíte falhou ao rodar e, na segun
 
 Vulnerabilidades remanescentes sem fix compatível detalhadas na seção 3 de
 [`seguranca-dependencias.md`](seguranca-dependencias.md).
+
+## 11. Mobile — Upgrade Expo SDK 58 (validação, nov/2026)
+
+Registro da validação feita no upgrade do Expo SDK 57 → 58 (issue #335 / PR #345).
+
+| Verificação | Comando | Status | Resultado |
+|---|---|:--:|---|
+| Compatibilidade de deps | `npx expo install --check` | PASS | "Dependencies are up to date" (expo 58.0.23) |
+| Type-check | `npx tsc --noEmit` | PASS | 0 erros (breaking changes do RN 0.88 ajustados) |
+| Lint | `npm run lint` | PASS | 0 erros/0 warnings |
+| Testes | `npm test` | PASS | 16 suítes, 167 testes (executado com `--runInBand`) |
+
+**Combinação de versões do Jest validada:** `jest@30.5.2` + `jest-expo@~58.0.14`
+(peer `jest ^29 || ^30`) + `ts-jest@^29.4.15` (peer `jest ^29 || ^30`, resolve 29.4.15)
++ `@react-native/jest-preset@0.88.1` + `babel-jest@30`. O `@react-native/jest-preset`
+mantém um `babel-jest@29` aninhado, que coexiste com o `babel-jest@30` de topo sem
+conflito. A suíte roda verde nessa combinação.
+
+> Observação: em execução paralela (sem `--runInBand`), com a máquina carregada, o Jest
+> 30 pode reportar "A worker process has failed to exit gracefully"; a suíte passa
+> integralmente em `--runInBand`. As suítes individuais também passam isoladas.
+
+**npm audit pós-SDK 58 (mobile):** 31 vulnerabilidades (0 critical, 0 high, 30 moderate,
+1 low) — todas toolchain de build/test. Detalhes em
+[`mobile/docs/security-audit-residual-risk.md`](../../mobile/docs/security-audit-residual-risk.md).
+
+**Validação em dispositivo (Android, Expo Go 58):** login e navegação confirmados no SDK
+58. Demais recursos nativos (checklist, assinatura, câmera/galeria, SQLite após reabrir,
+QR, GPS, notificações, sync offline→online) e iOS seguem pendentes de validação manual —
+ver checklist no PR #345.
