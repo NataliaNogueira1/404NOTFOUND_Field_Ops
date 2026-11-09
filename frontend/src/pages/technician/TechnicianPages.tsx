@@ -12,6 +12,7 @@ import {
 import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, PriorityBadge, StatusBadge } from '@/components/badges/Badge'
+import { InspectionIdCell } from '@/components/inspections/InspectionIdCell'
 import { Select } from '@/components/forms/Fields'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -598,6 +599,9 @@ function TechnicianInspectionCard({ inspection }: { inspection: TechnicianInspec
           <Link to={`/technician/inspections/${inspection.id}`} className="font-semibold text-primary">
             {inspection.title}
           </Link>
+          <div className="mt-1">
+            <InspectionIdCell id={inspection.id} />
+          </div>
           <p className="mt-1 text-sm text-muted">
             {inspection.clientName} - {inspection.siteName}
           </p>

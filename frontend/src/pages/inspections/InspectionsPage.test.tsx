@@ -111,6 +111,9 @@ describe('InspectionsPage', () => {
 
     expect(await screen.findByText('Inspecao API')).not.toBeNull()
     expect(screen.getByText('Mostrando 1-1 de 1')).not.toBeNull()
+    // Coluna ID visível com o identificador legível da inspeção (task #336)
+    expect(screen.getByRole('columnheader', { name: /^id$/i })).toBeInTheDocument()
+    expect(screen.getByText('#9')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringMatching(/inspections\?.*sort=dueDate%2Cdesc.*status=ASSIGNED/),
       expect.anything(),
