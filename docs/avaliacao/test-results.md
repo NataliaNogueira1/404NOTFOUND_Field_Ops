@@ -162,6 +162,7 @@ Registro da validação feita no upgrade do Expo SDK 57 → 58 (issue #335 / PR 
 |---|---|:--:|---|
 | Compatibilidade de deps | `npx expo install --check` | PASS | "Dependencies are up to date" (expo 58.0.23) |
 | Saúde do projeto | `npx expo-doctor` | PASS | 20/20 verificações, sem problemas (expo-doctor 1.21.6) |
+| Projeto nativo Android | `npx expo prebuild --platform android --no-install` | PASS | Gerou o projeto sem erros. RN 0.88 exige compileSdk 37, AGP 9.2.1, Kotlin 2.2.0 e NDK 27.1. **Não compila**: o APK (`build:apk` no EAS) ainda não foi gerado com o SDK 58. |
 | Type-check | `npx tsc --noEmit` | PASS | 0 erros (breaking changes do RN 0.88 ajustados) |
 | Lint | `npm run lint` | PASS | 0 erros/0 warnings |
 | Testes | `npm test` | PASS | 16 suítes, 167 testes (executado com `--runInBand`) |
