@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { useConnectivity } from '@/infrastructure/connectivity';
@@ -10,14 +11,21 @@ import { useConnectivity } from '@/infrastructure/connectivity';
  *
  * All screens keep reading from the local SQLite database while offline, so this
  * banner is purely informative — it does not block any local action.
+ *
+ * useSafeAreaInsets ensures the banner appears below the native status bar,
+ * notch, or punch-hole camera on both iOS and Android (issue #332).
  */
 export function OfflineBanner() {
   const { isOffline } = useConnectivity();
+  const insets = useSafeAreaInsets();
 
   if (!isOffline) return null;
 
   return (
-    <View style={styles.banner} accessibilityRole="alert">
+    <View
+      style={[styles.banner, { paddingTop: insets.top + Spacing.sm }]}
+      accessibilityRole="alert"
+    >
       <Text style={styles.text}>📡 Modo offline — usando dados salvos no dispositivo</Text>
     </View>
   );
@@ -26,7 +34,7 @@ export function OfflineBanner() {
 const styles = StyleSheet.create({
   banner: {
     backgroundColor: Colors.gray800,
-    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
   },
