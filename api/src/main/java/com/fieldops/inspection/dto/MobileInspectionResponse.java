@@ -34,6 +34,9 @@ public record MobileInspectionResponse(
         String rejectionReason,
         String rejectedBy,
         String rejectedAt,
+        String canceledReason,
+        String canceledBy,
+        String canceledAt,
         Long version,
         TemplateDto template,
         List<ReviewCommentDto> reviewComments
