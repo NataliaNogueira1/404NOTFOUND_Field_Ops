@@ -8,9 +8,7 @@ O desenvolvimento do FieldOps transformou requisitos, protótipos e artefatos de
 planejamento em uma solução integrada para inspeções em campo. O resultado
 reúne API Backend, painel Web administrativo, aplicativo Mobile, persistência
 offline, sincronização, recursos nativos, revisão e auditoria, além dos
-artefatos de gestão e documentação que orientaram sua execução. A síntese das
-entregas e da viabilidade está apresentada no
-[Capítulo 12 — Resultados e Discussão](./relatorio-final-cap12-resultados-discussao.md).
+artefatos de gestão e documentação que orientaram sua execução.
 
 ## 13.1 Síntese dos Resultados e Relação com os Objetivos
 
@@ -47,9 +45,8 @@ dependências técnicas visíveis e tratáveis.
 Também se verificou que a sincronização offline requer mais controle que fluxos
 tradicionais conectados: persistência local, ordenação de operações,
 idempotência, conflitos e evidências precisam ser tratados conjuntamente. Essa
-complexidade justifica a priorização do risco de sincronização e seus
-mecanismos de mitigação no
-[Capítulo 9 — Gerenciamento dos Riscos](./relatorio-final-cap9-gerenciamento-riscos.md).
+complexidade reforçou a priorização do risco de sincronização e de medidas para
+sua mitigação.
 
 Por fim, a experiência reforçou que testes automatizados, responsabilidades
 definidas e documentação versionada são complementares, não intercambiáveis.

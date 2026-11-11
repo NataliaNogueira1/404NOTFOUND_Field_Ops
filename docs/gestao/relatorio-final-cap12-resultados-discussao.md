@@ -4,10 +4,12 @@
 > **Equipe:** 404 Not Found
 > **Documento:** Capítulo 12 do Relatório Final, adaptado ao *Template - Relatório Final*.
 
-Este capítulo consolida os resultados disponíveis no repositório e discute a
-adequação da estratégia adotada. A análise distingue entregas implementadas e
-evidências de validação: a existência de código, testes ou planejamento de
-infraestrutura não é tratada como homologação ponta a ponta.
+Este capítulo apresenta os principais resultados alcançados no desenvolvimento
+do FieldOps e analisa a adequação das estratégias adotadas para atender aos
+objetivos definidos para o projeto. A discussão considera os resultados
+funcionais, técnicos e de gestão obtidos ao longo das etapas de desenvolvimento,
+distinguindo as entregas já implementadas e testadas daquelas que ainda dependem
+da homologação final em ambiente integrado.
 
 ---
 
@@ -74,11 +76,9 @@ A estratégia de dividir a solução entre API Spring Boot, painel React/Vite e
 aplicativo Expo/React Native foi adequada ao problema de inspeção em campo. A
 API concentra o domínio e o PostgreSQL; o Web atende administrador e
 supervisor; e o Mobile atende o técnico quando a conectividade é limitada. O
-uso de SQLite, outbox, idempotência e pull incremental responde diretamente ao
-principal risco técnico identificado: perda, duplicidade ou inconsistência de
-dados na sincronização. As respostas previstas para esse risco e para
-dependências entre frentes estão formalizadas no
-[Capítulo 9 — Gerenciamento dos Riscos](./relatorio-final-cap9-gerenciamento-riscos.md).
+uso de SQLite, outbox, idempotência e pull incremental busca reduzir o risco de
+perda, duplicidade ou inconsistência de dados na sincronização e as dependências
+entre as frentes de desenvolvimento.
 
 Essa separação, porém, exigiu coordenação contínua. Mudanças de contrato da API
 podem afetar simultaneamente Web e Mobile; por isso, o projeto adotou OpenAPI,
@@ -94,9 +94,7 @@ Sob o aspecto econômico, a proposta é viável dentro da linha de base aprovada
 o investimento consolidado de R$ 204.000,00 inclui R$ 189.395,00 em custos
 diretos e R$ 14.605,00 de reserva de contingência. A maior parcela é destinada
 a recursos humanos, o que é compatível com a natureza de desenvolvimento e
-integração do produto. Esses valores já estão consolidados no
-[Capítulo 5 — Gerenciamento dos Custos](./relatorio-final-cap5-gerenciamento-custos.md)
-e não são recalculados neste capítulo.
+integração do produto.
 
 Em prazo, o cronograma organizou o núcleo do MVP nas duas sprints, priorizando
 autenticação, cadastros, checklist, operação offline, sincronização e revisão.
