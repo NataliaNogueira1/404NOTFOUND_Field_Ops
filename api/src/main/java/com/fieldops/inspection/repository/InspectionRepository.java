@@ -66,6 +66,7 @@ public interface InspectionRepository extends JpaRepository<Inspection, Long>, J
         JOIN FETCH i.technician
         JOIN FETCH i.supervisor
         LEFT JOIN FETCH i.reviewedBy
+        LEFT JOIN FETCH i.canceledBy
         WHERE i.technician.id = :technicianId
           AND (
                 i.updatedAt > :cursorUpdatedAt
