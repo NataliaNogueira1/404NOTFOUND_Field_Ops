@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -86,76 +86,97 @@ export default function ChecklistScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
-        <Text style={[styles.title, { color: c.text }]}>{template.title}</Text>
-        <Text style={{ color: c.textSecondary }}>
-          {template.sections.length} seções / {total} itens
-        </Text>
+      {/*
+       * KeyboardAvoidingView pushes the ScrollView up when the software keyboard
+       * opens so the focused input (number, text) stays visible above the keyboard
+       * on both iOS and Android (issue #333).
+       *
+       * iOS:    behavior="padding" adds bottom padding equal to the keyboard height.
+       * Android: behavior is omitted — the OS already adjusts the window via
+       *          android:windowSoftInputMode, so adding extra padding would
+       *          double-offset the layout.
+       */}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={[styles.title, { color: c.text }]}>{template.title}</Text>
+          <Text style={{ color: c.textSecondary }}>
+            {template.sections.length} seções / {total} itens
+          </Text>
 
-        {readOnly && inspection ? <ReadOnlyBanner status={inspection.status} /> : null}
+          {readOnly && inspection ? <ReadOnlyBanner status={inspection.status} /> : null}
 
-        <Card style={styles.card}>
-          <ProgressBar value={inspection?.progress ?? 0} />
-          <View style={styles.progressRow}>
-            <Text style={{ color: c.textSecondary }}>
-              {answered} de {total} itens respondidos
-            </Text>
-            {pending > 0 ? (
-              <Text style={styles.pendingLink} onPress={handleScrollToPending}>
-                {pending} pendente{pending > 1 ? 's' : ''} ↓
+          <Card style={styles.card}>
+            <ProgressBar value={inspection?.progress ?? 0} />
+            <View style={styles.progressRow}>
+              <Text style={{ color: c.textSecondary }}>
+                {answered} de {total} itens respondidos
               </Text>
-            ) : null}
-          </View>
-        </Card>
+              {pending > 0 ? (
+                <Text style={styles.pendingLink} onPress={handleScrollToPending}>
+                  {pending} pendente{pending > 1 ? 's' : ''} ↓
+                </Text>
+              ) : null}
+            </View>
+          </Card>
 
-        {template.sections.map((section) => (
-          <View key={section.id}>
-            <SectionHeader title={section.title} meta={`${section.items.length} itens`} />
-            {section.items.map((item) => (
-              <ChecklistItemCard
-                key={item.id}
-                item={item}
-                index={allItems.findIndex((candidate) => candidate.id === item.id) + 1}
-                inspectionId={inspection?.id ?? id}
-                answer={answers[item.id]}
-                evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
-                onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
-                onRetryEvidence={retryEvidenceUpload}
-                reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
-                readOnly={readOnly}
-              />
-            ))}
-          </View>
-        ))}
+          {template.sections.map((section) => (
+            <View key={section.id}>
+              <SectionHeader title={section.title} meta={`${section.items.length} itens`} />
+              {section.items.map((item) => (
+                <ChecklistItemCard
+                  key={item.id}
+                  item={item}
+                  index={allItems.findIndex((candidate) => candidate.id === item.id) + 1}
+                  inspectionId={inspection?.id ?? id}
+                  answer={answers[item.id]}
+                  evidences={evidences.filter((evidence) => evidence.itemId === item.id)}
+                  onAnswer={(value, observation) => answerItem(item.id, value, observation, inspection?.id ?? id)}
+                  onRetryEvidence={retryEvidenceUpload}
+                  reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
+                  readOnly={readOnly}
+                />
+              ))}
+            </View>
+          ))}
 
-        <Button
-          label="Ver resumo"
-          onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
-          fullWidth
-          size="lg"
-        />
-        {readOnly ? (
           <Button
-            label="Voltar aos detalhes"
-            onPress={() => router.back()}
-            variant="secondary"
+            label="Ver resumo"
+            onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
             fullWidth
+            size="lg"
           />
-        ) : (
-          <Button
-            label="Não conformidades"
-            onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
-            variant="secondary"
-            fullWidth
-          />
-        )}
-      </ScrollView>
+          {readOnly ? (
+            <Button
+              label="Voltar aos detalhes"
+              onPress={() => router.back()}
+              variant="secondary"
+              fullWidth
+            />
+          ) : (
+            <Button
+              label="Não conformidades"
+              onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/non-conformities`)}
+              variant="secondary"
+              fullWidth
+            />
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  keyboardAvoiding: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
   container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
