@@ -53,7 +53,7 @@ public class NonConformityQueryService {
                 : clientName.trim().toLowerCase(Locale.ROOT);
     }
 
-    private NonConformityResponse toResponse(NonConformity nonConformity) {
+    NonConformityResponse toResponse(NonConformity nonConformity) {
         Long itemSnapshotId = nonConformity.getInspectionItemSnapshot() == null
                 ? null
                 : nonConformity.getInspectionItemSnapshot().getId();

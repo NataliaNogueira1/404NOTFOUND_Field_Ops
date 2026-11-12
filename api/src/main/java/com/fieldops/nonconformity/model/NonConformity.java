@@ -78,4 +78,18 @@ public class NonConformity {
     public NonConformityStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getClosedAt() { return closedAt; }
+
+    public void update(String title, String description, NonConformitySeverity severity, NonConformityStatus status) {
+        update(this.inspectionItemSnapshot, title, description, severity, status);
+    }
+
+    public void update(InspectionItemSnapshot itemSnapshot, String title, String description,
+            NonConformitySeverity severity, NonConformityStatus status) {
+        this.inspectionItemSnapshot = itemSnapshot;
+        this.title = title;
+        this.description = description;
+        this.severity = severity;
+        this.status = status;
+        this.closedAt = status == NonConformityStatus.CLOSED ? Instant.now() : null;
+    }
 }

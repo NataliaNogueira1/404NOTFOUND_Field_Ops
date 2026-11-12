@@ -8,6 +8,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface InspectionEvidenceRepository extends JpaRepository<InspectionEvidence, Long> {
 
+    @Query("SELECT CASE WHEN COUNT(e) > 0 THEN true ELSE false END FROM InspectionEvidence e "
+            + "WHERE e.inspection.id = :inspectionId AND e.itemSnapshot.id = :itemSnapshotId")
+    boolean existsByInspectionIdAndItemSnapshotId(@Param("inspectionId") Long inspectionId,
+            @Param("itemSnapshotId") Long itemSnapshotId);
+
     @Query("""
         SELECT evidence FROM InspectionEvidence evidence
         LEFT JOIN FETCH evidence.itemSnapshot snapshot

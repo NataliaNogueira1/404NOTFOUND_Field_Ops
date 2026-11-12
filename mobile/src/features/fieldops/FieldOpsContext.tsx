@@ -25,6 +25,7 @@ import {
   type ReviewComment,
   type SyncOperation,
 } from './types';
+import { criticalEvidenceValidationError } from './nonConformityValidation';
 
 // ─── Context Interface ─────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ interface FieldOpsContextValue {
   answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
-  addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
+  addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => boolean;
   /**
    * Persist the technician's handwritten signature for the given inspection
    * (PBI-086). Saves the SVG data URI to SQLite so it survives offline restarts
@@ -452,15 +453,21 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   }, [evidences, getSyncService]);
 
   const addNonConformity = useCallback((input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => {
+    if (criticalEvidenceValidationError(input.severity, input.evidenceCount ?? 0)) return false;
     const nc: NonConformity = { ...input, id: `nc-manual-${Date.now()}`, evidenceCount: input.evidenceCount ?? 0 };
     setNonConformities((current) => [...current, nc]);
     const repos = getRepos();
     const sync = getSyncService();
     if (repos && sync) {
       repos.nc.add(nc).catch(console.warn);
-      sync.enqueueNonConformity(nc).catch(console.warn);
+      const evidenceDependencies = evidences
+        .filter((evidence) => evidence.inspectionId === nc.inspectionId && evidence.itemId === nc.itemId
+          && evidence.syncStatus !== 'synced')
+        .map((evidence) => evidence.operationId ?? InspectionSyncService.evidenceOperationId(evidence.id));
+      sync.enqueueNonConformity(nc, evidenceDependencies).catch(console.warn);
     }
-  }, [getRepos, getSyncService]);
+    return true;
+  }, [evidences, getRepos, getSyncService]);
 
   /**
    * Persist the technician's handwritten signature (PBI-086).
