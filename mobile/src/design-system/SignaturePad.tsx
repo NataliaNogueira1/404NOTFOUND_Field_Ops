@@ -28,7 +28,7 @@
  *   disabled      — quando true, bloqueia novos traços
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   PanResponder,
   StyleSheet,
@@ -198,18 +198,39 @@ export function SignaturePad({
     setCurrentStroke((current) => [...current, { x, y }]);
   }, []);
 
+  // Keep the latest committed strokes in a ref so the useEffect below can
+  // read them without being listed as a dependency (they change on every stroke).
+  const committedStrokesRef = useRef<SignatureStroke[]>([]);
+  // A counter that increments on every finger-up. The useEffect watches this
+  // counter to fire onSignatureChange AFTER React finishes the render, avoiding
+  // the "setState during render" warning (issue #334).
+  const [commitCount, setCommitCount] = useState(0);
+
   const commitStroke = useCallback(() => {
     setCurrentStroke((finished) => {
       if (finished.length > 0) {
         setStrokes((prev) => {
           const next = [...prev, finished];
-          notify(next);
+          committedStrokesRef.current = next;
           return next;
         });
+        setCommitCount((n) => n + 1);
       }
       return [];
     });
-  }, [notify]);
+  }, []);
+
+  // Notify the parent after the render cycle caused by commitStroke settles.
+  // Calling onSignatureChange directly inside a setState updater would trigger
+  // React's "Cannot update a component while rendering a different component"
+  // warning because the parent's setState runs during the child's state update.
+  useEffect(() => {
+    if (commitCount === 0) return;
+    notify(committedStrokesRef.current);
+    // notify is stable (useCallback with stable deps); commitCount is the only
+    // trigger we need here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commitCount]);
 
   const panResponder = useMemo(
     () =>
