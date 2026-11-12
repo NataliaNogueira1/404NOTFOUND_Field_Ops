@@ -37,6 +37,17 @@ export default function ChecklistScreen() {
   const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
   const pending = total - answered;
 
+  // Parse stored strokes for read-only signature preview (issue #334).
+  // Must be declared before any early return to satisfy the Rules of Hooks.
+  const signatureStrokes = useMemo((): SignatureStroke[] | null => {
+    if (!readOnly || !inspection?.signatureStrokes) return null;
+    try {
+      return JSON.parse(inspection.signatureStrokes) as SignatureStroke[];
+    } catch {
+      return null;
+    }
+  }, [readOnly, inspection?.signatureStrokes]);
+
   // Scroll to first unanswered item — must be defined before any early return
   const handleScrollToPending = useCallback(() => {
     if (!template || !scrollRef.current) return;
@@ -83,16 +94,6 @@ export default function ChecklistScreen() {
       </SafeAreaView>
     );
   }
-
-  // Parse stored strokes for read-only signature preview (issue #334)
-  const signatureStrokes = useMemo((): SignatureStroke[] | null => {
-    if (!readOnly || !inspection?.signatureStrokes) return null;
-    try {
-      return JSON.parse(inspection.signatureStrokes) as SignatureStroke[];
-    } catch {
-      return null;
-    }
-  }, [readOnly, inspection?.signatureStrokes]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
