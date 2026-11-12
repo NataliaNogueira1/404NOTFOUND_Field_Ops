@@ -138,3 +138,18 @@ Os comandos Mobile não devem ser interpretados como resultados aprovados até a
 
 Para limites funcionais e de ambiente, consulte [known-limitations.md](known-limitations.md). Este documento não substitui o registro da demonstração E2E.
 
+
+## 9. Auditoria de segurança de dependências (npm audit)
+
+Execução realizada em **2026-11-08 13:35 (BRT)** — ver documento completo em
+[`seguranca-dependencias.md`](seguranca-dependencias.md).
+
+| Módulo | Antes do fix | Após `npm audit fix` | Build pós-fix | Testes pós-fix |
+|---|:---:|:---:|:---:|:---:|
+| Web (`frontend/`) | 20 vulns (1 crítica, 7 alta, 12 mod.) | 13 vulns (1 crítica, 2 alta, 10 mod.) | ✅ `built in 2.66s` | ✅ 42 arquivos, 219 testes |
+| Mobile (`mobile/`) | 31 vulns (0 crítica, 6 alta, 15 mod., 10 baixa) | 24 vulns (0 crítica, 3 alta, 11 mod., 10 baixa) | ⬜ Requer EAS/CI | ✅ `npx jest --ci`: 15 suítes, 141 testes (Node 24, `npm ci --ignore-scripts`) |
+
+Observação Mobile: na primeira execução 1 suíte falhou ao rodar e, na segunda, as 15 passaram (141 testes). O `npm ci` completo falha no build nativo do `better-sqlite3` com Node 24; o projeto usa Node 22 (`mobile/.nvmrc`).
+
+Vulnerabilidades remanescentes sem fix compatível detalhadas na seção 3 de
+[`seguranca-dependencias.md`](seguranca-dependencias.md).
