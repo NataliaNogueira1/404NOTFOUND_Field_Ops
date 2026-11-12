@@ -191,13 +191,28 @@ export function SignaturePad({
   // canvas), so no absolute-offset math is needed — immune to page scroll and
   // screen size, fixing the touch-offset bug (PBI-322). All reads go through
   // functional state updates, so nothing reads a ref during render.
-  const startStroke = useCallback((x: number, y: number) => {
-    setCurrentStroke([{ x, y }]);
+  //
+  // clampToCanvas ensures that if the finger drifts outside the canvas boundary
+  // (e.g. the user draws off the edge), coordinates are clamped to [0, dimension]
+  // instead of propagating out-of-bounds values that produce erratic lines or
+  // segments drawn across the whole screen.
+  const clampToCanvas = useCallback((x: number, y: number): { x: number; y: number } => {
+    const { width, height: h } = canvasSizeRef.current;
+    return {
+      x: Math.max(0, Math.min(x, width > 0 ? width : x)),
+      y: Math.max(0, Math.min(y, h > 0 ? h : y)),
+    };
   }, []);
 
+  const startStroke = useCallback((x: number, y: number) => {
+    const pt = clampToCanvas(x, y);
+    setCurrentStroke([pt]);
+  }, [clampToCanvas]);
+
   const extendStroke = useCallback((x: number, y: number) => {
-    setCurrentStroke((current) => [...current, { x, y }]);
-  }, []);
+    const pt = clampToCanvas(x, y);
+    setCurrentStroke((current) => [...current, pt]);
+  }, [clampToCanvas]);
 
   // Keep the latest committed strokes in a ref so the useEffect below can
   // read them without being listed as a dependency (they change on every stroke).
@@ -241,7 +256,10 @@ export function SignaturePad({
         onPanResponderGrant: (evt) => startStroke(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
         onPanResponderMove: (evt) => extendStroke(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
         onPanResponderRelease: commitStroke,
-        onPanResponderTerminate: () => setCurrentStroke([]),
+        // Terminate fires when the gesture is stolen (e.g. a ScrollView takes over
+        // or the finger leaves the screen boundary). Commit what was drawn so far
+        // instead of discarding it — avoids losing a partial stroke.
+        onPanResponderTerminate: commitStroke,
       }),
     [disabled, startStroke, extendStroke, commitStroke],
   );
