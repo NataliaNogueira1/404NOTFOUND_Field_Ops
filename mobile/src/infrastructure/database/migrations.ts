@@ -275,6 +275,19 @@ const migrations: Migration[] = [
       await addColumnIfMissing(db, 'evidences', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 11,
+    description: 'issue #334: store signature strokes JSON for on-device preview',
+    // The signature_uri column (v7) only persists the SVG data URI. React Native's
+    // <Image> cannot decode SVG data URIs, so the SignaturePreview component needs
+    // the raw strokes to redraw the signature on-device. This column stores them
+    // as a JSON string (SignatureStroke[][]), populated whenever a signature is saved.
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'signature_strokes', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'signature_width', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'signature_height', 'REAL');
+    },
+  },
 ];
 
 /**
