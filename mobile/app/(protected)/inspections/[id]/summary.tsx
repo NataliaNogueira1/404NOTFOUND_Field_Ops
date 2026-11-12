@@ -182,13 +182,12 @@ export default function SummaryScreen() {
         {/* ── Assinatura do técnico (PBI-086) ──────────────────────────── */}
         <Card style={styles.signatureCard}>
           <View style={styles.signatureHeader}>
-              {signatureRequired && (
+            {signatureRequired ? (
               <Text style={[styles.signatureTitle, { color: c.text }]}>
                 Assinatura do técnico
                 <Text style={{ color: c.danger }}> *</Text>
               </Text>
-            )}
-            {!signatureRequired && (
+            ) : (
               <Text style={[styles.signatureTitle, { color: c.text }]}>
                 Assinatura do técnico
               </Text>
@@ -200,49 +199,31 @@ export default function SummaryScreen() {
             )}
           </View>
 
-          {/* Assinatura já salva anteriormente (issue #334): exibe o preview
-              sem abrir o canvas de novo, preservando o traço do técnico. */}
-          {persistedStrokes && !signature ? (
+          {/* Canvas de assinatura */}
+          <SignaturePad
+            onSignatureChange={handleSignatureChange}
+            height={180}
+          />
+
+          {/* Prévia — sempre abaixo do canvas. Mostra a assinatura
+              recém-desenhada (signature) ou, se ainda não redesenhou nesta
+              sessão, a assinatura persistida (persistedStrokes). */}
+          {(signature ?? (persistedStrokes ? { strokes: persistedStrokes, width: inspection?.signatureWidth ?? 300, height: inspection?.signatureHeight ?? 180 } : null)) ? (
             <View style={styles.previewContainer}>
               <Text style={[styles.previewLabel, { color: c.textSecondary }]}>
-                Assinatura capturada:
+                Prévia da assinatura:
               </Text>
               <SignaturePreview
-                strokes={persistedStrokes}
-                sourceWidth={inspection?.signatureWidth ?? 300}
-                sourceHeight={inspection?.signatureHeight ?? 180}
+                strokes={signature?.strokes ?? persistedStrokes!}
+                sourceWidth={signature?.width ?? inspection?.signatureWidth ?? 300}
+                sourceHeight={signature?.height ?? inspection?.signatureHeight ?? 180}
                 height={80}
-                accessibilityLabel="Assinatura do técnico já capturada"
               />
               <Text style={[styles.previewConfirm, { color: c.success }]}>
                 ✓ Assinatura capturada
               </Text>
             </View>
           ) : null}
-
-          {/* Canvas de assinatura — sempre visível para permitir nova captura */}
-          <SignaturePad
-            onSignatureChange={handleSignatureChange}
-            height={180}
-          />
-
-          {/* Prévia da assinatura recém-desenhada nesta sessão */}
-          {signature && (
-            <View style={styles.previewContainer}>
-              <Text style={[styles.previewLabel, { color: c.textSecondary }]}>
-                Prévia da assinatura:
-              </Text>
-              <SignaturePreview
-                strokes={signature.strokes}
-                sourceWidth={signature.width}
-                sourceHeight={signature.height}
-                height={80}
-              />
-              <Text style={[styles.previewConfirm, { color: c.success }]}>
-                ✓ Assinatura capturada
-              </Text>
-            </View>
-          )}
         </Card>
 
         <Button label="Concluir inspeção" onPress={tryConclude} fullWidth size="lg" />

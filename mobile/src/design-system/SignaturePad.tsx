@@ -42,6 +42,7 @@ import { useThemeColors } from '@/features/theme';
 import {
   previewScale,
   scaleStrokes,
+  scaleAndCenterStrokes,
   strokesToSvgDataUri,
   type SignaturePoint,
   type SignatureStroke,
@@ -49,7 +50,7 @@ import {
 
 // Re-export the pure geometry helpers/types so existing imports from
 // '@/design-system' keep working.
-export { previewScale, scaleStrokes, strokesToSvgDataUri };
+export { previewScale, scaleStrokes, scaleAndCenterStrokes, strokesToSvgDataUri };
 export type { SignaturePoint, SignatureStroke };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -352,8 +353,10 @@ export function SignaturePreview({
 
   // Uniform scale that fits the original drawing into the preview box while
   // preserving the aspect ratio (so the preview is faithful, not distorted).
+  // scaleAndCenterStrokes also translates the drawing to center it inside the
+  // box instead of pinning it to the top-left corner (issue #334).
   const scale = previewScale(sourceWidth, sourceHeight, boxWidth, height);
-  const scaledStrokes = scale > 0 ? scaleStrokes(strokes, scale) : [];
+  const scaledStrokes = scale > 0 ? scaleAndCenterStrokes(strokes, scale, boxWidth, height) : [];
 
   return (
     <View
