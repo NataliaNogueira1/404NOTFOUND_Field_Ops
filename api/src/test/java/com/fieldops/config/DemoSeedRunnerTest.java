@@ -61,7 +61,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DemoSeedRunnerTest {
 
     private static final String CLIENT_DOCUMENT = "12.345.678/0001-90";
-    private static final int EXPECTED_INSPECTIONS = 9;
+    // #258: two inspections in each of the seven lifecycle states.
+    private static final int EXPECTED_INSPECTIONS = 14;
 
     @Mock private UserRepository userRepository;
     @Mock private ClientRepository clientRepository;
@@ -81,13 +82,13 @@ class DemoSeedRunnerTest {
     @InjectMocks private DemoSeedRunner runner;
 
     @Test
-    void seedsNineInspectionsWithVariedPrioritiesCancelsOneRejectsOneAndLeavesTwoForReview() {
+    void seedsTwoInspectionsInEveryLifecycleStateUsingRealDomainTransitions() {
         enableSeed();
         when(clientRepository.existsByDocument(CLIENT_DOCUMENT)).thenReturn(false);
         stubUsers();
         stubCatalog();
         List<Long> createdIds = stubInspectionCreation();
-        // The rejected inspection is reloaded to advance it to UNDER_REVIEW before rejecting it.
+        // IN_PROGRESS/SUBMITTED and the begin-review step reload the inspection to set its status.
         when(inspectionRepository.findById(anyLong()))
                 .thenAnswer(invocation -> Optional.of(new Inspection()));
         // No snapshots seeded here → answer-history seeding is a no-op (returns early).
@@ -108,14 +109,16 @@ class DemoSeedRunnerTest {
             assertThat(request.dueDate()).isNotNull();
         });
 
-        Long canceledId = createdIds.get(createdIds.size() - 4);
-        Long rejectedId = createdIds.get(createdIds.size() - 3);
+        // Every created inspection is distinct (14 of them: two per lifecycle state).
+        assertThat(createdIds).hasSize(EXPECTED_INSPECTIONS).doesNotHaveDuplicates();
 
-        // The fourth-from-last inspection is canceled through the real cancel flow (terminal state).
-        verify(inspectionService).cancel(eq(canceledId), anyString(), eq(10L));
-        // The third-from-last inspection is rejected through the real reject flow so the technician
-        // can receive a rejected inspection for correction (PBI-062 / #80).
-        verify(inspectionService).reject(eq(rejectedId), anyString(), eq(10L));
+        // Real domain transitions drive each review/terminal state (#258):
+        //  • begin-review runs for the 2 UNDER_REVIEW + 2 APPROVED + 2 REJECTED inspections (6);
+        //  • approve/reject/cancel each run for exactly 2 inspections.
+        verify(inspectionService, times(6)).beginReview(anyLong(), eq(10L));
+        verify(inspectionService, times(2)).approve(anyLong(), anyString(), eq(10L));
+        verify(inspectionService, times(2)).reject(anyLong(), anyString(), eq(10L));
+        verify(inspectionService, times(2)).cancel(anyLong(), anyString(), eq(10L));
     }
 
     @Test
