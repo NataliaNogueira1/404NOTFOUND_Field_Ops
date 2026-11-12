@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
 import { randomUuidV4, stableUuidFromSeed } from './uuid';
+import { Severity } from '@/features/fieldops/types';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -22,7 +23,6 @@ import type {
   NonConformity,
   ReviewComment,
 } from '@/features/fieldops/types';
-import { Severity } from '@/features/fieldops/types';
 
 // ─── API Response types ────────────────────────────────────────────────────────
 
@@ -941,17 +941,18 @@ export class InspectionSyncService {
   /**
    * Enqueue a non-conformity to be synced later.
    */
-  async enqueueNonConformity(nc: NonConformity): Promise<void> {
+  async enqueueNonConformity(nc: NonConformity, knownEvidenceDependencies: string[] = []): Promise<void> {
     const id = `nc-${nc.id}`;
     // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
     // conflict detection (PBI-055), mirroring enqueueAnswer.
     const inspection = await this.inspectionRepo.getById(nc.inspectionId);
-    const evidences = nc.severity === Severity.CRITICAL
-      ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId)
-      : [];
-    const dependencyIds = evidences.map((evidence) =>
-      InspectionSyncService.evidenceOperationId(evidence.id),
-    );
+    const evidence = nc.severity === Severity.CRITICAL ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId) : [];
+    const knownDependencies = nc.severity === Severity.CRITICAL ? knownEvidenceDependencies : [];
+    const dependencyIds = [...new Set([
+      ...evidence.filter((entry) => entry.syncStatus !== 'synced')
+        .map((entry) => entry.operationId ?? InspectionSyncService.evidenceOperationId(entry.id)),
+      ...knownDependencies,
+    ])];
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,

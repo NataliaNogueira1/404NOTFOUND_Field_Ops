@@ -1,9 +1,8 @@
 import { Severity } from './types';
 
-/** Prevents reporting a critical risk before its checklist item has evidence. */
-export function criticalNonConformityRequiresEvidence(
-  severity: Severity,
-  evidenceCount: number,
-): boolean {
-  return severity === Severity.CRITICAL && evidenceCount === 0;
+export function criticalEvidenceValidationError(severity: Severity, evidenceCount: number): string | null {
+  if (severity === Severity.CRITICAL && evidenceCount < 1) {
+    return 'Adicione uma evidência ao item antes de registrar uma não conformidade crítica.';
+  }
+  return null;
 }

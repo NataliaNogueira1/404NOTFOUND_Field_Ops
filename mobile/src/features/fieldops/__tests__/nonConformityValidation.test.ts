@@ -1,16 +1,17 @@
 import { Severity } from '../types';
-import { criticalNonConformityRequiresEvidence } from '../nonConformityValidation';
+import { criticalEvidenceValidationError } from '../nonConformityValidation';
 
-describe('criticalNonConformityRequiresEvidence', () => {
-  it('requires an evidence for a critical non-conformity', () => {
-    expect(criticalNonConformityRequiresEvidence(Severity.CRITICAL, 0)).toBe(true);
+describe('critical non-conformity evidence validation', () => {
+  it('requires at least one evidence item for critical severity', () => {
+    expect(criticalEvidenceValidationError(Severity.CRITICAL, 0))
+      .toBe('Adicione uma evidência ao item antes de registrar uma não conformidade crítica.');
   });
 
-  it('allows a critical non-conformity when its item has an evidence', () => {
-    expect(criticalNonConformityRequiresEvidence(Severity.CRITICAL, 1)).toBe(false);
+  it('allows critical non-conformities when the item has evidence', () => {
+    expect(criticalEvidenceValidationError(Severity.CRITICAL, 1)).toBeNull();
   });
 
-  it('does not require evidence for other severities', () => {
-    expect(criticalNonConformityRequiresEvidence(Severity.HIGH, 0)).toBe(false);
+  it('does not require evidence for other severity levels', () => {
+    expect(criticalEvidenceValidationError(Severity.HIGH, 0)).toBeNull();
   });
 });

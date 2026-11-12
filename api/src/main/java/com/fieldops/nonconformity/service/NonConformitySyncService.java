@@ -1,12 +1,13 @@
 package com.fieldops.nonconformity.service;
 
-import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.nonconformity.model.NonConformity;
 import com.fieldops.nonconformity.model.NonConformitySeverity;
+import com.fieldops.nonconformity.exception.CriticalEvidenceRequiredException;
 import com.fieldops.nonconformity.repository.NonConformityRepository;
 import com.fieldops.shared.exception.BusinessException;
 import com.fieldops.shared.exception.ResourceNotFoundException;
@@ -24,18 +25,18 @@ public class NonConformitySyncService {
 
     private final InspectionRepository inspectionRepository;
     private final InspectionItemSnapshotRepository snapshotRepository;
-    private final InspectionEvidenceRepository evidenceRepository;
     private final NonConformityRepository nonConformityRepository;
     private final IdempotencyService idempotencyService;
+    private final InspectionEvidenceRepository evidenceRepository;
 
     public NonConformitySyncService(InspectionRepository inspectionRepository,
-            InspectionItemSnapshotRepository snapshotRepository, InspectionEvidenceRepository evidenceRepository,
-            NonConformityRepository nonConformityRepository, IdempotencyService idempotencyService) {
+            InspectionItemSnapshotRepository snapshotRepository, NonConformityRepository nonConformityRepository,
+            IdempotencyService idempotencyService, InspectionEvidenceRepository evidenceRepository) {
         this.inspectionRepository = inspectionRepository;
         this.snapshotRepository = snapshotRepository;
-        this.evidenceRepository = evidenceRepository;
         this.nonConformityRepository = nonConformityRepository;
         this.idempotencyService = idempotencyService;
+        this.evidenceRepository = evidenceRepository;
     }
 
     /** Creates one OPEN non-conformity and records the operation in the same transaction. */
@@ -49,7 +50,10 @@ public class NonConformitySyncService {
                 .findByInspectionIdAndSourceTemplateItemId(inspection.getId(), payload.itemId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Inspection item not found for inspection: " + payload.itemId()));
-        assertCriticalEvidence(inspection, item, severity);
+        if (severity == NonConformitySeverity.CRITICAL
+                && !evidenceRepository.existsByInspectionIdAndItemSnapshotId(inspection.getId(), item.getId())) {
+            throw new CriticalEvidenceRequiredException();
+        }
 
         NonConformity saved = nonConformityRepository.save(NonConformity.create(inspection, item,
                 payload.title().trim(), payload.description().trim(), severity));
@@ -74,17 +78,6 @@ public class NonConformitySyncService {
     private void assertTechnicianOwns(Inspection inspection, Long technicianId) {
         if (!inspection.getTechnician().getId().equals(technicianId)) {
             throw new BusinessException("Inspection is not assigned to this technician: " + inspection.getId());
-        }
-    }
-
-    private void assertCriticalEvidence(Inspection inspection, InspectionItemSnapshot item,
-            NonConformitySeverity severity) {
-        if (severity != NonConformitySeverity.CRITICAL) {
-            return;
-        }
-        if (!evidenceRepository.existsByInspectionIdAndItemSnapshotId(inspection.getId(), item.getId())) {
-            throw new BusinessException("CRITICAL non-conformity requires evidence for item: "
-                    + item.getSourceTemplateItemId());
         }
     }
 }
