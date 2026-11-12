@@ -7,6 +7,7 @@ import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionRepository;
 import com.fieldops.nonconformity.dto.NonConformityRequest;
 import com.fieldops.nonconformity.dto.NonConformityResponse;
+import com.fieldops.nonconformity.exception.CriticalEvidenceRequiredException;
 import com.fieldops.nonconformity.model.NonConformity;
 import com.fieldops.nonconformity.model.NonConformitySeverity;
 import com.fieldops.nonconformity.repository.NonConformityRepository;
@@ -73,7 +74,8 @@ public class NonConformityManagementService {
     }
     private void assertCriticalEvidence(Inspection inspection, InspectionItemSnapshot item, NonConformitySeverity severity) {
         if (severity == NonConformitySeverity.CRITICAL && !evidences.existsByInspectionIdAndItemSnapshotId(inspection.getId(), item.getId())) {
-            throw new BusinessException("CRITICAL non-conformity requires evidence for item: " + item.getSourceTemplateItemId());
+            throw new CriticalEvidenceRequiredException(
+                    "CRITICAL non-conformity requires evidence for item: " + item.getSourceTemplateItemId());
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.fieldops.shared.exception;
 
+import com.fieldops.nonconformity.exception.CriticalEvidenceRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -111,6 +112,13 @@ public class GlobalExceptionHandler {
             BusinessException ex, HttpServletRequest request) {
 
         return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(CriticalEvidenceRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleCriticalEvidenceRequired(
+            CriticalEvidenceRequiredException ex, HttpServletRequest request) {
+
+        return build(HttpStatus.BAD_REQUEST, "CRITICAL_EVIDENCE_REQUIRED", ex.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

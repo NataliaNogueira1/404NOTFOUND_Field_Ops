@@ -22,6 +22,7 @@ import type {
   NonConformity,
   ReviewComment,
 } from '@/features/fieldops/types';
+import { Severity } from '@/features/fieldops/types';
 
 // ─── API Response types ────────────────────────────────────────────────────────
 
@@ -945,6 +946,12 @@ export class InspectionSyncService {
     // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
     // conflict detection (PBI-055), mirroring enqueueAnswer.
     const inspection = await this.inspectionRepo.getById(nc.inspectionId);
+    const evidences = nc.severity === Severity.CRITICAL
+      ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId)
+      : [];
+    const dependencyIds = evidences.map((evidence) =>
+      InspectionSyncService.evidenceOperationId(evidence.id),
+    );
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
@@ -954,7 +961,7 @@ export class InspectionSyncService {
       description: nc.description,
       severity: nc.severity,
       baseVersion: inspection?.serverVersion ?? 0,
-    });
+    }, dependencyIds);
   }
 
   /**

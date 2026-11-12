@@ -1,6 +1,8 @@
 package com.fieldops.nonconformity.controller;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
+import com.fieldops.evidence.model.InspectionEvidence;
+import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplate;
@@ -64,6 +66,9 @@ class NonConformityListControllerTest {
     private NonConformityRepository nonConformityRepository;
 
     @Autowired
+    private InspectionEvidenceRepository evidenceRepository;
+
+    @Autowired
     private InspectionRepository inspectionRepository;
 
     @Autowired
@@ -111,6 +116,7 @@ class NonConformityListControllerTest {
 
     private void cleanState() {
         nonConformityRepository.deleteAll();
+        evidenceRepository.deleteAll();
         inspectionRepository.deleteAll();
         itemRepository.deleteAll();
         sectionRepository.deleteAll();
@@ -291,6 +297,59 @@ class NonConformityListControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body.replace("New issue", "Closed issue").replace("OPEN", "CLOSED")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Closed issue"))
                 .andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
+    @Test
+    void rejectsCriticalNonConformityCreationWithoutEvidence() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+        Long itemId = acmeInspection.getItemSnapshots().getFirst().getSourceTemplateItemId();
+        long before = nonConformityRepository.count();
+        String body = nonConformityBody(acmeInspection.getId(), itemId, "CRITICAL");
+
+        mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires evidence")));
+
+        org.assertj.core.api.Assertions.assertThat(nonConformityRepository.count()).isEqualTo(before);
+    }
+
+    @Test
+    void createsCriticalNonConformityWhenEvidenceExists() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+        InspectionItemSnapshot item = acmeInspection.getItemSnapshots().getFirst();
+        evidenceRepository.save(InspectionEvidence.create(acmeInspection, item, "evidence/photo.jpg",
+                "test-checksum", "Evidence", Instant.now(), technician));
+
+        mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nonConformityBody(acmeInspection.getId(), item.getSourceTemplateItemId(), "CRITICAL")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.severity").value("CRITICAL"));
+    }
+
+    @Test
+    void rejectsCriticalSeverityUpdateWithoutEvidenceAndPreservesExistingSeverity() throws Exception {
+        String token = obtainToken("sup@fieldops.com");
+        InspectionItemSnapshot item = acmeInspection.getItemSnapshots().getFirst();
+        NonConformity existing = nonConformityRepository.save(NonConformity.create(acmeInspection, item,
+                "Existing issue", "Details", NonConformitySeverity.HIGH));
+        String body = nonConformityBody(acmeInspection.getId(), item.getSourceTemplateItemId(), "CRITICAL");
+
+        mockMvc.perform(put("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires evidence")));
+
+        org.assertj.core.api.Assertions.assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow()
+                .getSeverity()).isEqualTo(NonConformitySeverity.HIGH);
+    }
+
+    private String nonConformityBody(Long inspectionId, Long itemId, String severity) {
+        return "{\"inspectionId\":" + inspectionId + ",\"itemId\":" + itemId
+                + ",\"title\":\"Critical issue\",\"description\":\"Details\",\"severity\":\""
+                + severity + "\",\"status\":\"OPEN\"}";
     }
 
     // --- fixtures ---
