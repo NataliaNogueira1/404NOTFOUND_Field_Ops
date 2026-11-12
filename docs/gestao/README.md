@@ -9,6 +9,11 @@ Os diagramas em Mermaid são renderizáveis diretamente no GitHub.
 
 | Documento | Descrição |
 |---|---|
+| [`relatorio-final-pre-textual.md`](./relatorio-final-pre-textual.md) | Elementos pré-textuais do Relatório Final (capa, folha de rosto, resumo, abstract, palavras-chave, listas e sumário), adaptados ao template do professor. |
+| [`relatorio-final-cap1-introducao.md`](./relatorio-final-cap1-introducao.md) | Capítulo 1 (Introdução) do Relatório Final, itens 1.1, 1.2 e 1.3, derivado do TAP, do `project-context.md` e dos requisitos do MVP. |
+| [`relatorio-final-cap2-gerenciamento-integracao.md`](./relatorio-final-cap2-gerenciamento-integracao.md) | Capítulo 2 (Gerenciamento da Integração) do Relatório Final, itens 2.1 e 2.2, derivado do TAP e da EAP. |
+| [`relatorio-final-cap3-gerenciamento-escopo.md`](./relatorio-final-cap3-gerenciamento-escopo.md) | Capítulo 3 (Gerenciamento do Escopo) do Relatório Final, itens 3.1 e 3.2, reaproveitando a EAP (`eap.md`). |
+| [`relatorio-final-cap4-cronograma-roadmap.md`](./relatorio-final-cap4-cronograma-roadmap.md) | Capítulo 4 (Gerenciamento do Cronograma) do Relatório Final, itens 4.1 e 4.2, reaproveitando o `cronograma.md`. |
 | [`aula05-analise-qualidade.md`](./aula05-analise-qualidade.md) | Análise de qualidade do projeto, com ferramentas como Ishikawa, Pareto e gráficos de acompanhamento. |
 | [`aula05-orcamento-custos.md`](./aula05-orcamento-custos.md) | Orçamento, estimativas e distribuição de custos do projeto. |
 | [`cronograma.md`](./cronograma.md) | Cronograma de atividades, PBIs, sprints e marcos do projeto. |
@@ -21,6 +26,7 @@ Os diagramas em Mermaid são renderizáveis diretamente no GitHub.
 | [`relatorio-final-cap7-gerenciamento-recursos-humanos.md`](./relatorio-final-cap7-gerenciamento-recursos-humanos.md) | Capítulo 7 (Gerenciamento dos Recursos Humanos) do Relatório Final, itens 7.1 e 7.2, consolidando `organograma.md` e `matriz-raci.md` no template do professor. |
 | [`relatorio-final-cap8-gerenciamento-comunicacoes.md`](./relatorio-final-cap8-gerenciamento-comunicacoes.md) | Capítulo 8 (Gerenciamento das Comunicações) do Relatório Final, itens 8.1 e 8.2, adaptado do `plano-de-comunicacao.md` ao template do professor. |
 | [`relatorio-final-cap9-gerenciamento-riscos.md`](./relatorio-final-cap9-gerenciamento-riscos.md) | Capítulo 9 (Gerenciamento dos Riscos) do Relatório Final, itens 9.1 e 9.2, consolidando os riscos reais do projeto (Ishikawa/Pareto, cronograma e escalada) no template do professor. |
+| [`relatorio-final-cap10-gerenciamento-aquisicoes.md`](./relatorio-final-cap10-gerenciamento-aquisicoes.md) | Capítulo 10 (Gerenciamento das Aquisições) do Relatório Final, itens 10.1 e 10.2, derivando as aquisições das categorias B, C e D do orçamento (`aula05-orcamento-custos.md`) no template do professor. |
 | [`relatorio-final-cap12-resultados-discussao.md`](./relatorio-final-cap12-resultados-discussao.md) | Capítulo 12 (Resultados e Discussão) do Relatório Final, consolidando entregas técnicas, situação do MVP e análise de estratégia e viabilidade. |
 | [`relatorio-final-cap13-consideracoes-finais.md`](./relatorio-final-cap13-consideracoes-finais.md) | Capítulo 13 (Considerações Finais), relacionando resultados aos objetivos, lições aprendidas, limitações e recomendações. |
 | [`relatorio-final-referencias.md`](./relatorio-final-referencias.md) | Referências externas verificadas utilizadas no Relatório Final. |
