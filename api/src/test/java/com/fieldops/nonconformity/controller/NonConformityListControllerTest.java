@@ -1,6 +1,8 @@
 package com.fieldops.nonconformity.controller;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
+import com.fieldops.audit.model.AuditEvent;
+import com.fieldops.audit.repository.AuditEventRepository;
 import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
@@ -36,6 +38,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -66,6 +69,12 @@ class NonConformityListControllerTest {
 
     @Autowired
     private NonConformityRepository nonConformityRepository;
+
+    @Autowired
+    private AuditEventRepository auditEventRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private InspectionEvidenceRepository evidenceRepository;
@@ -125,6 +134,7 @@ class NonConformityListControllerTest {
 
     private void cleanState() {
         nonConformityRepository.deleteAll();
+        auditEventRepository.deleteAll();
         evidenceRepository.deleteAll();
         inspectionRepository.deleteAll();
         snapshotRepository.deleteAll();
@@ -300,7 +310,7 @@ class NonConformityListControllerTest {
     }
 
     @Test
-    void supportsNonConformityReadUpdateAndDelete() throws Exception {
+    void softDeletesNonConformityAndKeepsItOutOfReadQueries() throws Exception {
         InspectionItemSnapshot item = itemFor(acmeInspection);
         NonConformity existing = nonConformityRepository.save(NonConformity.create(acmeInspection, item,
                 "Existing issue", "Details", NonConformitySeverity.HIGH));
@@ -321,6 +331,35 @@ class NonConformityListControllerTest {
         mockMvc.perform(delete("/api/v1/non-conformities/{id}", existing.getId())
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/non-conformities").param("inspectionId", acmeInspection.getId().toString())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].id").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(existing.getId().intValue()))));
+        mockMvc.perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openNonConformities").value(2));
+        mockMvc.perform(get("/api/v1/inspections/{id}/review", acmeInspection.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nonConformities[*].id").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(existing.getId().intValue()))));
+
+        java.util.Map<String, Object> stored = jdbcTemplate.queryForMap(
+                "SELECT deleted_at, deleted_by FROM non_conformities WHERE id = ?", existing.getId());
+        assertThat(stored.get("deleted_at")).isNotNull();
+        assertThat(((Number) stored.get("deleted_by")).longValue()).isEqualTo(supervisor.getId());
+        assertThat(auditEventRepository.findByEntityTypeAndEntityIdOrderByOccurredAtAscIdAsc(
+                "NON_CONFORMITY", existing.getId()))
+                .anySatisfy((AuditEvent event) -> {
+                    assertThat(event.getAction().name()).isEqualTo("NON_CONFORMITY_DELETED");
+                    assertThat(event.getActorId()).isEqualTo(supervisor.getId());
+                });
     }
 
     private InspectionItemSnapshot itemFor(Inspection inspection) {

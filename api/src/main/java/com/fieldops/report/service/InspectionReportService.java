@@ -55,7 +55,7 @@ public class InspectionReportService {
         Inspection inspection = inspectionRepository.findById(inspectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection not found: " + inspectionId));
         List<NonConformity> nonConformities = nonConformityRepository
-                .findByInspectionIdOrderByCreatedAtAsc(inspectionId);
+                .findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(inspectionId);
         List<ReportAnswer> answers = latestAnswers(inspectionId);
         List<InspectionEvidence> evidences = inspectionEvidenceRepository
                 .findByInspectionIdOrderByCapturedAtAsc(inspectionId);

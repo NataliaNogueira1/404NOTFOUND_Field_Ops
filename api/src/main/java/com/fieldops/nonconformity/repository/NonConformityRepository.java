@@ -5,6 +5,7 @@ import com.fieldops.nonconformity.model.NonConformitySeverity;
 import com.fieldops.nonconformity.model.NonConformityStatus;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,7 +14,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface NonConformityRepository extends JpaRepository<NonConformity, Long> {
 
-    List<NonConformity> findByInspectionIdOrderByCreatedAtAsc(Long inspectionId);
+    List<NonConformity> findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long inspectionId);
+    Optional<NonConformity> findByIdAndDeletedAtIsNull(Long id);
 
     /**
      * Lists non-conformities with optional filters, fetching the owning inspection to avoid N+1
@@ -24,7 +26,8 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
     @Query(value = """
         SELECT n FROM NonConformity n
         JOIN FETCH n.inspection i
-        WHERE (:inspectionId IS NULL OR i.id = :inspectionId)
+        WHERE n.deletedAt IS NULL
+          AND (:inspectionId IS NULL OR i.id = :inspectionId)
           AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:severity IS NULL OR n.severity = :severity)
           AND (:status IS NULL OR n.status = :status)
@@ -32,7 +35,8 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
             countQuery = """
         SELECT COUNT(n) FROM NonConformity n
         JOIN n.inspection i
-        WHERE (:inspectionId IS NULL OR i.id = :inspectionId)
+        WHERE n.deletedAt IS NULL
+          AND (:inspectionId IS NULL OR i.id = :inspectionId)
           AND (:clientName IS NULL OR LOWER(i.clientName) = :clientName)
           AND (:severity IS NULL OR n.severity = :severity)
           AND (:status IS NULL OR n.status = :status)
@@ -47,7 +51,7 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
     @Query("""
         SELECT n.inspection.id, COUNT(n)
         FROM NonConformity n
-        WHERE n.inspection.id IN :inspectionIds
+        WHERE n.inspection.id IN :inspectionIds AND n.deletedAt IS NULL
         GROUP BY n.inspection.id
     """)
     List<Object[]> countByInspectionIds(@Param("inspectionIds") List<Long> inspectionIds);
@@ -58,6 +62,7 @@ public interface NonConformityRepository extends JpaRepository<NonConformity, Lo
         FROM NonConformity n
         JOIN n.inspection i
         WHERE n.status = :status
+          AND n.deletedAt IS NULL
           AND (CAST(:from AS date) IS NULL OR i.dueDate >= :from)
           AND (CAST(:to AS date) IS NULL OR i.dueDate <= :to)
           AND (CAST(:clientName AS string) IS NULL OR LOWER(i.clientName) = :clientName)

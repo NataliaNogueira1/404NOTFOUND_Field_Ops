@@ -25,6 +25,8 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.fieldops.shared.security.AuthenticatedUser;
 
 @RestController
 @RequestMapping("/api/v1/non-conformities")
@@ -79,8 +81,8 @@ public class NonConformityController {
 
     @Operation(summary = "Delete a non-conformity")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        managementService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser actor) {
+        managementService.delete(id, actor.getId());
         return ResponseEntity.noContent().build();
     }
 }

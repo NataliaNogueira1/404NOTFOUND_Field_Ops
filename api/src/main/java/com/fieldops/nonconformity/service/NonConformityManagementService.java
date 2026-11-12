@@ -1,6 +1,8 @@
 package com.fieldops.nonconformity.service;
 
 import com.fieldops.evidence.repository.InspectionEvidenceRepository;
+import com.fieldops.audit.model.AuditAction;
+import com.fieldops.audit.service.AuditService;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
@@ -14,6 +16,7 @@ import com.fieldops.nonconformity.model.NonConformityStatus;
 import com.fieldops.nonconformity.repository.NonConformityRepository;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import com.fieldops.shared.exception.BusinessException;
+import com.fieldops.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +27,20 @@ public class NonConformityManagementService {
     private final InspectionEvidenceRepository evidenceRepository;
     private final NonConformityRepository nonConformityRepository;
     private final NonConformityQueryService queryService;
+    private final UserRepository userRepository;
+    private final AuditService auditService;
 
     public NonConformityManagementService(InspectionRepository inspectionRepository,
             InspectionItemSnapshotRepository snapshotRepository, InspectionEvidenceRepository evidenceRepository,
-            NonConformityRepository nonConformityRepository, NonConformityQueryService queryService) {
+            NonConformityRepository nonConformityRepository, NonConformityQueryService queryService,
+            UserRepository userRepository, AuditService auditService) {
         this.inspectionRepository = inspectionRepository;
         this.snapshotRepository = snapshotRepository;
         this.evidenceRepository = evidenceRepository;
         this.nonConformityRepository = nonConformityRepository;
         this.queryService = queryService;
+        this.userRepository = userRepository;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -65,12 +73,18 @@ public class NonConformityManagementService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        nonConformityRepository.delete(findNonConformity(id));
+    public void delete(Long id, Long actorId) {
+        NonConformity entity = findNonConformity(id);
+        var actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + actorId));
+        entity.softDelete(actor);
+        nonConformityRepository.save(entity);
+        auditService.record(actorId, AuditAction.NON_CONFORMITY_DELETED,
+                AuditService.ENTITY_NON_CONFORMITY, id, null);
     }
 
     private NonConformity findNonConformity(Long id) {
-        return nonConformityRepository.findById(id)
+        return nonConformityRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Non-conformity not found: " + id));
     }
 
