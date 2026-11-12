@@ -1,34 +1,19 @@
 /**
- * SignaturePad — PBI-086 (bugfix PBI-322)
+ * SignaturePad — PBI-086 (bugfix PBI-322, issue #334)
  *
  * Canvas de assinatura manuscrita sem dependências externas.
  * Usa PanResponder para capturar traços e os renderiza como segmentos de linha
  * com Views de posicionamento absoluto.
  *
- * A assinatura é entregue ao pai de duas formas (via onSignatureChange):
- *   - `dataUri`: SVG em data URI base64, usado para persistência/sync (o backend
- *     e o SQLite guardam esse formato).
- *   - `strokes`: os pontos capturados, usados para a prévia on-device. O preview
- *     NÃO pode usar <Image> com o SVG data URI porque o componente nativo
- *     <Image> do React Native não decodifica SVG em Expo Go (causa do bug de
- *     preview reportado na PBI-322); por isso a prévia redesenha os strokes com
- *     o mesmo mecanismo de Views do canvas (ver SignaturePreview).
+ * Performance: o stroke in-flight é mantido em um ref e renderizado via um
+ * componente filho isolado (LiveStroke) que só re-renderiza a si mesmo,
+ * evitando re-render do componente pai a cada ponto de movimento.
  *
- * Correção do offset (PBI-322): as coordenadas vêm de `locationX/locationY`,
- * que já são relativas à view tocada. Isso elimina a conta anterior de
- * `pageX − measure()`, que ficava defasada após rolagem da tela (a tela de
- * conclusão é um ScrollView) e deslocava o traço em relação ao dedo.
- *
- * Props:
- *   onSignatureChange(signature | null) — chamado quando o canvas muda.
- *     null = canvas vazio; { dataUri, strokes } quando há traços.
- *   strokeColor   — cor do traço (padrão: azul primário do projeto)
- *   strokeWidth   — espessura do traço em px (padrão: 2)
- *   height        — altura do canvas em dp (padrão: 180)
- *   disabled      — quando true, bloqueia novos traços
+ * Boundary: quando o dedo sai dos limites do canvas (x<0, y<0, x>width,
+ * y>height) o stroke é imediatamente commitado — sem clamp, sem linhas tortas.
  */
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
   StyleSheet,
@@ -72,7 +57,7 @@ export interface SignaturePadProps {
   disabled?: boolean;
 }
 
-// ─── Stroke rendering (shared by the canvas and the preview) ───────────────────
+// ─── Stroke segment rendering ─────────────────────────────────────────────────
 
 /**
  * Draws signature strokes as absolutely-positioned Views. Used both live in the
@@ -143,6 +128,33 @@ function SignatureStrokes({
   );
 }
 
+/**
+ * Isolated component for the in-flight stroke. Receives a ref to a mutable
+ * array and a tick counter — re-renders only when tick changes, keeping the
+ * parent SignaturePad from re-rendering on every touch-move event.
+ */
+const LiveStroke = React.memo(function LiveStroke({
+  strokeRef,
+  tick,
+  strokeColor,
+  strokeWidth,
+}: {
+  strokeRef: React.MutableRefObject<SignatureStroke>;
+  tick: number;
+  strokeColor: string;
+  strokeWidth: number;
+}) {
+  // tick is the render trigger; reading strokeRef.current here is intentional.
+  void tick;
+  return (
+    <SignatureStrokes
+      strokes={strokeRef.current.length > 0 ? [strokeRef.current] : []}
+      strokeColor={strokeColor}
+      strokeWidth={strokeWidth}
+    />
+  );
+});
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SignaturePad({
@@ -154,15 +166,16 @@ export function SignaturePad({
 }: SignaturePadProps) {
   const c = useThemeColors();
 
-  // All completed strokes.
+  // Completed strokes — only updated on finger-up. Changing this re-renders
+  // the whole component, but that only happens ~once per stroke, not per point.
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
-  // The stroke currently being drawn (in-flight). Kept in state — it is render
-  // data: the live trace must repaint as the finger moves. Handlers use
-  // functional updates, so no ref is read during render (PBI-322 lint-safe).
-  const [currentStroke, setCurrentStroke] = useState<SignatureStroke>([]);
 
-  // Canvas dimensions (measured on layout). A ref is correct here: the values are
-  // only read inside event handlers (onLayout/notify), never during render.
+  // In-flight stroke lives in a ref to avoid triggering a full re-render on
+  // every touch-move. LiveStroke subscribes to `liveTick` to repaint itself.
+  const liveStrokeRef = useRef<SignatureStroke>([]);
+  const [liveTick, setLiveTick] = useState(0);
+
+  // Canvas dimensions — read in gesture handlers only, never during render.
   const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 0, height });
 
   // ─── Notify parent ────────────────────────────────────────────────────────
@@ -185,83 +198,97 @@ export function SignaturePad({
     [onSignatureChange, height, strokeColor, strokeWidth],
   );
 
-  // ─── Gesture handlers ──────────────────────────────────────────────────────
+  // ─── Commit helpers ───────────────────────────────────────────────────────
 
-  // locationX/locationY are relative to the view that received the touch (the
-  // canvas), so no absolute-offset math is needed — immune to page scroll and
-  // screen size, fixing the touch-offset bug (PBI-322). All reads go through
-  // functional state updates, so nothing reads a ref during render.
-  //
-  // clampToCanvas ensures that if the finger drifts outside the canvas boundary
-  // (e.g. the user draws off the edge), coordinates are clamped to [0, dimension]
-  // instead of propagating out-of-bounds values that produce erratic lines or
-  // segments drawn across the whole screen.
-  const clampToCanvas = useCallback((x: number, y: number): { x: number; y: number } => {
-    const { width, height: h } = canvasSizeRef.current;
-    return {
-      x: Math.max(0, Math.min(x, width > 0 ? width : x)),
-      y: Math.max(0, Math.min(y, h > 0 ? h : y)),
-    };
-  }, []);
-
-  const startStroke = useCallback((x: number, y: number) => {
-    const pt = clampToCanvas(x, y);
-    setCurrentStroke([pt]);
-  }, [clampToCanvas]);
-
-  const extendStroke = useCallback((x: number, y: number) => {
-    const pt = clampToCanvas(x, y);
-    setCurrentStroke((current) => [...current, pt]);
-  }, [clampToCanvas]);
-
-  // Keep the latest committed strokes in a ref so the useEffect below can
-  // read them without being listed as a dependency (they change on every stroke).
-  const committedStrokesRef = useRef<SignatureStroke[]>([]);
-  // A counter that increments on every finger-up. The useEffect watches this
-  // counter to fire onSignatureChange AFTER React finishes the render, avoiding
-  // the "setState during render" warning (issue #334).
+  // Ref to hold the latest committed strokes so the useEffect below can read
+  // them without being a dependency (they change on every stroke).
+  const committedRef = useRef<SignatureStroke[]>([]);
   const [commitCount, setCommitCount] = useState(0);
 
-  const commitStroke = useCallback(() => {
-    setCurrentStroke((finished) => {
-      if (finished.length > 0) {
-        setStrokes((prev) => {
-          const next = [...prev, finished];
-          committedStrokesRef.current = next;
-          return next;
-        });
-        setCommitCount((n) => n + 1);
-      }
-      return [];
+  const commitCurrentStroke = useCallback(() => {
+    const finished = liveStrokeRef.current;
+    liveStrokeRef.current = [];
+    // Repaint LiveStroke as empty.
+    setLiveTick((n) => n + 1);
+    if (finished.length === 0) return;
+    setStrokes((prev) => {
+      const next = [...prev, finished];
+      committedRef.current = next;
+      return next;
     });
+    setCommitCount((n) => n + 1);
   }, []);
 
-  // Notify the parent after the render cycle caused by commitStroke settles.
-  // Calling onSignatureChange directly inside a setState updater would trigger
-  // React's "Cannot update a component while rendering a different component"
-  // warning because the parent's setState runs during the child's state update.
+  // Notify parent after render settles (avoids setState-during-render, #334).
   useEffect(() => {
     if (commitCount === 0) return;
-    notify(committedStrokesRef.current);
-    // notify is stable (useCallback with stable deps); commitCount is the only
-    // trigger we need here.
+    notify(committedRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitCount]);
+
+  // ─── Gesture handlers ──────────────────────────────────────────────────────
+
+  // Minimum squared distance between consecutive points. Skipping points that
+  // are too close reduces the number of segments rendered without visible loss
+  // of quality, which is the main source of lag on slow devices.
+  const MIN_DIST_SQ = 4; // 2dp minimum distance
+
+  // Timestamp of the last accepted point, used to throttle high-frequency events.
+  const lastPointTimeRef = useRef(0);
+  const THROTTLE_MS = 16; // ~60fps cap; natively fires faster on some devices
+
+  const isInsideCanvas = useCallback((x: number, y: number): boolean => {
+    const { width: w, height: h } = canvasSizeRef.current;
+    return x >= 0 && y >= 0 && (w <= 0 || x <= w) && (h <= 0 || y <= h);
+  }, []);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => !disabled,
         onMoveShouldSetPanResponder: () => !disabled,
-        onPanResponderGrant: (evt) => startStroke(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-        onPanResponderMove: (evt) => extendStroke(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-        onPanResponderRelease: commitStroke,
-        // Terminate fires when the gesture is stolen (e.g. a ScrollView takes over
-        // or the finger leaves the screen boundary). Commit what was drawn so far
-        // instead of discarding it — avoids losing a partial stroke.
-        onPanResponderTerminate: commitStroke,
+
+        onPanResponderGrant: (evt) => {
+          const { locationX: x, locationY: y } = evt.nativeEvent;
+          if (!isInsideCanvas(x, y)) return;
+          liveStrokeRef.current = [{ x, y }];
+          lastPointTimeRef.current = Date.now();
+          setLiveTick((n) => n + 1);
+        },
+
+        onPanResponderMove: (evt) => {
+          const { locationX: x, locationY: y } = evt.nativeEvent;
+
+          // Stop drawing immediately when the finger exits the canvas boundary.
+          if (!isInsideCanvas(x, y)) {
+            commitCurrentStroke();
+            return;
+          }
+
+          // Throttle: skip points that arrive faster than THROTTLE_MS.
+          const now = Date.now();
+          if (now - lastPointTimeRef.current < THROTTLE_MS) return;
+          lastPointTimeRef.current = now;
+
+          // Skip points too close to the last one (reduces segment count).
+          const live = liveStrokeRef.current;
+          if (live.length > 0) {
+            const last = live[live.length - 1];
+            const dx = x - last.x;
+            const dy = y - last.y;
+            if (dx * dx + dy * dy < MIN_DIST_SQ) return;
+          }
+
+          liveStrokeRef.current = [...live, { x, y }];
+          setLiveTick((n) => n + 1);
+        },
+
+        onPanResponderRelease: commitCurrentStroke,
+        // Terminate fires when the gesture is stolen — commit what was drawn.
+        onPanResponderTerminate: commitCurrentStroke,
       }),
-    [disabled, startStroke, extendStroke, commitStroke],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [disabled, isInsideCanvas, commitCurrentStroke],
   );
 
   // ─── Layout ───────────────────────────────────────────────────────────────
@@ -276,16 +303,15 @@ export function SignaturePad({
   // ─── Clear ────────────────────────────────────────────────────────────────
 
   const clear = useCallback(() => {
-    setCurrentStroke([]);
+    liveStrokeRef.current = [];
+    setLiveTick((n) => n + 1);
     setStrokes([]);
     onSignatureChange(null);
   }, [onSignatureChange]);
 
-  // ─── Render strokes ───────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
 
-  // All strokes (committed + in-flight) rendered as thin View-based segments.
-  const allStrokes = currentStroke.length > 0 ? [...strokes, currentStroke] : strokes;
-  const isEmpty = strokes.length === 0 && currentStroke.length === 0;
+  const isEmpty = strokes.length === 0 && liveStrokeRef.current.length === 0;
 
   return (
     <View style={styles.wrapper}>
@@ -302,7 +328,7 @@ export function SignaturePad({
         onLayout={onLayout}
         {...panResponder.panHandlers}
       >
-        {/* Placeholder text */}
+        {/* Placeholder */}
         {isEmpty && (
           <Text
             style={[styles.placeholder, { color: c.textSecondary }]}
@@ -312,7 +338,20 @@ export function SignaturePad({
           </Text>
         )}
 
-        <SignatureStrokes strokes={allStrokes} strokeColor={strokeColor} strokeWidth={strokeWidth} />
+        {/* Completed strokes — re-rendered only on finger-up */}
+        <SignatureStrokes
+          strokes={strokes}
+          strokeColor={strokeColor}
+          strokeWidth={strokeWidth}
+        />
+
+        {/* In-flight stroke — isolated re-render on every point */}
+        <LiveStroke
+          strokeRef={liveStrokeRef}
+          tick={liveTick}
+          strokeColor={strokeColor}
+          strokeWidth={strokeWidth}
+        />
       </View>
 
       {/* Actions */}
@@ -370,9 +409,8 @@ export function SignaturePreview({
   }, []);
 
   // Uniform scale that fits the original drawing into the preview box while
-  // preserving the aspect ratio (so the preview is faithful, not distorted).
-  // scaleAndCenterStrokes also translates the drawing to center it inside the
-  // box instead of pinning it to the top-left corner (issue #334).
+  // preserving the aspect ratio. scaleAndCenterStrokes also translates the
+  // drawing to center it inside the box (issue #334).
   const scale = previewScale(sourceWidth, sourceHeight, boxWidth, height);
   const scaledStrokes = scale > 0 ? scaleAndCenterStrokes(strokes, scale, boxWidth, height) : [];
 
