@@ -68,6 +68,12 @@ interface InspectionRow {
   server_version: number;
   /** PBI-086: SVG data URI or local file path of the technician's signature. */
   signature_uri: string | null;
+  /** issue #334: raw strokes JSON for on-device SignaturePreview. */
+  signature_strokes: string | null;
+  /** issue #334: canvas width at capture time (for preview scaling). */
+  signature_width: number | null;
+  /** issue #334: canvas height at capture time (for preview scaling). */
+  signature_height: number | null;
   /** PBI-086: 1 when the template requires a signature before conclusion. */
   signature_required: number;
 }
@@ -325,13 +331,29 @@ export class InspectionRepository {
    * Persist the technician's handwritten signature for the given inspection
    * (PBI-086). The value is an SVG data URI (base64) produced by SignaturePad
    * and is stored alongside the inspection row so it survives offline restarts.
+   * The raw strokes, canvas width and height are also stored so the
+   * SignaturePreview component can redraw the signature on-device (issue #334).
    */
-  async saveSignature(inspectionId: string, signatureUri: string): Promise<void> {
+  async saveSignature(
+    inspectionId: string,
+    signatureUri: string,
+    strokes?: string,
+    width?: number,
+    height?: number,
+  ): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections
-         SET signature_uri = ?, sync_status = 'pending', updated_at = datetime('now')
+         SET signature_uri = ?,
+             signature_strokes = ?,
+             signature_width = ?,
+             signature_height = ?,
+             sync_status = 'pending',
+             updated_at = datetime('now')
        WHERE id = ?`,
       signatureUri,
+      strokes ?? null,
+      width ?? null,
+      height ?? null,
       inspectionId,
     );
   }
@@ -528,6 +550,10 @@ export class InspectionRepository {
     serverVersion: row.server_version,
     // PBI-086: signature fields (may be absent in rows created before migration v7)
     signatureUri: row.signature_uri ?? undefined,
+    // issue #334: strokes/dimensions for on-device SignaturePreview (migration v11)
+    signatureStrokes: row.signature_strokes ?? undefined,
+    signatureWidth: row.signature_width ?? undefined,
+    signatureHeight: row.signature_height ?? undefined,
     signatureRequired: row.signature_required === 1,
   });
 
