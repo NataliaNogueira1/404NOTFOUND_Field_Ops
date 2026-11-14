@@ -222,6 +222,22 @@ describe('PBI-044 — photo pending on upload failure', () => {
     expect(stored?.lastError).toBeUndefined();
   });
 
+  // Issue #229 — the backend needs a UUID idempotency key that is identical on
+  // every resend, so a retried photo is never stored twice on the server.
+  it('sends the same UUID operationId on every attempt of the same photo', async () => {
+    mockUpload.mockRejectedValueOnce(new Error('Timeout durante upload'));
+    const evidence = await captureEvidence(db, service);
+    await service.pushPendingOperations(TOKEN); // fails
+
+    await service.retryEvidenceUpload((await evidenceRepo.getById(evidence.id))!);
+    mockUpload.mockResolvedValue({ status: 'APPLIED' });
+    await service.pushPendingOperations(TOKEN);
+
+    const [first, second] = mockUpload.mock.calls.map((call) => call[1].operationId);
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(second).toBe(first);
+  });
+
   // Test 7 — a failed upload marks the operation FAILED (error) in the outbox.
   it('marks the outbox operation as error when the upload fails', async () => {
     mockUpload.mockRejectedValue(new Error('Timeout durante upload'));
