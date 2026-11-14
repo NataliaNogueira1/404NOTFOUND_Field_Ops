@@ -25,6 +25,7 @@
         <springdoc.version>2.8.6</springdoc.version>
         <testcontainers.version>1.20.4</testcontainers.version>
         <openpdf.version>3.0.5</openpdf.version>
+        <awssdk.version>2.59.1</awssdk.version>
     </properties>
 
     <dependencies>
@@ -79,6 +80,10 @@
             <groupId>com.github.librepdf</groupId>
             <artifactId>openpdf</artifactId>
             <version>${openpdf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
 
         <dependency>
@@ -140,6 +145,13 @@
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-bom</artifactId>
                 <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
