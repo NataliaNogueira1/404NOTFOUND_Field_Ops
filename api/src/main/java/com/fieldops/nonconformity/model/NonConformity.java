@@ -2,6 +2,7 @@ package com.fieldops.nonconformity.model;
 
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
+import com.fieldops.user.model.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,6 +53,13 @@ public class NonConformity {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by")
+    private User deletedBy;
+
     protected NonConformity() {
     }
 
@@ -78,4 +86,27 @@ public class NonConformity {
     public NonConformityStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getClosedAt() { return closedAt; }
+    public Instant getDeletedAt() { return deletedAt; }
+    public User getDeletedBy() { return deletedBy; }
+
+    public void softDelete(User actor) {
+        if (deletedAt == null) {
+            deletedAt = Instant.now();
+            deletedBy = actor;
+        }
+    }
+
+    public void update(String title, String description, NonConformitySeverity severity, NonConformityStatus status) {
+        update(this.inspectionItemSnapshot, title, description, severity, status);
+    }
+
+    public void update(InspectionItemSnapshot itemSnapshot, String title, String description,
+            NonConformitySeverity severity, NonConformityStatus status) {
+        this.inspectionItemSnapshot = itemSnapshot;
+        this.title = title;
+        this.description = description;
+        this.severity = severity;
+        this.status = status;
+        this.closedAt = status == NonConformityStatus.CLOSED ? Instant.now() : null;
+    }
 }

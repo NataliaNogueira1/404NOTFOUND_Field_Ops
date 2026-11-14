@@ -57,7 +57,7 @@ public class InspectionReviewService {
         Map<Long, List<InspectionEvidence>> evidenceBySnapshot = evidenceRepository.findByInspectionIdOrderByCapturedAtAsc(inspectionId)
                 .stream().filter(value -> value.getItemSnapshot() != null)
                 .collect(Collectors.groupingBy(value -> value.getItemSnapshot().getId()));
-        Map<Long, List<NonConformity>> ncBySnapshot = nonConformityRepository.findByInspectionIdOrderByCreatedAtAsc(inspectionId)
+        Map<Long, List<NonConformity>> ncBySnapshot = nonConformityRepository.findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(inspectionId)
                 .stream().filter(value -> value.getInspectionItemSnapshot() != null)
                 .collect(Collectors.groupingBy(value -> value.getInspectionItemSnapshot().getId()));
         List<InspectionReviewResponse.NonConformity> allNcs = ncBySnapshot.values().stream().flatMap(List::stream)
