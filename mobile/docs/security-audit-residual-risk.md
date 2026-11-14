@@ -1,120 +1,85 @@
 # Risco Residual de Segurança — npm audit mobile
 
-**Data do baseline:** outubro/2026  
-**Baseline:** 75 vulnerabilidades (2 critical, 56 high, 17 moderate)  
-**Após correções:** 57 vulnerabilidades (0 critical, 50 high, 7 moderate)
+**Data desta revisão:** novembro/2026 (após upgrade para o Expo SDK 58)
+**Resultado atual:** 31 vulnerabilidades (0 critical, 0 high, 30 moderate, 1 low)
+
+Histórico, para referência:
+
+| Marco | Critical | High | Moderate | Low | Total |
+|---|:--:|:--:|:--:|:--:|:--:|
+| Baseline (SDK 57, out/2026) | 2 | 56 | 17 | 0 | 75 |
+| Após overrides (SDK 57) | 0 | 50 | 7 | 0 | 57 |
+| **Após upgrade SDK 58 (nov/2026)** | **0** | **0** | **30** | **1** | **31** |
+
+O upgrade para o **Expo SDK 58** (React Native 0.88, jest 30, jest-expo 58) eliminou
+**todas as vulnerabilidades critical e high** que, na análise anterior, dependiam
+justamente dessa atualização para serem corrigidas (cadeias Metro, Jest e React Native).
+As 31 restantes são todas de **toolchain de build/test**, sem superfície de ataque no
+runtime do app em produção.
 
 ---
 
-## O que foi corrigido (via `overrides` no package.json)
+## O que foi corrigido pelo upgrade do SDK 58
 
-| Pacote | Vulnerabilidade | Versão vulnerável | Versão segura |
-|---|---|---|---|
-| `handlebars` | JavaScript Injection via AST/own-property bypass (CRITICAL) | `3.0.0 – 4.7.9` | `^4.7.10` |
-| `shell-quote` | Command injection via line terminator (CRITICAL) | `1.8.4 – 1.10.0` | `^1.11.0` |
-| `brace-expansion` (série 1.x) | DoS via recursão/rewrite (HIGH) | `<=1.1.20` | `^1.1.21` |
-| `brace-expansion` (série 5.x) | DoS via recursão/rewrite (HIGH) | `4.0.0 – 5.0.11` | `^5.0.12` |
-| `@expo/metro-file-map` | via micromatch (HIGH) | `<=57.0.3` | `^57.0.4` |
-| `@xmldom/xmldom` | — (HIGH) | `<=0.8.14 / 0.9.0–0.9.11` | `^0.9.12` |
-| `js-yaml` | CPU DoS via merge keys (HIGH) | `4.0.0 – 4.3.1` | `^4.3.2` |
-| `compression` | Memory leak / DoS (HIGH) | `<1.8.2` | `^1.8.2` |
-| `source-map-js` | Event-loop DoS via indexed sections (HIGH) | `1.0.0 – 1.2.1` | `^1.2.2` |
+As ressalvas da análise anterior (SDK 57) que foram **resolvidas** pelo upgrade:
 
-Todas as correções acima são **não-breaking** (sem bump major) e foram aplicadas como
-`overrides` no `package.json`, pois os pacotes são dependências transitivas.
+| Item anterior | Situação no SDK 58 |
+|---|---|
+| Cadeia `metro` (série 0.84.x) — HIGH | Resolvida: o Metro do SDK 58 saiu do range vulnerável |
+| Cadeia `jest@29.x` / `jest-expo@57.x` — HIGH | Resolvida: jest 30 + jest-expo 58 adotados |
+| `react-native@0.86.3` — HIGH | Resolvida: RN 0.88 no SDK 58 |
+| `react-native-reanimated@4.5.1` / `worklets@0.10.1` — HIGH | Resolvidas: reanimated 4.7 / worklets 0.13 |
+| `@react-native-community/datetimepicker@9.1.0` — HIGH | Atualizado para 9.2.1 (versão do SDK 58) |
 
----
-
-## Risco residual — sem correção viável no momento
-
-### 1. `node-forge <=1.4.0` — HIGH (GHSA-86w9-cpqp-85rv)
-
-**CVE:** RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm
-elements (bypass de verificação de assinatura).
-
-**Por que não foi corrigido:** A versão mais recente publicada (`1.4.0`) ainda está
-no range vulnerável (`<=1.4.0`). Não existe versão `>1.4.0` publicada no npm. O "fix"
-sugerido pelo npm audit seria fazer upgrade do `expo` para `44.x` (major incompatível
-com o Expo SDK 57 em uso no projeto). 
-
-**Impacto prático:** `node-forge` é usado apenas pela toolchain do `@expo/cli` para
-verificação de certificados de code-signing. Não é exposto como superfície de ataque
-em produção no app.
-
-**Ação:** monitorar publicação de `node-forge > 1.4.0` ou nova versão de
-`@expo/code-signing-certificates` que não dependa desta versão vulnerável.
+Os `overrides` não-breaking aplicados anteriormente no `package.json` (`handlebars`,
+`shell-quote`, `brace-expansion`, `@xmldom/xmldom`, `js-yaml`, `compression`,
+`source-map-js`) permanecem válidos. O override de `@expo/metro-file-map` foi
+atualizado de `^57.0.4` para `^58.0.0`, acompanhando o SDK.
 
 ---
 
-### 2. Cadeia `metro >=0.71.0` — HIGH (via metro-transform-worker, metro-config, metro-file-map)
+## Risco residual — sem correção não-breaking no momento
 
-**Por que não foi corrigido:** Todo o ecossistema Metro da série `0.84.x` (usada pelo
-Expo 57 / React Native 0.86) está no range vulnerável. O fix seria upgrade para
-`metro@0.87.x`, que exige `react-native@0.72.17` (major regressivo — RN 0.72 é uma
-versão muito mais antiga que 0.86) ou esperar que o Expo SDK 58 corrija a cadeia.
+As 31 vulnerabilidades restantes são **moderate/low**, todas em dependências de
+desenvolvimento (bundler, test runner e lint). O `npm audit fix` sem `--force` não as
+resolve porque os fixes exigem bumps major da toolchain do Expo/Jest, que desalinhariam
+as versões fixadas pelo SDK 58.
 
-**Impacto prático:** Metro é a toolchain de empacotamento (bundler) — roda somente no
-ambiente de desenvolvimento/build, não no app em produção no dispositivo do usuário.
+### 1. `glob` / `minimatch` (moderate) — via jest, @expo/cli, @typescript-eslint
 
-**Ação:** aguardar Expo SDK 58 e realizar upgrade quando disponível.
+**Causa:** DoS por amplificação em `glob`/`minimatch` em versões usadas pela toolchain
+de teste (jest 30, jest-expo), pelo `@expo/cli` e pelo `@typescript-eslint`.
 
----
+**Por que não foi corrigido:** o fix exige `--force` com bumps major (ex.: eslint 9.x
+em outra linha, ou versões de jest/expo fora do alinhamento do SDK 58).
 
-### 3. Cadeia `jest@29.x` / `jest-expo@57.x` — HIGH (braces, micromatch, jest-snapshot, etc.)
+**Impacto prático:** roda apenas em build/test; não compõe o bundle de produção.
 
-**Por que não foi corrigido:** O fix exigiria `jest@30.x` e `jest-expo@58.x`
-(ambos major). `jest@30` introduz quebras de API e `jest-expo@58` ainda não é
-compatível com Expo SDK 57 conforme a [documentação versionada](https://docs.expo.dev/versions/v57.0.0/).
+### 2. `deepmerge` (moderate) — via jest-config/jest-cli
 
-**Impacto prático:** Jest é exclusivamente ferramenta de teste — não roda em produção.
+**Impacto prático:** dependência transitiva do Jest; ambiente de teste apenas.
 
-**Ação:** avaliar upgrade para jest@30 + jest-expo@58 quando Expo SDK 58 for adotado.
+### 3. `uuid` (moderate) — via `@expo/ngrok` — **sem fix disponível**
 
----
+**Por que não foi corrigido:** `@expo/ngrok` é usado apenas para tunelamento em
+desenvolvimento (`expo start --tunnel`). Não há versão corrigida publicada e o pacote
+não compõe o app de produção.
 
-### 4. `react-native@0.86.3` — HIGH (via @react-native/community-cli-plugin, etc.)
+### 4. `low` (1) — dependência transitiva da toolchain
 
-**Por que não foi corrigido:** O "fix" apontado pelo npm (`react-native@0.72.17`) é uma
-versão *mais antiga*, não mais nova — o npm audit interpretou incorretamente a direção
-do fix. React Native 0.86.3 é a versão correta para Expo SDK 57.
-
-**Impacto prático:** As vulnerabilidades reportadas estão na CLI e no bundle builder
-(toolchain), não no runtime do app.
+**Impacto prático:** severidade baixa, restrita ao ambiente de desenvolvimento.
 
 ---
 
-### 5. `react-native-reanimated@4.5.1` e `react-native-worklets@0.10.1` — HIGH
+## Decisão
 
-**Por que não foi corrigido:** Os fixes (`reanimated@4.2.2` e `worklets@0.7.4`) são
-versões *mais antigas* — o npm audit está na direção errada. As versões instaladas são
-as mais recentes e compatíveis com Expo SDK 57.
+As 31 vulnerabilidades remanescentes são **aceitas conscientemente** porque:
 
----
+- Nenhuma é **critical** ou **high**.
+- Todas são **toolchain de build/test** (Metro, Jest, `@expo/cli`, `@expo/ngrok`,
+  `@typescript-eslint`), sem superfície de ataque no runtime do app no dispositivo.
+- Os fixes exigem `--force` com bumps major que quebrariam o alinhamento de versões do
+  Expo SDK 58.
 
-### 6. `@react-native-community/datetimepicker@9.1.0` — HIGH
-
-**Por que não foi corrigido:** O fix apontado (`8.1.1`) é uma versão mais antiga.
-`9.1.0` é a versão correta para RN 0.86.
-
----
-
-## Lint preexistente (não relacionado a este trabalho)
-
-O `npm run lint` falha com 5 erros em `src/design-system/SignaturePad.tsx`
-(regra `react-hooks/refs` — acesso a ref durante render). Esses erros existiam
-antes desta tarefa e não são introduzidos pelos overrides.
-
----
-
-## Resumo final
-
-| Categoria | Antes | Depois |
-|---|---|---|
-| Critical | 2 | **0** |
-| High | 56 | 50 |
-| Moderate | 17 | 7 |
-| **Total** | **75** | **57** |
-
-As 50 high restantes são todas **toolchain de build/test** (Metro, Jest, React Native CLI)
-ou pacotes onde o npm audit aponta um "fix" para versão *mais antiga* (incorreto).
-Nenhuma delas é superfície de ataque em produção no dispositivo do usuário.
+**Ação de acompanhamento:** reavaliar a cada atualização de patch do SDK 58 e nas
+próximas versões do Expo, aplicando correções não-breaking quando disponíveis.

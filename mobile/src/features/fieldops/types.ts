@@ -65,6 +65,16 @@ export interface Inspection {
    */
   signatureUri?: string;
   /**
+   * Raw strokes serialised as JSON for the on-device SignaturePreview (issue #334).
+   * React Native's <Image> cannot decode SVG data URIs, so the preview component
+   * redraws the strokes directly instead of using signatureUri.
+   */
+  signatureStrokes?: string;
+  /** Canvas width at capture time, needed to scale the preview correctly. */
+  signatureWidth?: number;
+  /** Canvas height at capture time, needed to scale the preview correctly. */
+  signatureHeight?: number;
+  /**
    * When true, the conclusion flow requires a non-empty signature before
    * submitting (PBI-086, configurable per inspection template).
    */
