@@ -25,6 +25,9 @@ const nodeProject = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // expo-file-system ships untransformed ESM; the sync code only needs it for
+    // the photo upload, which tests mock. Map it to a CJS-friendly stub.
+    '^expo-file-system$': '<rootDir>/src/test-stubs/expoFileSystem.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
