@@ -19,6 +19,10 @@ jest.mock('react-native', () => ({ Platform: { OS: 'android' } }), { virtual: tr
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
+const mockUpload = jest.fn();
+jest.mock('../EvidenceUploadClient', () => ({
+  evidenceUploadClient: { upload: (...args: unknown[]) => mockUpload(...args) },
+}));
 jest.mock('@/infrastructure/api/client', () => ({
   apiClient: {
     get: (...args: unknown[]) => mockGet(...args),
@@ -35,6 +39,7 @@ import { createInMemoryDb } from '@/infrastructure/database/__tests__/inMemoryDb
 import { runMigrations } from '@/infrastructure/database/migrations';
 import {
   AnswerRepository,
+  EvidenceRepository,
   NonConformityRepository,
   SyncQueueRepository,
   InspectionRepository,
@@ -119,6 +124,7 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
   let db: SQLiteDatabase;
   let queueRepo: SyncQueueRepository;
   let answerRepo: AnswerRepository;
+  let evidenceRepo: EvidenceRepository;
   let ncRepo: NonConformityRepository;
   let service: InspectionSyncService;
 
@@ -128,10 +134,12 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     await seedInspection(db);
     queueRepo = new SyncQueueRepository(db);
     answerRepo = new AnswerRepository(db);
+    evidenceRepo = new EvidenceRepository(db);
     ncRepo = new NonConformityRepository(db);
     service = new InspectionSyncService(db);
     mockGet.mockReset();
     mockPost.mockReset();
+    mockUpload.mockReset();
   });
 
   // ── Criterion: answers leave the queue after a successful sync ──────────────
@@ -279,6 +287,65 @@ describe('PBI-051 — mobile sync of answers and non-conformities', () => {
     expect(result.sent).toBe(2);
     expect(await queueRepo.countPending()).toBe(0);
     expect(mockPost).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends a critical NC only after its same-item evidence upload completes', async () => {
+    const answerId = InspectionSyncService.answerOperationId(INSPECTION_ID, ITEM_ID);
+    await answerRepo.save(INSPECTION_ID, ITEM_ID, 'NAO_CONFORME');
+    await service.enqueueAnswer(INSPECTION_ID, ITEM_ID, 'NAO_CONFORME');
+    const evidence = {
+      id: 'critical-evidence-1',
+      inspectionId: INSPECTION_ID,
+      itemId: ITEM_ID,
+      description: 'Foto da falha crítica',
+      uri: 'file:///critical.jpg',
+      capturedAt: '2026-10-05T12:00:00Z',
+      syncStatus: 'pending' as const,
+      responseId: answerId,
+      retryCount: 0,
+    };
+    await evidenceRepo.add(evidence);
+    await service.enqueueEvidence(evidence);
+    const nc = buildNonConformity({ id: 'nc-critical-1', severity: Severity.CRITICAL, evidenceCount: 1 });
+    await ncRepo.add(nc);
+    await service.enqueueNonConformity(nc);
+    mockPost.mockResolvedValue(pushResult('APPLIED'));
+    mockUpload.mockResolvedValue(undefined);
+
+    const result = await service.pushPendingOperations(TOKEN);
+    const ncOperation = (await queueRepo.getAll()).find((operation) => operation.entityType === 'non_conformity');
+
+    expect(result).toEqual({ sent: 3, failed: 0, errors: [] });
+    expect(ncOperation).toBeUndefined();
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+    expect(mockPost.mock.invocationCallOrder[0]).toBeLessThan(mockUpload.mock.invocationCallOrder[0]);
+    expect(mockUpload.mock.invocationCallOrder[0]).toBeLessThan(mockPost.mock.invocationCallOrder[1]);
+    expect(mockPost.mock.calls[1][1].operations[0].type).toBe('NON_CONFORMITY_CREATE');
+  });
+
+  it('does not block a non-critical NC on evidence uploads', async () => {
+    const evidence = {
+      id: 'non-critical-evidence-1',
+      inspectionId: INSPECTION_ID,
+      itemId: ITEM_ID,
+      description: 'Optional photo',
+      uri: 'file:///optional.jpg',
+      capturedAt: '2026-10-05T12:00:00Z',
+      syncStatus: 'pending' as const,
+      retryCount: 0,
+    };
+    await evidenceRepo.add(evidence);
+    await service.enqueueEvidence(evidence);
+    const nc = buildNonConformity({ id: 'nc-high-1', severity: Severity.HIGH });
+    await ncRepo.add(nc);
+    const evidenceOperationId = InspectionSyncService.evidenceOperationId(evidence.id);
+    await service.enqueueNonConformity(nc, [evidenceOperationId]);
+
+    const operations = await queueRepo.getAll();
+    const ncOperation = operations.find((operation) => operation.entityType === 'non_conformity');
+
+    expect(ncOperation?.dependencyIds).not.toContain(evidenceOperationId);
   });
 
   // ── Robustness: a legacy status op without baseVersion must not wedge sync ──

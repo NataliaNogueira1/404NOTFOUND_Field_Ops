@@ -72,7 +72,7 @@ class InspectionReportServiceTest {
         InspectionEvidence evidence = org.mockito.Mockito.mock(InspectionEvidence.class);
         byte[] report = "PDF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
         when(inspectionRepository.findById(15L)).thenReturn(Optional.of(inspection));
-        when(nonConformityRepository.findByInspectionIdOrderByCreatedAtAsc(15L)).thenReturn(List.of());
+        when(nonConformityRepository.findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(15L)).thenReturn(List.of());
         when(responseHistoryRepository.findLatestAnswersByInspectionId(15L)).thenReturn(List.of(entry));
         when(userRepository.findAllById(List.of(42L))).thenReturn(List.of(author));
         when(inspectionEvidenceRepository.findByInspectionIdOrderByCapturedAtAsc(15L))

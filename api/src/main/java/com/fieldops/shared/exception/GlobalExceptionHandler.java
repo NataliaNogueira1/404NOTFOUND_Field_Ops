@@ -1,5 +1,6 @@
 package com.fieldops.shared.exception;
 
+import com.fieldops.nonconformity.exception.CriticalEvidenceRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -26,6 +27,12 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(CriticalEvidenceRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleCriticalEvidenceRequired(
+            CriticalEvidenceRequiredException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "CRITICAL_EVIDENCE_REQUIRED", ex.getMessage(), request, List.of());
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleBodyValidation(
