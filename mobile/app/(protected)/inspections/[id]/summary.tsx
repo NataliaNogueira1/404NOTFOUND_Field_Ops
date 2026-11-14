@@ -49,14 +49,35 @@ export default function SummaryScreen() {
     () => inspections.find((i) => i.id === id),
     [inspections, id],
   );
+
+  // Restore a previously-saved signature from SQLite when the screen mounts
+  // (e.g. the technician drew a signature, navigated away, and returned).
+  // Uses the persisted strokes + dimensions so the SignaturePreview can redraw
+  // without SVG decoding (issue #334).
+  const persistedStrokes = useMemo(() => {
+    if (!inspection?.signatureStrokes) return null;
+    try {
+      return JSON.parse(inspection.signatureStrokes) as import('@/design-system').SignatureStroke[];
+    } catch {
+      return null;
+    }
+  }, [inspection?.signatureStrokes]);
   const signatureRequired = inspection?.signatureRequired ?? false;
 
   // Persist the signature to SQLite whenever it changes (auto-save pattern —
   // same as answerItem). The canvas calls this on every finger-up event.
+  // Raw strokes + dimensions are also persisted so the SignaturePreview can
+  // redraw the signature on-device without relying on SVG decoding (issue #334).
   function handleSignatureChange(value: SignatureValue | null) {
     setSignature(value);
     if (value) {
-      saveSignature(id, value.dataUri);
+      saveSignature(
+        id,
+        value.dataUri,
+        JSON.stringify(value.strokes),
+        value.width,
+        value.height,
+      );
     }
   }
 
@@ -96,13 +117,13 @@ export default function SummaryScreen() {
       }
     }
 
-    // PBI-086: assinatura obrigatória e canvas vazio
-    if (signatureRequired && !signatureUri) {
+    // PBI-086: assinatura obrigatória e canvas vazio (nem recém-desenhada nem persistida)
+    if (signatureRequired && !signatureUri && !persistedStrokes) {
       problems.push('Assinatura do técnico — obrigatória para concluir');
     }
 
     return problems;
-  }, [answers, evidences, items, signatureRequired, signatureUri]);
+  }, [answers, evidences, items, signatureRequired, signatureUri, persistedStrokes]);
 
   const conformes = Object.values(answers).filter(
     (a) => a.value === 'CONFORME' || a.value === true,
@@ -161,18 +182,17 @@ export default function SummaryScreen() {
         {/* ── Assinatura do técnico (PBI-086) ──────────────────────────── */}
         <Card style={styles.signatureCard}>
           <View style={styles.signatureHeader}>
-              {signatureRequired && (
+            {signatureRequired ? (
               <Text style={[styles.signatureTitle, { color: c.text }]}>
                 Assinatura do técnico
                 <Text style={{ color: c.danger }}> *</Text>
               </Text>
-            )}
-            {!signatureRequired && (
+            ) : (
               <Text style={[styles.signatureTitle, { color: c.text }]}>
                 Assinatura do técnico
               </Text>
             )}
-            {signatureRequired && !signatureUri && (
+            {signatureRequired && !signatureUri && !persistedStrokes && (
               <Text style={[styles.signatureHint, { color: c.textSecondary }]}>
                 Obrigatória para concluir
               </Text>
@@ -185,23 +205,25 @@ export default function SummaryScreen() {
             height={180}
           />
 
-          {/* Prévia da assinatura capturada */}
-          {signature && (
+          {/* Prévia — sempre abaixo do canvas. Mostra a assinatura
+              recém-desenhada (signature) ou, se ainda não redesenhou nesta
+              sessão, a assinatura persistida (persistedStrokes). */}
+          {(signature ?? (persistedStrokes ? { strokes: persistedStrokes, width: inspection?.signatureWidth ?? 300, height: inspection?.signatureHeight ?? 180 } : null)) ? (
             <View style={styles.previewContainer}>
               <Text style={[styles.previewLabel, { color: c.textSecondary }]}>
                 Prévia da assinatura:
               </Text>
               <SignaturePreview
-                strokes={signature.strokes}
-                sourceWidth={signature.width}
-                sourceHeight={signature.height}
+                strokes={signature?.strokes ?? persistedStrokes!}
+                sourceWidth={signature?.width ?? inspection?.signatureWidth ?? 300}
+                sourceHeight={signature?.height ?? inspection?.signatureHeight ?? 180}
                 height={80}
               />
               <Text style={[styles.previewConfirm, { color: c.success }]}>
                 ✓ Assinatura capturada
               </Text>
             </View>
-          )}
+          ) : null}
         </Card>
 
         <Button label="Concluir inspeção" onPress={tryConclude} fullWidth size="lg" />
