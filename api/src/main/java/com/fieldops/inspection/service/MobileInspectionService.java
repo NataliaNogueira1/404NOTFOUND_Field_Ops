@@ -117,7 +117,8 @@ public class MobileInspectionService {
         List<InspectionStatus> mobileStatuses = List.of(
                 InspectionStatus.ASSIGNED,
                 InspectionStatus.IN_PROGRESS,
-                InspectionStatus.REJECTED
+                InspectionStatus.REJECTED,
+                InspectionStatus.CANCELED
         );
 
         List<Inspection> inspections = inspectionRepository.findByTechnicianAndStatuses(

@@ -80,6 +80,9 @@ public class MobileInspectionResponseMapper {
                 inspection.getRejectionReason(),
                 inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
                 inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
+                inspection.getCanceledReason(),
+                inspection.getCanceledBy() != null ? inspection.getCanceledBy().getName() : null,
+                inspection.getCanceledAt() != null ? inspection.getCanceledAt().toString() : null,
                 inspection.getVersion(),
                 templateDto,
                 toReviewComments(inspection.getId()));
