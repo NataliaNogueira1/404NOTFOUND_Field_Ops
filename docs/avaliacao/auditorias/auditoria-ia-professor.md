@@ -51,7 +51,7 @@ O projeto demonstra organização por componentes e registro detalhado de tarefa
 
 ### Aplicativo Expo — mobile/develop
 
-- **Identificado no código/documentação:** Expo SDK 57, React Native, TypeScript, Expo Router, SQLite, Secure Store, módulo de conexão, rotas de inspeção/checklist, scanner, evidências e estrutura de outbox/sync. README afirma persistência/offline, mas isso ainda não é demonstração funcional.
+- **Identificado no código/documentação:** Expo SDK 58, React Native, TypeScript, Expo Router, SQLite, Secure Store, módulo de conexão, rotas de inspeção/checklist, scanner, evidências e estrutura de outbox/sync. README afirma persistência/offline, mas isso ainda não é demonstração funcional.
 - **Parcial/em desenvolvimento:** branches específicas de download, upload de evidências, sincronização/localização, notificações e assinatura; conferir merges na `develop` antes de considerar aceitas.
 - **Não validado:** execução efetiva offline após reiniciar app, pull/outbox sem duplicação, câmera/QR/GPS em aparelho, APK e testes independentes. #259 documenta débito de segurança de dependências.
 

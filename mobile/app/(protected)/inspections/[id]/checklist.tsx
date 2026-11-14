@@ -1,4 +1,4 @@
-﻿import { useCallback, useMemo, useRef } from 'react';
+import { type ComponentRef, useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,7 +23,9 @@ export default function ChecklistScreen() {
   const c = useThemeColors();
   const { inspections, answers, evidences, reviewComments, answerItem, retryEvidenceUpload } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
-  const scrollRef = useRef<ScrollView>(null);
+  // RN 0.88 types ScrollView as a function component; derive the imperative
+  // instance type (with scrollTo) from the component ref instead of the class.
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
   // Lock the whole checklist when the inspection is in a reviewed state. Derived from the
