@@ -1,4 +1,6 @@
 import { apiRequest } from '@/api/client'
+import { inspectionReviewApi, type ReviewEvidence } from '@/api/inspectionReview'
+import type { LightboxPhoto } from '@/components/feedback/Lightbox'
 import { Severity } from '@/types/domain'
 
 /**
@@ -74,6 +76,22 @@ function normalize(nonConformity: BackendNonConformity): NonConformityListItem {
   }
 }
 
+/**
+ * Maps an inspection evidence to the lightbox photo contract (PBI-255). The
+ * binary content is loaded lazily on open via inspectionReviewApi.loadEvidenceImage,
+ * so `src` stays empty here and only `contentUrl` is carried.
+ */
+function evidencePhoto(evidence: ReviewEvidence, itemTitle: string): LightboxPhoto {
+  return {
+    src: '',
+    contentUrl: evidence.contentUrl,
+    item: itemTitle,
+    capturedAt: evidence.capturedAt,
+    location: evidence.location ?? undefined,
+    description: evidence.description ?? undefined,
+  }
+}
+
 export const nonConformitiesApi = {
   async list(filters: NonConformityFilters) {
     const params = new URLSearchParams({
@@ -87,5 +105,26 @@ export const nonConformitiesApi = {
     if (filters.status) params.set('status', filters.status)
     const result = await apiRequest<BackendPage<BackendNonConformity>>(`/api/v1/non-conformities?${params}`)
     return { ...result, content: result.content.map(normalize) }
+  },
+
+  /**
+   * Resolve the equipment photos already linked to a non-conformity for the
+   * supervisor/admin NC detail view (PBI-255). It reuses the inspection review
+   * payload — the single place the backend exposes evidences per item snapshot —
+   * and filters by the NC's `inspectionItemSnapshotId`. When the NC is not bound
+   * to a specific item snapshot, there is no item to match, so no photos are
+   * returned (empty state). The binary content download stays lazy and
+   * authenticated via the existing lightbox flow.
+   */
+  async loadEvidencePhotos(
+    inspectionId: string,
+    inspectionItemSnapshotId: string | null,
+  ): Promise<LightboxPhoto[]> {
+    if (!inspectionItemSnapshotId) return []
+    const review = await inspectionReviewApi.get(inspectionId)
+    const items = review.sections.flatMap((section) => section.items)
+    const matchingItem = items.find((item) => item.snapshotId === inspectionItemSnapshotId)
+    if (!matchingItem) return []
+    return matchingItem.evidences.map((evidence) => evidencePhoto(evidence, matchingItem.title))
   },
 }

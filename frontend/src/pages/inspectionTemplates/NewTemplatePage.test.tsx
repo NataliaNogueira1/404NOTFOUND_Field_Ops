@@ -39,13 +39,13 @@ describe('NewTemplatePage', () => {
     )
 
     await userEvent.click(screen.getByRole('button', { name: 'Criar modelo' }))
-    expect(await screen.findByText('Informe o titulo do modelo.')).not.toBeNull()
+    expect(await screen.findByText('Informe o título do modelo.')).not.toBeNull()
     expect(screen.getByText('Selecione uma categoria.')).not.toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
 
-    await userEvent.type(screen.getByLabelText('Titulo'), 'Inspecao Preventiva de Compressor')
-    await userEvent.type(screen.getByLabelText('Descricao'), 'Checklist mensal')
-    await userEvent.selectOptions(screen.getByLabelText('Categoria'), 'Manutencao Preventiva')
+    await userEvent.type(screen.getByLabelText('Título'), 'Inspecao Preventiva de Compressor')
+    await userEvent.type(screen.getByLabelText('Descrição'), 'Checklist mensal')
+    await userEvent.selectOptions(screen.getByLabelText('Categoria'), 'Manutenção Preventiva')
     await userEvent.click(screen.getByRole('button', { name: 'Criar modelo' }))
 
     await waitFor(() =>
@@ -56,7 +56,7 @@ describe('NewTemplatePage', () => {
           body: JSON.stringify({
             title: 'Inspecao Preventiva de Compressor',
             description: 'Checklist mensal',
-            category: 'Manutencao Preventiva',
+            category: 'Manutenção Preventiva',
           }),
         }),
       ),

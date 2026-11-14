@@ -7,8 +7,8 @@ import { ThemeToggle } from '@/theme/ThemeToggle'
 import { cn } from '@/utils/cn'
 
 const navItems = [
-  { label: 'Inicio', to: '/technician/home', icon: Home },
-  { label: 'Minhas Inspecoes', to: '/technician/inspections', icon: ClipboardList },
+  { label: 'Início', to: '/technician/home', icon: Home },
+  { label: 'Minhas Inspeções', to: '/technician/inspections', icon: ClipboardList },
   { label: 'Perfil', to: '/technician/profile', icon: User },
 ]
 
@@ -17,7 +17,7 @@ export function TechnicianLayout() {
   const navigate = useNavigate()
   const session = useSyncExternalStore(authSession.subscribe, authSession.snapshot, authSession.snapshot)
   const user = session.user
-  const displayName = user?.name ?? 'Tecnico'
+  const displayName = user?.name ?? 'Técnico'
   const initials = displayName
     .split(' ')
     .map((part) => part[0])
@@ -50,7 +50,7 @@ export function TechnicianLayout() {
             />
             <div>
               <span className="block text-lg font-semibold text-primary">FieldOps</span>
-              <span className="text-xs text-muted">Portal do tecnico</span>
+              <span className="text-xs text-muted">Portal do técnico</span>
             </div>
           </div>
           <button
@@ -83,7 +83,7 @@ export function TechnicianLayout() {
         </nav>
         <div className="border-t border-border p-4">
           <p className="text-sm font-semibold">{displayName}</p>
-          <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
+          <p className="text-xs text-muted">{user?.role ?? 'Técnico'}</p>
           <button
             className="focus-ring mt-3 inline-flex items-center gap-2 rounded-fieldops px-2 py-1.5 text-sm font-semibold text-danger hover:bg-danger-light/20"
             onClick={logout}
@@ -103,14 +103,14 @@ export function TechnicianLayout() {
             <Menu />
           </button>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-text">Portal do Tecnico</p>
-            <p className="hidden text-xs text-muted sm:block">Operacao de campo web</p>
+            <p className="truncate text-sm font-semibold text-text">Portal do Técnico</p>
+            <p className="hidden text-xs text-muted sm:block">Operação de campo web</p>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <button
               className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
-              aria-label="Notificacoes"
+              aria-label="Notificações"
             >
               <Bell size={20} />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
@@ -122,7 +122,7 @@ export function TechnicianLayout() {
               </span>
               <div className="hidden sm:block">
                 <p className="text-sm font-semibold leading-tight text-text">{displayName}</p>
-                <p className="text-xs text-muted">{user?.role ?? 'Tecnico'}</p>
+                <p className="text-xs text-muted">{user?.role ?? 'Técnico'}</p>
               </div>
             </div>
           </div>

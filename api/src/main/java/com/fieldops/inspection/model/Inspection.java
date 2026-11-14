@@ -76,6 +76,33 @@ public class Inspection {
     @Column(name = "started_at")
     private Instant startedAt;
 
+    // One-shot GPS location captured when the inspection starts (PBI-045 / RN-061).
+    // Nullable: capturing is optional and may be skipped or denied (RN-059).
+    @Column(name = "start_latitude")
+    private Double startLatitude;
+
+    @Column(name = "start_longitude")
+    private Double startLongitude;
+
+    @Column(name = "start_accuracy")
+    private Double startAccuracy;
+
+    @Column(name = "start_captured_at")
+    private Instant startCapturedAt;
+
+    // One-shot GPS location captured when the inspection is concluded (PBI-045).
+    @Column(name = "end_latitude")
+    private Double endLatitude;
+
+    @Column(name = "end_longitude")
+    private Double endLongitude;
+
+    @Column(name = "end_accuracy")
+    private Double endAccuracy;
+
+    @Column(name = "end_captured_at")
+    private Instant endCapturedAt;
+
     @Column(name = "reviewed_at")
     private Instant reviewedAt;
 
@@ -155,6 +182,22 @@ public class Inspection {
     public void setProgress(Integer progress) { this.progress = progress; }
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
+    public Double getStartLatitude() { return startLatitude; }
+    public void setStartLatitude(Double startLatitude) { this.startLatitude = startLatitude; }
+    public Double getStartLongitude() { return startLongitude; }
+    public void setStartLongitude(Double startLongitude) { this.startLongitude = startLongitude; }
+    public Double getStartAccuracy() { return startAccuracy; }
+    public void setStartAccuracy(Double startAccuracy) { this.startAccuracy = startAccuracy; }
+    public Instant getStartCapturedAt() { return startCapturedAt; }
+    public void setStartCapturedAt(Instant startCapturedAt) { this.startCapturedAt = startCapturedAt; }
+    public Double getEndLatitude() { return endLatitude; }
+    public void setEndLatitude(Double endLatitude) { this.endLatitude = endLatitude; }
+    public Double getEndLongitude() { return endLongitude; }
+    public void setEndLongitude(Double endLongitude) { this.endLongitude = endLongitude; }
+    public Double getEndAccuracy() { return endAccuracy; }
+    public void setEndAccuracy(Double endAccuracy) { this.endAccuracy = endAccuracy; }
+    public Instant getEndCapturedAt() { return endCapturedAt; }
+    public void setEndCapturedAt(Instant endCapturedAt) { this.endCapturedAt = endCapturedAt; }
     public Instant getReviewedAt() { return reviewedAt; }
     public void setReviewedAt(Instant reviewedAt) { this.reviewedAt = reviewedAt; }
     public User getReviewedBy() { return reviewedBy; }

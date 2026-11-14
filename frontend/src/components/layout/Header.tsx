@@ -7,13 +7,13 @@ import { ThemeToggle } from '@/theme/ThemeToggle'
 
 const titles: Record<string, string> = {
   dashboard: 'Dashboard',
-  users: 'Usuarios',
+  users: 'Usuários',
   clients: 'Clientes',
   sites: 'Locais',
   equipment: 'Equipamentos',
-  'inspection-templates': 'Modelos de inspecao',
-  inspections: 'Inspecoes',
-  'non-conformities': 'Nao conformidades',
+  'inspection-templates': 'Modelos de inspeção',
+  inspections: 'Inspeções',
+  'non-conformities': 'Não conformidades',
   audit: 'Auditoria',
 }
 
@@ -47,7 +47,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         <ThemeToggle />
         <button
           className="focus-ring relative rounded-full p-2 text-muted hover:bg-primary-light/30"
-          aria-label="Notificacoes"
+          aria-label="Notificações"
         >
           <Bell size={20} />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-white" />
@@ -58,8 +58,8 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
             {initials}
           </span>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold leading-tight">{user?.name ?? 'Usuario'}</p>
-            <p className="text-xs text-muted">{user?.role ?? 'Sessao'}</p>
+            <p className="text-sm font-semibold leading-tight">{user?.name ?? 'Usuário'}</p>
+            <p className="text-xs text-muted">{user?.role ?? 'Sessão'}</p>
           </div>
         </div>
         <button

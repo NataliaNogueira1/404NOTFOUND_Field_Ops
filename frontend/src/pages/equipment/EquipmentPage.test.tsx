@@ -110,14 +110,14 @@ describe('EquipmentPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo equipamento' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Gerador Diesel')
-    await userEvent.type(within(dialog).getByLabelText('Nº Patrimonio (opcional)'), 'PAT-900')
-    await userEvent.type(within(dialog).getByLabelText('Nº Serie (opcional)'), 'SN-900')
+    await userEvent.type(within(dialog).getByLabelText('Nº Patrimônio (opcional)'), 'PAT-900')
+    await userEvent.type(within(dialog).getByLabelText('Nº Série (opcional)'), 'SN-900')
     await userEvent.type(within(dialog).getByLabelText('Fabricante (opcional)'), 'Cummins')
     await userEvent.type(within(dialog).getByLabelText('Modelo (opcional)'), 'C90')
-    await userEvent.type(within(dialog).getByLabelText('Descricao (opcional)'), 'Gerador principal')
+    await userEvent.type(within(dialog).getByLabelText('Descrição (opcional)'), 'Gerador principal')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Gerar QR Code' }))
     await userEvent.selectOptions(within(dialog).getByLabelText('Status'), 'ACTIVE')
-    await userEvent.type(within(dialog).getByLabelText('Data de instalacao (opcional)'), '2026-09-04')
+    await userEvent.type(within(dialog).getByLabelText('Data de instalação (opcional)'), '2026-09-04')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }))
 
     await waitFor(() =>
@@ -156,7 +156,7 @@ describe('EquipmentPage', () => {
     await screen.findByText('Compressor XPTO')
 
     await userEvent.click(screen.getByRole('button', { name: 'Inativar Compressor XPTO' }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('deixara de aparecer em novas inspecoes')
+    expect(screen.getByRole('dialog')).toHaveTextContent('deixará de aparecer em novas inspeções')
     expect(patchBody).toBeUndefined()
     await userEvent.click(screen.getByRole('button', { name: 'Inativar' }))
 

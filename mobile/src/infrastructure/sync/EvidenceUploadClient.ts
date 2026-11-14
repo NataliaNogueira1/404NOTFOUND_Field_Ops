@@ -1,166 +1,117 @@
 import { File, UploadType } from 'expo-file-system';
 
+import { tokenStorage } from '@/infrastructure/storage/tokenStorage';
+
 /**
- * Uploads an evidence photo to the backend in a single multipart request
- * (issue #229 / RN-078), matching the real endpoint (EvidenceUploadController):
+ * Isolated client for uploading an evidence file to the server (PBI-044, RN-078).
  *
- *   POST /api/v1/inspections/{inspectionId}/evidence   (multipart/form-data)
- *     file              the photo binary
- *     itemId            template item id (numeric, unscoped)
- *     mimeType          e.g. image/jpeg
- *     description       optional
- *     latitude/longitude optional, only both together
- *     capturedAtDevice  ISO-8601 device capture time
- *     operationId       UUID idempotency key: a resend returns the first result
- *                       and never creates a second evidence (RN-068)
- *   ← 201 { id, checksum }
+ * The server endpoint persists the binary and metadata idempotently. The outbox
+ * supplies a stable UUID so retries remain safe after connectivity failures.
  *
- * expo-file-system v57 removed the legacy uploadAsync (it throws at runtime).
- * The replacement is `new File(uri).createUploadTask(url, options)` with
- * `parameters` for the extra multipart fields.
- * See: https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
- *
- * Resolves only on a 2xx response; any other outcome throws so the outbox keeps
- * the photo as FAILED and available for retry (PBI-044 / RN-047).
- *
- * itemId note: the mobile stores item ids as "<inspectionId>::<templateItemId>"
- * (scopedId). The server expects the numeric templateItemId only.
+ * Why `File.upload` instead of `fetch` + `FormData` (Expo SDK 57 / RN 0.86 new
+ * architecture): the new-architecture `FormData` rejects the React Native file
+ * part shape (`{ uri, name, type }`) at runtime with
+ * "Unsupported FormDataPart implementation". `expo-file-system`'s native
+ * multipart upload reads the file directly from disk and builds the
+ * multipart/form-data body on the native side, so the binary part is valid.
  */
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  heic: 'image/heic',
-};
-
 export interface EvidenceUploadInput {
-  /** UUID idempotency key, stable across retries of the same photo. */
-  operationId: string;
-  /** Server inspection id (numeric string). */
   inspectionId: string;
-  /** Scoped local item id: "<inspectionId>::<templateItemId>" or plain numeric string */
   itemId: string;
   localUri: string;
   description?: string;
   mimeType?: string;
-  capturedAt: string;
-  latitude?: number;
-  longitude?: number;
+  capturedAtDevice: string;
+  operationId: string;
 }
 
 export interface EvidenceUploadResult {
+  /** Server-confirmed status. Only 'APPLIED' allows marking the evidence SYNCED. */
   status: 'APPLIED';
-  evidenceId: number;
-  checksum: string;
+  storageKey?: string;
 }
-
-// ─── Public client class ───────────────────────────────────────────────────────
 
 export class EvidenceUploadClient {
   /**
-   * Uploads a single evidence photo (binary + metadata in one request).
-   * Throws on any non-2xx outcome so the outbox marks it FAILED.
+   * Uploads a single evidence file. Resolves only when the server confirms
+   * APPLIED; otherwise it throws so the caller keeps the photo pending/failed.
    */
   async upload(token: string, input: EvidenceUploadInput): Promise<EvidenceUploadResult> {
     if (!input.localUri) {
       throw new Error('Evidence has no local file to upload.');
     }
-    if (!UUID_PATTERN.test(input.operationId)) {
-      throw new Error(`operationId must be a UUID, got "${input.operationId}".`);
-    }
-    const inspectionId = Number(input.inspectionId);
-    if (!Number.isInteger(inspectionId) || inspectionId <= 0) {
-      throw new Error(`Cannot upload evidence: invalid inspection id "${input.inspectionId}".`);
-    }
 
-    const mimeType = input.mimeType ?? mimeTypeFromUri(input.localUri);
-    const task = new File(input.localUri).createUploadTask(
-      `${BASE_URL}/api/v1/inspections/${inspectionId}/evidence`,
-      {
-        uploadType: UploadType.MULTIPART,
-        fieldName: 'file',
-        mimeType,
-        httpMethod: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        parameters: buildParameters(input, mimeType),
-      },
-    );
+    // Prefer the freshest token from storage: the apiClient interceptor may have
+    // renewed the access token (via /auth/refresh) during the same sync cycle
+    // after a 401 on the batch push. The token parameter captured when the sync
+    // started could be stale by the time the evidence upload runs.
+    const freshToken = (await tokenStorage.getAccessToken()) ?? token;
 
-    const result = await task.uploadAsync();
-    if (!result) {
-      throw new Error('Evidence upload failed: no response from server (network error).');
-    }
+    const url = `${BASE_URL}/api/v1/inspections/${input.inspectionId}/evidence`;
+
+    // Non-file multipart parts (the backend EvidenceUploadRequest fields). The
+    // binary `file` part is added by expo-file-system from the File reference.
+    const parameters: Record<string, string> = {
+      itemId: input.itemId,
+      capturedAtDevice: input.capturedAtDevice,
+      operationId: input.operationId,
+    };
+    if (input.description) parameters.description = input.description;
+    if (input.mimeType) parameters.mimeType = input.mimeType;
+
+    const file = new File(input.localUri);
+    const result = await file.upload(url, {
+      uploadType: UploadType.MULTIPART,
+      // Must match @RequestPart("file") on EvidenceUploadController.
+      fieldName: 'file',
+      mimeType: input.mimeType ?? 'image/jpeg',
+      parameters,
+      headers: freshToken ? { Authorization: `Bearer ${freshToken}` } : {},
+    });
+
     if (result.status < 200 || result.status >= 300) {
-      throw new Error(`Evidence upload failed (API ${result.status}): ${result.body}`);
+      throw new Error(`Upload falhou (API ${result.status}): ${describeError(result.body)}`);
     }
-    return parseResponse(result.body);
+
+    const data = parseResponse(result.body);
+    return { status: 'APPLIED', storageKey: data.checksum ?? String(data.id ?? '') };
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildParameters(input: EvidenceUploadInput, mimeType: string): Record<string, string> {
-  const parameters: Record<string, string> = {
-    itemId: String(extractTemplateItemId(input.itemId)),
-    mimeType,
-    capturedAtDevice: input.capturedAt,
-    operationId: input.operationId,
-  };
-  if (input.description) parameters.description = input.description;
-  // The backend rejects latitude without longitude (and vice versa).
-  if (input.latitude !== undefined && input.longitude !== undefined) {
-    parameters.latitude = String(input.latitude);
-    parameters.longitude = String(input.longitude);
-  }
-  return parameters;
-}
-
-function parseResponse(body: string): EvidenceUploadResult {
-  let data: { id?: number; checksum?: string };
+/** Parse the EvidenceUploadResponse JSON body, tolerating an empty/invalid body. */
+function parseResponse(body: string): { id?: number; checksum?: string } {
   try {
-    data = JSON.parse(body) as { id?: number; checksum?: string };
+    return JSON.parse(body) as { id?: number; checksum?: string };
   } catch {
-    throw new Error('Evidence upload succeeded but server returned invalid JSON.');
+    return {};
   }
-  if (typeof data.id !== 'number') {
-    throw new Error('Evidence upload succeeded but server returned no evidence id.');
-  }
-  return { status: 'APPLIED', evidenceId: data.id, checksum: data.checksum ?? '' };
-}
-
-function mimeTypeFromUri(uri: string): string {
-  const extension = uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
-  return MIME_BY_EXTENSION[extension] ?? 'image/jpeg';
 }
 
 /**
- * Extracts the numeric templateItemId from a scoped local item id.
- *
- * InspectionRepository.saveTemplate stores item ids as
- * "<inspectionId>::<templateItemId>" (scopedId). The server expects the
- * original numeric templateItemId.
- *
- * Examples:
- *   "insp-1::42"  → 42
- *   "5::11"       → 11
- *   "42"          → 42  (already unscoped, defensive fallback)
+ * Extract a readable message from the standardized backend ErrorResponse
+ * ({ code, message, fieldErrors }). Falls back to the raw body when it is not
+ * the expected JSON shape, so the sync screen shows the real cause instead of a
+ * truncated timestamp blob.
  */
-export function extractTemplateItemId(scopedItemId: string): number {
-  const sep = scopedItemId.lastIndexOf('::');
-  const raw = sep !== -1 ? scopedItemId.slice(sep + 2) : scopedItemId;
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error(
-      `Cannot extract a valid templateItemId from "${scopedItemId}": got "${raw}".`,
-    );
+function describeError(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      code?: string;
+      message?: string;
+      fieldErrors?: { field: string; message: string }[];
+    };
+    const fields = parsed.fieldErrors?.length
+      ? ` (${parsed.fieldErrors.map((f) => `${f.field}: ${f.message}`).join(', ')})`
+      : '';
+    if (parsed.code || parsed.message) {
+      return `${parsed.code ?? ''} ${parsed.message ?? ''}${fields}`.trim();
+    }
+    return body;
+  } catch {
+    return body;
   }
-  return id;
 }
 
 export const evidenceUploadClient = new EvidenceUploadClient();

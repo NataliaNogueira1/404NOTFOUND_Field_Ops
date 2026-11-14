@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -10,6 +10,13 @@ import { useFieldOps } from '@/features/fieldops';
 import { ThemeSelector, useThemeColors } from '@/features/theme';
 import { useBiometricAuth } from '@/hooks';
 import { biometricStorage } from '@/infrastructure/storage/tokenStorage';
+import {
+  getNotificationSettings,
+  setNotificationsEnabled,
+  sendTestReminder,
+  type InspectionReminderInput,
+  type NotificationSettings,
+} from '@/infrastructure/notifications/localNotifications';
 
 function getInitials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
@@ -46,6 +53,68 @@ export default function ProfileScreen() {
       setIsTogglingBiometric(false);
     }
   }
+
+  // ─── Notifications toggle state (PBI-084) ──────────────────────────────────
+  const [notifications, setNotifications] = useState<NotificationSettings | null>(null);
+  const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
+
+  // Load current notification settings (preference + OS permission) on mount.
+  useEffect(() => {
+    void getNotificationSettings().then(setNotifications);
+  }, []);
+
+  function toReminderInputs(): InspectionReminderInput[] {
+    return inspections.map((insp) => ({
+      id: insp.id,
+      title: insp.title,
+      dueDate: insp.dueDate,
+      dueTime: insp.dueTime,
+      status: insp.status,
+    }));
+  }
+
+  async function handleNotificationsToggle(value: boolean) {
+    setIsTogglingNotifications(true);
+    try {
+      const next = await setNotificationsEnabled(value, toReminderInputs());
+      setNotifications(next);
+    } finally {
+      setIsTogglingNotifications(false);
+    }
+  }
+
+  // DEV-only: fire a sample local notification in ~5s to verify the pipeline.
+  async function handleSendTestReminder() {
+    const scheduled = await sendTestReminder(5);
+    Alert.alert(
+      scheduled ? 'Notificação de teste agendada' : 'Não foi possível agendar',
+      scheduled
+        ? 'Você receberá um lembrete de teste em alguns segundos.'
+        : 'Verifique a permissão de notificações e se o app roda em um build nativo (não Expo Go).',
+    );
+  }
+
+  const notificationsEnabled = notifications?.enabled ?? false;
+  const notificationsSupported = notifications?.supported ?? false;
+  // Permission was denied at the OS level and we can no longer prompt in-app.
+  const notificationsBlockedByOs =
+    notifications != null &&
+    notifications.enabled &&
+    notifications.supported &&
+    !notifications.permissionGranted &&
+    !notifications.canAskPermission;
+
+  const notificationsHint = notifications == null
+    ? 'Carregando...'
+    : !notificationsSupported
+      ? 'Indisponível neste ambiente (Expo Go/web). Gere um build para testar.'
+      : notificationsBlockedByOs
+        ? 'Permissão negada no sistema. Ative nas configurações do dispositivo.'
+        : notificationsEnabled
+          ? 'Ativado — você receberá lembretes de prazo das inspeções.'
+          : 'Desativado — nenhum lembrete de prazo será exibido.';
+
+  const notificationsLabel = 'Lembretes de prazo';
 
   // Whether the biometric row should be interactive
   const biometricAvailable =
@@ -94,6 +163,51 @@ export default function ProfileScreen() {
         <Card style={styles.card}>
           <Row label="Versão" value="1.0.0" />
           <Row label="Dispositivo" value="Expo Android" />
+        </Card>
+
+        {/* Notification settings (PBI-084) */}
+        <Card style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Notificações</Text>
+
+          <View
+            style={[styles.toggleRow, !notificationsSupported && styles.toggleRowDisabled]}
+            accessible
+            accessibilityRole="none"
+          >
+            <View style={styles.toggleText}>
+              <Text
+                style={[styles.toggleLabel, { color: notificationsSupported ? c.text : c.textSecondary }]}
+              >
+                {notificationsLabel}
+              </Text>
+              <Text style={[styles.toggleHint, { color: notificationsBlockedByOs ? c.danger : c.textSecondary }]}>
+                {notificationsHint}
+              </Text>
+            </View>
+
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={(v) => void handleNotificationsToggle(v)}
+              disabled={!notificationsSupported || isTogglingNotifications || notifications == null}
+              trackColor={{ false: c.gray200, true: Colors.primaryLight }}
+              thumbColor={notificationsEnabled ? Colors.primary : c.gray400}
+              accessibilityLabel={notificationsLabel}
+              accessibilityRole="switch"
+              accessibilityState={{
+                checked: notificationsEnabled,
+                disabled: !notificationsSupported || isTogglingNotifications,
+              }}
+            />
+          </View>
+
+          {__DEV__ && notificationsSupported ? (
+            <Button
+              label="Enviar notificação de teste (5s)"
+              onPress={() => void handleSendTestReminder()}
+              variant="secondary"
+              fullWidth
+            />
+          ) : null}
         </Card>
 
         {/* Security settings */}
@@ -196,8 +310,16 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: FontSize.sm },
   rowValue: { fontWeight: FontWeight.semibold },
 
-  // Security section
+  // Section titles (Notifications / Security)
   sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // Toggle rows (shared by Notifications and Security switches)
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  toggleRowDisabled: { opacity: 0.5 },
+  toggleText: { flex: 1, gap: 2 },
+  toggleLabel: { fontSize: FontSize.md, fontWeight: FontWeight.medium },
+  toggleHint: { fontSize: FontSize.xs, lineHeight: 16 },
+
   biometricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
   biometricRowDisabled: { opacity: 0.5 },
   biometricText: { flex: 1, gap: 2 },

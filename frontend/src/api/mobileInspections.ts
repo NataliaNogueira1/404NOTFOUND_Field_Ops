@@ -114,7 +114,7 @@ function normalizeSection(section: BackendTemplateSection): TemplateSection {
 function normalizeTemplate(template: BackendTemplate | null, fallbackId: string): InspectionTemplate {
   return {
     id: template?.id ?? fallbackId,
-    title: template?.title ?? 'Modelo de inspecao',
+    title: template?.title ?? 'Modelo de inspeção',
     category: template?.category ?? '',
     description: '',
     version: template?.version ?? 1,

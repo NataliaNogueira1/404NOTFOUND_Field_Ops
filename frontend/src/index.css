@@ -82,6 +82,21 @@
   .shadow-fieldops {
     box-shadow: var(--shadow-soft);
   }
+  /* Soft cross-fade for the rotating login tagline (PBI-274). Remounting the
+     element with a changing `key` replays the fade-in, so no JS opacity state
+     is needed. */
+  .animate-fade-in {
+    animation: fieldops-fade-in 0.5s ease-in-out;
+  }
+}
+
+@keyframes fieldops-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Native date/time inputs: in dark mode the browser's calendar-picker icon

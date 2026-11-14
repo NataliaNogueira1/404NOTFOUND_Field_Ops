@@ -74,7 +74,7 @@ describe('InspectionsPage', () => {
 
     // Aguarda carregamento terminar
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Sem dados na tabela
@@ -93,7 +93,7 @@ describe('InspectionsPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Com API offline, a tabela deve ficar vazia (sem fallback mock)
@@ -111,10 +111,30 @@ describe('InspectionsPage', () => {
 
     expect(await screen.findByText('Inspecao API')).not.toBeNull()
     expect(screen.getByText('Mostrando 1-1 de 1')).not.toBeNull()
+    // Coluna ID visível com o identificador legível da inspeção (task #336)
+    expect(screen.getByRole('columnheader', { name: /^id$/i })).toBeInTheDocument()
+    expect(screen.getByText('#9')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringMatching(/inspections\?.*sort=dueDate%2Cdesc.*status=ASSIGNED/),
       expect.anything(),
     )
+  })
+
+  it('envia o intervalo de datas da listagem como from e to', async () => {
+    const fetchMock = vi.fn(() => emptyPage())
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <MemoryRouter initialEntries={['/app/inspections?from=2026-10-10&to=2026-10-20']}>
+        <InspectionsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/inspections\?.*from=2026-10-10.*to=2026-10-20/),
+        expect.anything(),
+      )
+    })
   })
 
   it('cancela uma inspeção via API com o motivo informado e recarrega a lista', async () => {
@@ -152,7 +172,7 @@ describe('InspectionsPage', () => {
 
     await waitFor(() => expect(cancelBody).toEqual({ reason: 'Cliente solicitou reagendamento' }))
     expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/v1/inspections?'))).toHaveLength(2)
-    expect(await screen.findByText(/inspecao cancelada com sucesso/i)).not.toBeNull()
+    expect(await screen.findByText(/inspeção cancelada com sucesso/i)).not.toBeNull()
   })
 
   it('exibe erro de validação ao tentar cancelar com motivo menor que 10 caracteres', async () => {
@@ -235,11 +255,11 @@ describe('InspectionsPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.queryByText(/carregando inspecoes/i)).toBeNull()
+      expect(screen.queryByText(/carregando inspeções/i)).toBeNull()
     })
 
     // Os selects de técnico e cliente devem existir mas sem opções além de "Todos"
-    expect(screen.getByLabelText(/tecnico/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/técnico/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
   })
 })

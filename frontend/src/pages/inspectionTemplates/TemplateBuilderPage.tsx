@@ -54,7 +54,7 @@ export function TemplateBuilderPage() {
         setIsDraft(template.status === 'DRAFT')
         setSections(template.sections.map((section) => ({ ...section, items: orderedItems(section.items) })))
       })
-      .catch(() => setSaveError('Nao foi possivel carregar o modelo.'))
+      .catch(() => setSaveError('Não foi possível carregar o modelo.'))
   }, [id, persistedTemplate])
 
   async function saveDraft(showToast = true) {
@@ -69,7 +69,7 @@ export function TemplateBuilderPage() {
       }
       if (showToast) showSuccess()
     } catch {
-      setSaveError('Nao foi possivel salvar o rascunho.')
+      setSaveError('Não foi possível salvar o rascunho.')
     }
   }
 
@@ -93,7 +93,7 @@ export function TemplateBuilderPage() {
       setSectionDraft(null)
       showSuccess()
     } catch {
-      setSaveError('Nao foi possivel salvar a secao.')
+      setSaveError('Não foi possível salvar a seção.')
     }
   }
 
@@ -116,7 +116,7 @@ export function TemplateBuilderPage() {
       }
     } catch {
       setSections(original)
-      setSaveError('Nao foi possivel reordenar a secao.')
+      setSaveError('Não foi possível reordenar a seção.')
     }
   }
 
@@ -129,7 +129,7 @@ export function TemplateBuilderPage() {
       setDeletingSection(null)
       showSuccess()
     } catch {
-      setSaveError('Nao foi possivel excluir a secao.')
+      setSaveError('Não foi possível excluir a seção.')
     }
   }
 
@@ -152,7 +152,7 @@ export function TemplateBuilderPage() {
       }
     } catch {
       setSections(original)
-      setSaveError('Nao foi possivel reordenar o item.')
+      setSaveError('Não foi possível reordenar o item.')
     }
   }
 
@@ -184,7 +184,7 @@ export function TemplateBuilderPage() {
       setEditingItem(null)
       showSuccess()
     } catch {
-      setSaveError('Nao foi possivel salvar o item.')
+      setSaveError('Não foi possível salvar o item.')
     }
   }
 
@@ -205,7 +205,7 @@ export function TemplateBuilderPage() {
       setPublish(false)
       showSuccess()
     } catch {
-      setSaveError('Nao foi possivel publicar o modelo.')
+      setSaveError('Não foi possível publicar o modelo.')
     } finally {
       setPublishing(false)
     }
@@ -228,7 +228,7 @@ export function TemplateBuilderPage() {
             Modelos
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">{title || 'Modelo sem titulo'}</h1>
+            <h1 className="text-2xl font-semibold">{title || 'Modelo sem título'}</h1>
             <Badge tone={isDraft ? 'warning' : 'success'}>{isDraft ? 'Rascunho' : 'Ativo'}</Badge>
           </div>
         </div>
@@ -239,7 +239,7 @@ export function TemplateBuilderPage() {
               void saveDraft(false).then(() => navigate(`/app/inspection-templates/${id}/preview`))
             }}
           >
-            Previa
+            Prévia
           </Button>
           <Button
             variant="secondary"
@@ -258,9 +258,9 @@ export function TemplateBuilderPage() {
           className="flex flex-wrap items-center justify-between gap-3 border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark"
           role="alert"
         >
-          <p>O modelo possui {publicationIssues.length} pendencia(s) para publicacao.</p>
+          <p>O modelo possui {publicationIssues.length} pendência(s) para publicação.</p>
           <Button variant="secondary" onClick={() => setShowPublicationIssues(true)}>
-            Ver pendencias
+            Ver pendências
           </Button>
         </Card>
       )}
@@ -271,7 +271,7 @@ export function TemplateBuilderPage() {
       )}
       <Card className="grid gap-4 p-5 md:grid-cols-2">
         <Input
-          label="Titulo"
+          label="Título"
           id="tpl-title"
           maxLength={200}
           value={title}
@@ -287,7 +287,7 @@ export function TemplateBuilderPage() {
         />
         <div className="md:col-span-2">
           <Textarea
-            label="Descricao"
+            label="Descrição"
             id="tpl-description"
             value={description}
             disabled={!isDraft}
@@ -326,7 +326,7 @@ export function TemplateBuilderPage() {
           onClick={() => setSectionDraft({ id: '', title: '', description: '' })}
         >
           <Plus size={17} />
-          Adicionar secao
+          Adicionar seção
         </Button>
       </div>
       {sectionDraft && (
@@ -347,9 +347,9 @@ export function TemplateBuilderPage() {
       )}
       <ConfirmDialog
         open={Boolean(deletingSection)}
-        title="Excluir secao?"
-        description="Esta acao tambem exclui os itens vinculados a secao."
-        confirmLabel="Excluir secao"
+        title="Excluir seção?"
+        description="Esta ação também exclui os itens vinculados à seção."
+        confirmLabel="Excluir seção"
         variant="danger"
         onCancel={() => setDeletingSection(null)}
         onConfirm={() => void deleteSection()}
@@ -357,7 +357,7 @@ export function TemplateBuilderPage() {
       <ConfirmDialog
         open={publish}
         title="Publicar modelo?"
-        description="Ao publicar, a versao nao podera ser alterada. Continuar?"
+        description="Ao publicar, a versão não poderá ser alterada. Continuar?"
         confirmLabel="Continuar e publicar"
         onCancel={() => setPublish(false)}
         onConfirm={() => void publishTemplate()}
@@ -367,7 +367,7 @@ export function TemplateBuilderPage() {
         open={showPublicationIssues}
         onClose={() => setShowPublicationIssues(false)}
       />
-      <Toast show={toast} message="Alteracao salva com sucesso" />
+      <Toast show={toast} message="Alteração salva com sucesso" />
     </div>
   )
 }
@@ -401,7 +401,7 @@ function SectionCard({
     <Card className="p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase text-muted">Secao {index + 1}</p>
+          <p className="text-xs font-semibold uppercase text-muted">Seção {index + 1}</p>
           <h2 className="mt-1 text-lg font-semibold">{section.title}</h2>
           {section.description && <p className="mt-1 text-sm text-muted">{section.description}</p>}
         </div>
@@ -453,9 +453,9 @@ function SectionCard({
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge tone="primary">{responseTypeLabels[item.responseType]}</Badge>
                   <Badge tone="primary">Ordem {itemIndex + 1}</Badge>
-                  {item.required && <Badge tone="warning">Obrigatorio</Badge>}
-                  {item.requireObservationOnFailure && <Badge tone="danger">Observacao na falha</Badge>}
-                  {item.requireEvidenceOnFailure && <Badge tone="danger">Evidencia na falha</Badge>}
+                  {item.required && <Badge tone="warning">Obrigatório</Badge>}
+                  {item.requireObservationOnFailure && <Badge tone="danger">Observação na falha</Badge>}
+                  {item.requireEvidenceOnFailure && <Badge tone="danger">Evidência na falha</Badge>}
                 </div>
               </div>
               <div className="flex gap-1">
@@ -501,13 +501,13 @@ function SectionCard({
         ))}
         {section.items.length === 0 && (
           <p className="rounded-fieldops border border-dashed border-border p-4 text-sm text-muted">
-            Itens serao adicionados aqui.
+            Itens serão adicionados aqui.
           </p>
         )}
       </div>
       <Button variant="secondary" className="mt-4" disabled={!editable} onClick={onAddItem}>
         <Plus size={16} />
-        Adicionar item a secao
+        Adicionar item à seção
       </Button>
     </Card>
   )
@@ -526,7 +526,7 @@ function SectionModal({
   return (
     <Modal
       open
-      title={draft.id ? 'Editar secao' : 'Adicionar secao'}
+      title={draft.id ? 'Editar seção' : 'Adicionar seção'}
       onClose={onClose}
       footer={
         <>
@@ -534,21 +534,21 @@ function SectionModal({
             Cancelar
           </Button>
           <Button disabled={!form.title.trim()} onClick={() => onSave(form)}>
-            Salvar secao
+            Salvar seção
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="Titulo da secao"
+          label="Título da seção"
           id="section-title"
           maxLength={200}
           value={form.title}
           onChange={(event) => setForm({ ...form, title: event.target.value })}
         />
         <Textarea
-          label="Descricao da secao"
+          label="Descrição da seção"
           id="section-description"
           value={form.description ?? ''}
           onChange={(event) => setForm({ ...form, description: event.target.value })}
@@ -602,10 +602,10 @@ function swap<T>(values: T[], first: number, second: number) {
 const responseTypeLabels: Record<ResponseType, string> = {
   [ResponseType.TEXT_SHORT]: 'Texto curto',
   [ResponseType.TEXT_LONG]: 'Texto longo',
-  [ResponseType.NUMBER]: 'Numero',
-  [ResponseType.BOOLEAN]: 'Sim/Nao',
-  [ResponseType.CONFORMITY]: 'Conforme/Nao Conforme',
-  [ResponseType.SINGLE_CHOICE]: 'Selecao unica',
+  [ResponseType.NUMBER]: 'Número',
+  [ResponseType.BOOLEAN]: 'Sim/Não',
+  [ResponseType.CONFORMITY]: 'Conforme/Não Conforme',
+  [ResponseType.SINGLE_CHOICE]: 'Seleção única',
   [ResponseType.DATE]: 'Data',
 }
 
@@ -641,7 +641,7 @@ function ItemModal({
   const error = !draft.question.trim()
     ? 'Informe a pergunta do item.'
     : draft.responseType === ResponseType.SINGLE_CHOICE && !validOptions
-      ? 'Informe pelo menos duas opcoes.'
+      ? 'Informe pelo menos duas opções.'
       : ''
 
   function changeResponseType(responseType: ResponseType) {
@@ -690,14 +690,14 @@ function ItemModal({
     >
       <div className="space-y-4">
         <Input
-          label="Titulo (pergunta)"
+          label="Título (pergunta)"
           id="item-question"
           maxLength={500}
           value={draft.question}
           onChange={(event) => setDraft({ ...draft, question: event.target.value })}
         />
         <Textarea
-          label="Descricao (ajuda)"
+          label="Descrição (ajuda)"
           id="item-desc"
           maxLength={1000}
           value={draft.description ?? ''}
@@ -721,7 +721,7 @@ function ItemModal({
             checked={draft.required}
             onChange={(event) => setDraft({ ...draft, required: event.target.checked })}
           />
-          Item obrigatorio
+          Item obrigatório
         </label>
         <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm">
           <input
@@ -729,7 +729,7 @@ function ItemModal({
             checked={draft.requireObservationOnFailure}
             onChange={(event) => setDraft({ ...draft, requireObservationOnFailure: event.target.checked })}
           />
-          Observacao obrigatoria na falha
+          Observação obrigatória na falha
         </label>
         <label className="flex items-center gap-2 rounded-fieldops border border-border p-3 text-sm">
           <input
@@ -737,16 +737,16 @@ function ItemModal({
             checked={draft.requireEvidenceOnFailure}
             onChange={(event) => setDraft({ ...draft, requireEvidenceOnFailure: event.target.checked })}
           />
-          Evidencia obrigatoria na falha
+          Evidência obrigatória na falha
         </label>
         {draft.responseType === ResponseType.SINGLE_CHOICE && (
           <div className="space-y-3">
-            <p className="text-sm font-medium">Opcoes de resposta</p>
+            <p className="text-sm font-medium">Opções de resposta</p>
             {optionDrafts.map((option, index) => (
               <div key={option.id} className="flex items-end gap-2">
                 <div className="flex-1">
                   <Input
-                    label={`Opcao ${index + 1}`}
+                    label={`Opção ${index + 1}`}
                     id={`item-option-${option.id}`}
                     value={option.value}
                     onChange={(event) => changeOption(option.id, event.target.value)}
@@ -755,7 +755,7 @@ function ItemModal({
                 <Button
                   variant="ghost"
                   className="mb-0.5 px-2"
-                  aria-label={`Remover opcao ${index + 1}`}
+                  aria-label={`Remover opção ${index + 1}`}
                   onClick={() => removeOption(option.id)}
                 >
                   <Trash2 size={16} />
@@ -764,7 +764,7 @@ function ItemModal({
             ))}
             <Button variant="secondary" onClick={addOption}>
               <Plus size={16} />
-              Adicionar opcao
+              Adicionar opção
             </Button>
           </div>
         )}

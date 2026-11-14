@@ -84,6 +84,55 @@ class AdminCatalogListControllerTest {
                 .andExpect(jsonPath("$.totalPages").value(1));
     }
 
+    @Test
+    void listsInspectionsWithinAnInclusiveDueDateRange() throws Exception {
+        User technician = persistUser("Range Technician", Role.TECHNICIAN);
+        User supervisor = persistUser("Range Supervisor", Role.SUPERVISOR);
+        InspectionTemplate template = persistTemplate("Range Compressor", "Maintenance", true);
+        persistInspection(template, technician, supervisor, "Range start", "Range Client",
+                InspectionStatus.ASSIGNED, Priority.MEDIUM, LocalDate.of(2026, 10, 10));
+        persistInspection(template, technician, supervisor, "Range middle", "Range Client",
+                InspectionStatus.ASSIGNED, Priority.MEDIUM, LocalDate.of(2026, 10, 15));
+        persistInspection(template, technician, supervisor, "Range end", "Range Client",
+                InspectionStatus.ASSIGNED, Priority.MEDIUM, LocalDate.of(2026, 10, 20));
+        persistInspection(template, technician, supervisor, "Range outside", "Range Client",
+                InspectionStatus.ASSIGNED, Priority.MEDIUM, LocalDate.of(2026, 10, 21));
+
+        mockMvc.perform(get("/api/v1/inspections")
+                        .param("name", "range")
+                        .param("from", "2026-10-10")
+                        .param("to", "2026-10-20")
+                        .param("page", "0").param("size", "10").param("sort", "dueDate,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[0].title").value("Range start"))
+                .andExpect(jsonPath("$.content[1].title").value("Range middle"))
+                .andExpect(jsonPath("$.content[2].title").value("Range end"));
+
+        mockMvc.perform(get("/api/v1/inspections")
+                        .param("name", "range")
+                        .param("from", "2026-10-21")
+                        .param("page", "0").param("size", "10").param("sort", "dueDate,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Range outside"));
+
+        mockMvc.perform(get("/api/v1/inspections")
+                        .param("name", "range")
+                        .param("to", "2026-10-15")
+                        .param("page", "0").param("size", "10").param("sort", "dueDate,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Range start"))
+                .andExpect(jsonPath("$.content[1].title").value("Range middle"));
+
+        mockMvc.perform(get("/api/v1/inspections")
+                        .param("name", "range")
+                        .param("page", "0").param("size", "10").param("sort", "dueDate,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(4));
+    }
+
     private InspectionTemplate persistTemplate(String title, String category, boolean published) {
         User creator = userRepository.findByEmail("template.creator@example.com")
                 .orElseGet(() -> persistUser("Template Creator", Role.SUPERVISOR));

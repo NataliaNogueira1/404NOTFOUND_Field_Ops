@@ -24,11 +24,11 @@ describe('DataTable', () => {
     )
 
     expect(screen.getByText('Mostrando 11-20 de 42')).not.toBeNull()
-    expect(screen.getByText('Pagina 2 de 5')).not.toBeNull()
-    expect(screen.getByLabelText('Itens por pagina')).toHaveTextContent('10')
-    expect(screen.getByLabelText('Itens por pagina')).toHaveTextContent('25')
-    expect(screen.getByLabelText('Itens por pagina')).toHaveTextContent('50')
-    await userEvent.selectOptions(screen.getByLabelText('Itens por pagina'), '25')
+    expect(screen.getByText('Página 2 de 5')).not.toBeNull()
+    expect(screen.getByLabelText('Itens por página')).toHaveTextContent('10')
+    expect(screen.getByLabelText('Itens por página')).toHaveTextContent('25')
+    expect(screen.getByLabelText('Itens por página')).toHaveTextContent('50')
+    await userEvent.selectOptions(screen.getByLabelText('Itens por página'), '25')
     expect(changeSize).toHaveBeenCalledWith(25)
   })
 

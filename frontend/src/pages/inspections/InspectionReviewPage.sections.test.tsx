@@ -9,8 +9,8 @@ describe('InspectionReviewPage sections', () => {
   it('highlights non-conforming answers and offers navigation to each snapshot section', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(review), { headers: { 'Content-Type': 'application/json' } }))))
     render(<MemoryRouter initialEntries={['/app/inspections/1/review']}><Routes><Route path="/app/inspections/:id/review" element={<InspectionReviewPage />} /></Routes></MemoryRouter>)
-    expect(await screen.findByText('Resposta nao conforme: NON_CONFORMING')).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Navegacao por secao' })).toHaveTextContent('Seguranca')
+    expect(await screen.findByText('Resposta não conforme: NON_CONFORMING')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Navegação por seção' })).toHaveTextContent('Seguranca')
     expect(screen.getByRole('link', { name: 'Eletrica' })).toHaveAttribute('href', '#review-section-2')
   })
 })

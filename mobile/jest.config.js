@@ -25,9 +25,11 @@ const nodeProject = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    // expo-file-system ships untransformed ESM; the sync code only needs it for
-    // the photo upload, which tests mock. Map it to a CJS-friendly stub.
-    '^expo-file-system$': '<rootDir>/src/test-stubs/expoFileSystem.ts',
+    // The node project has no Expo runtime — mock the native modules imported
+    // transitively via EvidenceUploadClient (SecureStore for the token, and
+    // FileSystem for the multipart upload) so the sync modules load.
+    '^expo-secure-store$': '<rootDir>/jest/__mocks__/expo-secure-store.ts',
+    '^expo-file-system$': '<rootDir>/jest/__mocks__/expo-file-system.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
@@ -48,7 +50,7 @@ const expoModulesCoreDir = path.dirname(
 const componentsProject = {
   displayName: 'components',
   preset: 'jest-expo',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/app'],
   testMatch: ['**/__tests__/**/*.test.tsx'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

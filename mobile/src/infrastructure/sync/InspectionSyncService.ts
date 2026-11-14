@@ -1,7 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
-import { deterministicUuid, randomUuidV4 } from './uuid';
+import { randomUuidV4, stableUuidFromSeed } from './uuid';
+import { Severity } from '@/features/fieldops/types';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -90,12 +91,23 @@ interface ApiItem {
 /** Operation types accepted by the backend sync applicators (PBI-051, #223). */
 type SyncPushType = 'INSPECTION_STATUS' | 'ANSWER_UPSERT' | 'NON_CONFORMITY_CREATE';
 
-/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.).
- * inspectionId/itemId for content ops are numbers — matching the Long the backend expects. */
+/**
+ * One-shot GPS reading sent with a start/conclusion transition (PBI-045).
+ * Mirrors the backend {@code CapturedLocation}. Null/omitted when the technician
+ * opted out or was denied the permission (RN-059).
+ */
+interface SyncLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: string;
+}
+
+/** Type-specific payloads mirror the backend DTOs (AnswerUpsertPayload, etc.). */
 type SyncPushPayload =
-  | { inspectionId: string; status: string }
-  | { inspectionId: number | string; itemId: number | string; value: string; observation?: string }
-  | { inspectionId: number | string; itemId: number | string; title: string; description: string; severity: string };
+  | { inspectionId: string; status: string; location?: SyncLocation | null }
+  | { inspectionId: string; itemId: string; value: string; observation?: string }
+  | { inspectionId: string; itemId: string; title: string; description: string; severity: string };
 
 /** One operation in a sync batch. */
 interface SyncPushOperation {
@@ -182,10 +194,21 @@ export class InspectionSyncService {
   /**
    * Fetch inspections assigned to the current technician and store locally.
    * This is the main "download" operation.
+   *
+   * @param token        - Bearer access token.
+   * @param onAfterPull  - Optional async callback called with the downloaded
+   *                       inspections after they are persisted. Used to
+   *                       reschedule local deadline reminders (PBI-084) without
+   *                       coupling this service to the notifications module
+   *                       (keeps existing tests unaffected).
    */
-  async pullInspections(token: string): Promise<{ downloaded: number; errors: string[] }> {
+  async pullInspections(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{ downloaded: number; errors: string[] }> {
     const errors: string[] = [];
     let downloaded = 0;
+    const downloaded_inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }> = [];
 
     try {
       const apiInspections = await apiClient.get<ApiInspection[]>(
@@ -196,6 +219,13 @@ export class InspectionSyncService {
         try {
           await this.saveInspectionLocally(apiInsp);
           downloaded++;
+          downloaded_inspections.push({
+            id: apiInsp.id,
+            title: apiInsp.title,
+            dueDate: apiInsp.dueDate,
+            dueTime: apiInsp.dueTime,
+            status: apiInsp.status,
+          });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           errors.push(`[${apiInsp.id}] ${msg}`);
@@ -204,6 +234,16 @@ export class InspectionSyncService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
       errors.push(msg);
+    }
+
+    // Reschedule local deadline reminders after pull. Errors here must never
+    // break the sync result or surface to the user as sync failures (RN-041).
+    if (onAfterPull && downloaded_inspections.length > 0) {
+      try {
+        await onAfterPull(downloaded_inspections);
+      } catch {
+        // Notification scheduling failure is silently swallowed.
+      }
     }
 
     return { downloaded, errors };
@@ -381,46 +421,115 @@ export class InspectionSyncService {
     // Only operations whose dependencies are already applied are eligible: a
     // photo UPLOAD stays deferred while its answer op is still pending/failed
     // (RN-069). This is enforced by the sync worker, not just the UI.
-    const pending = await this.syncQueueRepo.getReady();
-    let sent = 0;
-    let failed = 0;
-    const errors: string[] = [];
+    //
+    // The loop drains the queue in dependency order: after an answer is applied
+    // and removed, its dependent evidence UPLOAD becomes ready in the next pass.
+    // Without the loop, a single sync would only send the answer and leave the
+    // evidence pending until the user manually syncs again.
+    let totalSent = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
 
-    for (const operation of pending) {
-      try {
-        await this.syncQueueRepo.markInProgress(operation.id);
-        await this.sendOperation(token, operation);
-        await this.syncQueueRepo.markSent(operation.id);
-        // For an evidence UPLOAD, success means the server confirmed APPLIED, so
-        // the evidence row is marked SYNCED (its file may now be released).
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markSyncedById(operation.entityId);
+    while (true) {
+      const pending = await this.syncQueueRepo.getReady();
+      if (pending.length === 0) break;
+
+      let sent = 0;
+      let failed = 0;
+      // Tracks whether a CONFLICT was auto-reconciled this pass (version refreshed
+      // and operation re-queued). Counts as progress so the drain loop runs
+      // another pass to resend it, even if nothing else was sent.
+      let reconciled = 0;
+      for (const operation of pending) {
+        try {
+          await this.syncQueueRepo.markInProgress(operation.id);
+          await this.sendOperation(token, operation);
+          await this.syncQueueRepo.markSent(operation.id);
+          // For an evidence UPLOAD, success means the server confirmed APPLIED, so
+          // the evidence row is marked SYNCED (its file may now be released).
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markSyncedById(operation.entityId);
+          }
+          sent++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          if (err instanceof VersionConflictError) {
+            // Auto-reconcile a stale-version conflict on an inspection transition
+            // (PBI-055): start+conclusion queued offline freeze baseVersion=0, so
+            // after the start bumps the server to v1 the conclusion is rejected
+            // (local=0, server=1). Pull the inspection to refresh the local
+            // serverVersion, rewrite the queued baseVersion and retry. Capped by
+            // attempts so a genuine, unresolvable conflict still ends terminal.
+            const reconciledOk = await this.tryReconcileConflict(token, operation);
+            if (reconciledOk) {
+              reconciled++;
+              continue;
+            }
+            await this.syncQueueRepo.markConflict(operation.id, msg);
+            allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
+            continue;
+          }
+          // Failure never deletes the file or the evidence: we only flag it FAILED
+          // and persist the error so the photo stays available for retry (RN-047).
+          await this.syncQueueRepo.markError(operation.id, msg);
+          if (operation.entityType === 'evidence') {
+            await this.evidenceRepo.markFailed(operation.entityId, msg);
+          }
+          failed++;
+          allErrors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
         }
-        sent++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        if (err instanceof VersionConflictError) {
-          await this.syncQueueRepo.markConflict(operation.id, msg);
-          errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
-          continue;
-        }
-        // Failure never deletes the file or the evidence: we only flag it FAILED
-        // and persist the error so the photo stays available for retry (RN-047).
-        await this.syncQueueRepo.markError(operation.id, msg);
-        if (operation.entityType === 'evidence') {
-          await this.evidenceRepo.markFailed(operation.entityId, msg);
-        }
-        failed++;
-        errors.push(`[${operation.entityType}:${operation.entityId}] ${msg}`);
       }
+
+      // Cleanup successfully sent operations after each pass so dependent
+      // operations become eligible in the next iteration.
+      if (sent > 0) {
+        await this.syncQueueRepo.removeSent();
+      }
+      totalSent += sent;
+      totalFailed += failed;
+
+      // Keep draining while real progress was made: either something was sent OR
+      // a conflict was reconciled and re-queued for another attempt. If neither
+      // happened, break to avoid an infinite loop (remaining ops stay for retry).
+      if (sent === 0 && reconciled === 0) break;
     }
 
-    // Cleanup successfully sent operations
-    if (sent > 0) {
-      await this.syncQueueRepo.removeSent();
+    return { sent: totalSent, failed: totalFailed, errors: allErrors };
+  }
+
+  // Max automatic retries for a version-conflicted inspection transition before
+  // it is left as a terminal CONFLICT for the technician to resolve. One retry
+  // covers the common start→conclusion case; the cap prevents an infinite loop
+  // when the server keeps advancing for another reason.
+  private static readonly MAX_CONFLICT_RETRIES = 2;
+
+  /**
+   * Try to auto-reconcile a version CONFLICT for an inspection transition by
+   * pulling the fresh server version and re-queuing the operation with it.
+   * Returns true when the operation was re-queued for retry, false when it
+   * should be marked as a terminal conflict (non-transition op, retry cap
+   * reached, or the pull/refresh did not yield a usable version).
+   */
+  private async tryReconcileConflict(
+    token: string,
+    operation: { id: string; entityType: string; entityId: string; attempts: number },
+  ): Promise<boolean> {
+    if (operation.entityType !== 'inspection') return false;
+    if (operation.attempts >= InspectionSyncService.MAX_CONFLICT_RETRIES) return false;
+
+    try {
+      // Refresh the local serverVersion from the server (saveInspectionLocally
+      // stores serverVersion = apiInsp.version).
+      await this.pullInspection(token, operation.entityId);
+    } catch {
+      return false;
     }
 
-    return { sent, failed, errors };
+    const fresh = await this.inspectionRepo.getById(operation.entityId);
+    if (!fresh || fresh.serverVersion === undefined) return false;
+
+    await this.syncQueueRepo.requeueWithBaseVersion(operation.id, fresh.serverVersion);
+    return true;
   }
 
   private async sendOperation(
@@ -472,7 +581,10 @@ export class InspectionSyncService {
       responseId?: string;
       uri?: string;
       description?: string;
-      capturedAt?: string; // vem do enqueueEvidence (evidence.capturedAt)
+      capturedAt: string;
+      // Optional: legacy outbox rows enqueued before the operationId was added
+      // to the evidence payload (d64ece8) have no value here.
+      operationId?: string;
     },
   ): Promise<void> {
     // Prefer the freshest URI from the DB (retry reuses the persisted file).
@@ -482,23 +594,26 @@ export class InspectionSyncService {
       throw new Error('Evidence has no local file to upload.');
     }
 
-    // The backend requires a UUID idempotency key. Derive it from the stable
-    // outbox id so every retry/resend of this photo carries the same key and the
-    // server never stores a second evidence (RN-068, issue #229).
-    const outboxOperationId = deterministicUuid(
-      InspectionSyncService.evidenceOperationId(evidenceId),
-    );
+    // A legacy row may lack operationId, which the backend requires
+    // (VALIDATION_ERROR "operationId is required"). Derive a STABLE id from the
+    // evidence id so every resend of this photo maps to the same server
+    // operation and never duplicates (RN-068). New rows keep their own id.
+    const operationId = payload.operationId ?? stableUuidFromSeed(evidenceId);
 
+    // The backend also requires capturedAtDevice; fall back to the stored
+    // evidence capture time, then to "now", so a legacy row missing it in the
+    // payload still uploads instead of failing validation.
+    const capturedAtDevice = payload.capturedAt ?? evidence?.capturedAt ?? new Date().toISOString();
+
+    // Unscope defensively at send time too: legacy rows persisted a scoped
+    // itemId that the backend cannot parse as a Long. Idempotent for new rows.
     await evidenceUploadClient.upload(token, {
       inspectionId: payload.inspectionId,
-      itemId: payload.itemId,
-      // capturedAt: required by backend — prefer payload, fallback to DB, then now (RN-074).
-      capturedAt: payload.capturedAt ?? evidence?.capturedAt ?? new Date().toISOString(),
-      operationId: outboxOperationId,
+      itemId: unscopeItemId(payload.itemId),
       localUri,
       description: payload.description,
-      // TODO(#229): Evidence entity does not have latitude/longitude yet.
-      // Pass them here when GPS capture per evidence is implemented (EP-08).
+      capturedAtDevice,
+      operationId,
     });
   }
 
@@ -512,7 +627,7 @@ export class InspectionSyncService {
   private async pushInspectionStatus(
     token: string,
     inspectionId: string,
-    payload: { operationId?: string; status: string; baseVersion?: number },
+    payload: { operationId?: string; status: string; baseVersion?: number; location?: SyncLocation | null },
   ): Promise<void> {
     // Tolerate a missing baseVersion instead of throwing. Legacy outbox rows
     // enqueued before PBI-055 (server version tracking) have no baseVersion;
@@ -528,7 +643,10 @@ export class InspectionSyncService {
           type: 'INSPECTION_STATUS',
           baseVersion: payload.baseVersion ?? 0,
           dependencyIds: [],
-          payload: { inspectionId, status: payload.status },
+          // Carry the one-shot GPS location so the server persists it with the
+          // transition (PBI-045). `?? null` keeps the field present and explicit
+          // when the technician skipped or was denied the capture (RN-059).
+          payload: { inspectionId, status: payload.status, location: payload.location ?? null },
         },
       ],
     };
@@ -564,9 +682,12 @@ export class InspectionSyncService {
       baseVersion: payload.baseVersion,
       type: 'ANSWER_UPSERT',
       payload: {
-        // Backend AnswerUpsertPayload expects Long — send as JSON numbers, not strings.
-        inspectionId: toBackendId(payload.inspectionId),
-        itemId: toBackendId(payload.itemId),
+        inspectionId: payload.inspectionId,
+        // Unscope defensively at send time too: legacy outbox rows enqueued
+        // before the unscope fix (c7ae390) persisted a scoped id (e.g. "5::1"),
+        // which the backend cannot parse as a Long. unscopeItemId is idempotent,
+        // so already-unscoped payloads pass through unchanged.
+        itemId: unscopeItemId(payload.itemId),
         value: serializeAnswerValue(payload.value),
         observation: payload.observation,
       },
@@ -588,9 +709,11 @@ export class InspectionSyncService {
       baseVersion: payload.baseVersion,
       type: 'NON_CONFORMITY_CREATE',
       payload: {
-        // Backend NonConformityCreatePayload expects Long — send as JSON numbers.
-        inspectionId: toBackendId(payload.inspectionId),
-        itemId: toBackendId(payload.itemId),
+        inspectionId: payload.inspectionId,
+        // Unscope defensively at send time (see pushAnswer): legacy NC rows
+        // enqueued before c7ae390 kept a scoped itemId that the backend rejects
+        // with "Invalid NON_CONFORMITY_CREATE payload". Idempotent for new rows.
+        itemId: unscopeItemId(payload.itemId),
         title: payload.title,
         description: payload.description,
         severity: payload.severity,
@@ -651,8 +774,14 @@ export class InspectionSyncService {
 
   /**
    * Perform a full sync cycle: push pending operations, then pull latest data.
+   *
+   * @param onAfterPull  - Optional callback forwarded to {@link pullInspections}
+   *                       for rescheduling local deadline reminders (PBI-084).
    */
-  async fullSync(token: string): Promise<{
+  async fullSync(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{
     pulled: number;
     pushed: number;
     errors: string[];
@@ -665,27 +794,39 @@ export class InspectionSyncService {
 
     // Then pull server-side updates incrementally by cursor (PBI-053). With no
     // local cursor this does the initial full pull; with one it only fetches the
-    // delta (new inspections, reviews, cancellations).
-    //
-    // `pullInspections` (the legacy full-pull) is the fallback whenever
-    // `pullChanges` produces ANY error — not only on first sync. This covers the
-    // case where the server rejects the stored cursor (422 INVALID_CURSOR) or
-    // when the incremental endpoint is temporarily unavailable. The full-pull
-    // result replaces the incremental errors so the user sees a successful sync
-    // if the fallback succeeds (RN-072).
+    // delta (new inspections, reviews, cancellations). `pullInspections` is kept
+    // as a recovery fallback: if the incremental pull failed AND we have never
+    // stored a cursor (so there is nothing local to lose), fall back to the plain
+    // full pull so a first-run sync still populates the device.
     const pullResult = await this.pullChanges(token);
+    errors.push(...pullResult.errors);
     let pulled = pullResult.downloaded;
 
-    if (pullResult.errors.length > 0) {
+    if (pullResult.errors.length > 0 && (await this.metadataRepo.getPullCursor()) === null) {
       const fallback = await this.pullInspections(token);
-      if (fallback.errors.length === 0) {
-        // Fallback succeeded — discard the incremental errors (RN-072).
-        pulled += fallback.downloaded;
-      } else {
-        // Both failed — report all errors.
-        errors.push(...pullResult.errors);
-        errors.push(...fallback.errors);
-        pulled += fallback.downloaded;
+      errors.push(...fallback.errors);
+      pulled += fallback.downloaded;
+    }
+
+    // Reschedule local deadline reminders (PBI-084) after the incremental pull.
+    // `pullChanges` only returns a change count, so we read the current state
+    // from SQLite (the source of truth, already reflecting this pull's updates
+    // — new inspections, due-date changes, cancellations) and hand it to the
+    // callback. Failures here must never break the sync result (RN-041).
+    if (onAfterPull) {
+      try {
+        const all = await this.inspectionRepo.getAll();
+        await onAfterPull(
+          all.map((i) => ({
+            id: i.id,
+            title: i.title,
+            dueDate: i.dueDate,
+            dueTime: i.dueTime,
+            status: i.status,
+          })),
+        );
+      } catch {
+        // Notification scheduling failure is silently swallowed.
       }
     }
 
@@ -778,6 +919,7 @@ export class InspectionSyncService {
         uri: evidence.uri,
         description: evidence.description,
         capturedAt: evidence.capturedAt,
+        operationId: randomUuidV4(),
       },
       dependencyIds,
     );
@@ -799,11 +941,18 @@ export class InspectionSyncService {
   /**
    * Enqueue a non-conformity to be synced later.
    */
-  async enqueueNonConformity(nc: NonConformity): Promise<void> {
+  async enqueueNonConformity(nc: NonConformity, knownEvidenceDependencies: string[] = []): Promise<void> {
     const id = `nc-${nc.id}`;
     // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
     // conflict detection (PBI-055), mirroring enqueueAnswer.
     const inspection = await this.inspectionRepo.getById(nc.inspectionId);
+    const evidence = nc.severity === Severity.CRITICAL ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId) : [];
+    const knownDependencies = nc.severity === Severity.CRITICAL ? knownEvidenceDependencies : [];
+    const dependencyIds = [...new Set([
+      ...evidence.filter((entry) => entry.syncStatus !== 'synced')
+        .map((entry) => entry.operationId ?? InspectionSyncService.evidenceOperationId(entry.id)),
+      ...knownDependencies,
+    ])];
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
@@ -813,85 +962,80 @@ export class InspectionSyncService {
       description: nc.description,
       severity: nc.severity,
       baseVersion: inspection?.serverVersion ?? 0,
-    });
-  }
-
-  /**
-   * Stable outbox id for the IN_PROGRESS transition of a given inspection.
-   * Using a deterministic id (no timestamp) means:
-   *   1. The SUBMITTED operation can declare it as a dependencyId, guaranteeing
-   *      the server processes IN_PROGRESS before SUBMITTED (fixes the
-   *      "Illegal transition from ASSIGNED to SUBMITTED" error).
-   *   2. Retries reuse the same row instead of creating duplicates (RN-068).
-   */
-  static transitionOperationId(inspectionId: string): string {
-    return `transition-${inspectionId}`;
+    }, dependencyIds);
   }
 
   /**
    * Enqueue a status change to be synced later.
-   *
-   * When status is SUBMITTED the outbox row declares the IN_PROGRESS transition
-   * as a dependency so the server always receives IN_PROGRESS first (RN-069).
-   * This prevents the "Illegal transition from ASSIGNED to SUBMITTED" error that
-   * occurred when both operations were enqueued together and processed out of
-   * order due to SQLite's second-granularity created_at timestamps.
+   * For SUBMITTED transitions, also carries the technician's signature URI
+   * (PBI-086) so it can be relayed to the server during sync.
    */
   async enqueueStatusChange(inspectionId: string, status: string): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
-    const id = `status-${inspectionId}-${status}`;
-
-    // SUBMITTED must wait for IN_PROGRESS to be confirmed on the server first.
-    // Declare the deterministic transition id as a dependency so getReady()
-    // defers SUBMITTED until the transition row is no longer in the queue.
-    const dependencyIds =
-      status === 'SUBMITTED'
-        ? [InspectionSyncService.transitionOperationId(inspectionId)]
-        : [];
-
-    await this.syncQueueRepo.enqueue(
-      id,
-      'UPDATE',
-      'inspection',
-      inspectionId,
-      {
-        status,
-        baseVersion: inspection.serverVersion ?? 0,
-      },
-      dependencyIds,
-    );
+    const id = `status-${inspectionId}-${Date.now()}`;
+    await this.syncQueueRepo.enqueue(id, 'UPDATE', 'inspection', inspectionId, {
+      operationId: randomUuidV4(),
+      status,
+      baseVersion: inspection.serverVersion ?? 0,
+      // Include the signature (if any) so the server can store it once the
+      // conclusion transition is applied (PBI-086). Other transitions ignore it.
+      ...(status === 'SUBMITTED' && inspection.signatureUri
+        ? { signatureUri: inspection.signatureUri }
+        : {}),
+    });
   }
 
   /**
    * Enqueue an inspection TRANSITION (e.g. start → IN_PROGRESS) into the outbox,
-   * carrying the device timestamp and the optional start location (PBI-034).
-   *
-   * The outbox id is deterministic (`transition-<inspectionId>`) so the SUBMITTED
-   * operation can safely declare it as a dependency (see enqueueStatusChange).
-   * INSERT OR REPLACE semantics in enqueue() mean retries reuse the same row
-   * without creating duplicates (RN-068).
+   * carrying the device timestamp and the optional start location (PBI-034). The
+   * location now travels in the batch payload and is persisted server-side
+   * (PBI-045); it is null when the technician opted out or was denied (RN-059).
    */
   async enqueueTransition(
     inspectionId: string,
     input: {
       status: string;
       startedAtDevice: string;
-      location: { latitude: number; longitude: number; accuracy?: number } | null;
+      location: SyncLocation | null;
     },
   ): Promise<void> {
     const inspection = await this.requireInspection(inspectionId);
-    // Deterministic id — no timestamp — so the SUBMITTED dependency always resolves.
-    const id = InspectionSyncService.transitionOperationId(inspectionId);
+    const id = `transition-${inspectionId}-${Date.now()}`;
     // operationId is the server-side idempotency key (PBI-052): a stable UUID kept
     // in the payload so a resend of this same outbox row never applies twice.
-    // startedAtDevice/location are kept locally for now; the batch endpoint only
-    // consumes {inspectionId, status} today — location persistence is PBI-045.
     await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
       operationId: randomUuidV4(),
       status: input.status,
       baseVersion: inspection.serverVersion ?? 0,
       startedAtDevice: input.startedAtDevice,
       location: input.location,
+    });
+  }
+
+  /**
+   * Enqueue an inspection CONCLUSION transition (IN_PROGRESS → SUBMITTED) into
+   * the outbox, carrying the device timestamp and the optional conclusion
+   * location (PBI-040 / PBI-045). Location is null when the technician was
+   * denied or opted out of the capture (RN-059).
+   */
+  async enqueueConclusion(
+    inspectionId: string,
+    input: {
+      endedAtDevice: string;
+      location: SyncLocation | null;
+    },
+  ): Promise<void> {
+    const inspection = await this.requireInspection(inspectionId);
+    const id = `conclusion-${inspectionId}-${Date.now()}`;
+    await this.syncQueueRepo.enqueue(id, 'TRANSITION', 'inspection', inspectionId, {
+      operationId: randomUuidV4(),
+      status: 'SUBMITTED',
+      baseVersion: inspection.serverVersion ?? 0,
+      endedAtDevice: input.endedAtDevice,
+      location: input.location,
+      // Relay the technician's signature captured at conclusion (PBI-086) so it
+      // is not lost now that the conclusion uses its own outbox operation.
+      ...(inspection.signatureUri ? { signatureUri: inspection.signatureUri } : {}),
     });
   }
 
@@ -926,21 +1070,4 @@ function serializeAnswerValue(value: ChecklistValue): string {
 function unscopeItemId(scopedItemId: string): string {
   const separator = scopedItemId.indexOf('::');
   return separator === -1 ? scopedItemId : scopedItemId.slice(separator + 2);
-}
-
-/**
- * Converts a string id to a JSON number for backend DTOs that expect Long
- * (AnswerUpsertPayload, NonConformityCreatePayload, EvidenceCreatePayload).
- * The backend's Jackson deserializer accepts both numeric JSON values and
- * string-encoded numbers, but sending an actual number is safer and avoids
- * the 500 that occurs when Jackson tries to coerce a non-numeric string
- * (e.g. "insp-1") to Long.
- *
- * Returns the numeric value when the string is a valid integer, or the
- * original string as a fallback (so test ids like "insp-1" still work in
- * unit tests without hitting a real backend).
- */
-function toBackendId(id: string): number | string {
-  const n = Number(id);
-  return Number.isInteger(n) && n > 0 ? n : id;
 }

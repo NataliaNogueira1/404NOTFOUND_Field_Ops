@@ -1,10 +1,11 @@
-﻿import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
+﻿import { useEffect, useState } from 'react';
+import { Animated, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput as RNTextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { Button, Card, TextInput } from '@/design-system';
-import { useAuth } from '@/features/auth';
+import { LOGIN_PHRASES, LOGIN_PHRASE_INTERVAL_MS, useAuth, useRotatingPhrase } from '@/features/auth';
 import { ThemeToggle, useThemeColors } from '@/features/theme';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 
@@ -76,10 +77,48 @@ function PasswordInput({
   );
 }
 
+// ─── Rotating motivational subtitle (PBI-274) ─────────────────────────────────
+
+/**
+ * Shows a motivational phrase that rotates every few seconds with a smooth
+ * cross-fade. The timing lives in useRotatingPhrase (interval cleaned up on
+ * unmount); this component only animates the opacity when the active phrase
+ * changes. Works in light and dark mode via useThemeColors.
+ */
+function RotatingSubtitle() {
+  const c = useThemeColors();
+  const index = useRotatingPhrase(LOGIN_PHRASES.length, LOGIN_PHRASE_INTERVAL_MS);
+  // Lazy state initializer creates the Animated.Value once; it is a stable
+  // render value, so the lint rule against reading refs during render is moot.
+  const [opacity] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    // Fade out then back in whenever the phrase changes, for a soft transition.
+    opacity.setValue(0);
+    const animation = Animated.timing(opacity, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [index, opacity]);
+
+  return (
+    <Animated.Text
+      style={[styles.subtitle, { color: c.textSecondary, opacity }]}
+      accessibilityLiveRegion="polite"
+    >
+      {LOGIN_PHRASES[index]}
+    </Animated.Text>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
+  const router = useRouter();
   const c = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -115,9 +154,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
         <Image source={fieldOpsLogo} style={styles.brandMark} accessibilityLabel="FieldOps" />
         <Text style={[styles.title, { color: c.text }]}>FieldOps</Text>
-        <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          Tudo pronto para sua proxima inspecao
-        </Text>
+        <RotatingSubtitle />
         <Card style={styles.form} shadow="md">
           <TextInput
             label="E-mail"
@@ -136,7 +173,13 @@ export default function LoginScreen() {
           />
           {!!error && <Text style={styles.error}>{error}</Text>}
           <Button label="Entrar" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
-          <Pressable><Text style={styles.link}>Esqueceu a senha?</Text></Pressable>
+          <Pressable
+            onPress={() => router.push('/(public)/forgot-password')}
+            accessibilityRole="button"
+            accessibilityLabel="Esqueceu a senha?"
+          >
+            <Text style={styles.link}>Esqueceu a senha?</Text>
+          </Pressable>
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>

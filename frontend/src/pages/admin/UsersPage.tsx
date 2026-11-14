@@ -48,7 +48,7 @@ export function UsersPage() {
       setTotalElements(result.totalElements)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch (cause) {
-      setError(messageFor(cause, 'Nao foi possivel carregar os usuarios.'))
+      setError(messageFor(cause, 'Não foi possível carregar os usuários.'))
     } finally {
       setLoading(false)
     }
@@ -65,7 +65,7 @@ export function UsersPage() {
     if (creating) await usersApi.create(input)
     else await usersApi.update(editing.id, input)
     setEditing(null)
-    showToast(creating ? 'Usuario criado com sucesso.' : 'Usuario atualizado com sucesso.')
+    showToast(creating ? 'Usuário criado com sucesso.' : 'Usuário atualizado com sucesso.')
     await loadUsers()
   }
 
@@ -75,10 +75,10 @@ export function UsersPage() {
     try {
       await usersApi.updateStatus(changingStatus.id, next)
       setChangingStatus(null)
-      showToast(next === UserStatus.ACTIVE ? 'Usuario ativado com sucesso.' : 'Usuario inativado com sucesso.')
+      showToast(next === UserStatus.ACTIVE ? 'Usuário ativado com sucesso.' : 'Usuário inativado com sucesso.')
       await loadUsers()
     } catch (cause) {
-      setError(messageFor(cause, 'Nao foi possivel alterar o status.'))
+      setError(messageFor(cause, 'Não foi possível alterar o status.'))
       setChangingStatus(null)
     }
   }
@@ -94,7 +94,7 @@ export function UsersPage() {
     { header: 'Perfil', sortKey: 'role', cell: (user) => <RoleBadge role={user.role} /> },
     { header: 'Status', sortKey: 'status', cell: (user) => <UserStatusBadge status={user.status} /> },
     {
-      header: 'Acoes',
+      header: 'Ações',
       cell: (user) => (
         <div className="flex gap-2">
           <Button
@@ -121,12 +121,12 @@ export function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Usuarios"
-        description="Gerencie os usuarios e permissoes da plataforma."
+        title="Usuários"
+        description="Gerencie os usuários e permissões da plataforma."
         action={
           <Button onClick={() => setEditing('new')}>
             <Plus size={17} />
-            Novo usuario
+            Novo usuário
           </Button>
         }
       />
@@ -166,7 +166,7 @@ export function UsersPage() {
         columns={columns}
         rows={rows}
         loading={loading}
-        loadingLabel="Carregando usuarios..."
+        loadingLabel="Carregando usuários..."
         page={list.page + 1}
         pageSize={list.size}
         totalRows={totalElements}
@@ -184,11 +184,11 @@ export function UsersPage() {
       />
       <ConfirmDialog
         open={Boolean(changingStatus)}
-        title={changingStatus?.status === UserStatus.ACTIVE ? 'Inativar usuario' : 'Ativar usuario'}
+        title={changingStatus?.status === UserStatus.ACTIVE ? 'Inativar usuário' : 'Ativar usuário'}
         description={
           changingStatus?.status === UserStatus.ACTIVE
-            ? `O usuario ${changingStatus?.name} perdera o acesso ao sistema.`
-            : `O usuario ${changingStatus?.name} voltara a ter acesso ao sistema.`
+            ? `O usuário ${changingStatus?.name} perderá o acesso ao sistema.`
+            : `O usuário ${changingStatus?.name} voltará a ter acesso ao sistema.`
         }
         confirmLabel={changingStatus?.status === UserStatus.ACTIVE ? 'Inativar' : 'Ativar'}
         variant={changingStatus?.status === UserStatus.ACTIVE ? 'danger' : 'primary'}
@@ -224,12 +224,12 @@ function UserModal({
   const nameError = !draft.name.trim()
     ? 'Informe o nome.'
     : draft.name.trim().length > 100
-      ? 'Use no maximo 100 caracteres.'
+      ? 'Use no máximo 100 caracteres.'
       : ''
   const formatEmailError = !draft.email.trim()
     ? 'Informe o e-mail.'
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
-      ? 'Informe um e-mail valido.'
+      ? 'Informe um e-mail válido.'
       : ''
   const passwordError =
     creating && !draft.password
@@ -243,9 +243,9 @@ function UserModal({
     if (formatEmailError) return
     try {
       const available = await usersApi.emailAvailable(draft.email.trim(), editingId)
-      setEmailError(available ? '' : 'Este e-mail ja esta em uso.')
+      setEmailError(available ? '' : 'Este e-mail já está em uso.')
     } catch (cause) {
-      setEmailError(messageFor(cause, 'Nao foi possivel validar o e-mail.'))
+      setEmailError(messageFor(cause, 'Não foi possível validar o e-mail.'))
     }
   }
 
@@ -262,7 +262,7 @@ function UserModal({
         password: draft.password || undefined,
       })
     } catch (cause) {
-      setSubmitError(messageFor(cause, 'Nao foi possivel salvar o usuario.'))
+      setSubmitError(messageFor(cause, 'Não foi possível salvar o usuário.'))
     } finally {
       setSaving(false)
     }
@@ -271,7 +271,7 @@ function UserModal({
   return (
     <Modal
       open
-      title={creating ? 'Novo usuario' : 'Editar usuario'}
+      title={creating ? 'Novo usuário' : 'Editar usuário'}
       onClose={onClose}
       footer={
         <>
@@ -344,7 +344,7 @@ function UserModal({
 function messageFor(cause: unknown, fallback: string) {
   if (cause instanceof ApiError) {
     if (cause.fieldErrors.length) return cause.fieldErrors.map((error) => error.message).join(' ')
-    if (cause.message === 'Email is already in use') return 'Este e-mail ja esta em uso.'
+    if (cause.message === 'Email is already in use') return 'Este e-mail já está em uso.'
   }
   return fallback
 }

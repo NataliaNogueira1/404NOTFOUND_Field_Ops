@@ -39,7 +39,9 @@ public class MobileInspectionController {
         this.service = service;
     }
 
-    @Operation(summary = "List inspections assigned to the authenticated technician")
+    @Operation(summary = "List inspections assigned to the authenticated technician, including canceled ones",
+            description = "Returns ASSIGNED, IN_PROGRESS, REJECTED, and CANCELED inspections ordered by due date and time. "
+                    + "Cancellation audit fields are included when present.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Inspections with template snapshot"),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
@@ -77,7 +79,9 @@ public class MobileInspectionController {
     public ResponseEntity<MobileStatusUpdateResponse> updateStatus(@PathVariable Long id,
             @Valid @RequestBody MobileStatusUpdateRequest request,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(
-                service.updateStatus(id, request.operationId(), request.status(), request.baseVersion(), user.getId()));
+        // This single-status endpoint carries no location; the batch /sync/push path
+        // is the one that transports the captured GPS location (PBI-045).
+        return ResponseEntity.ok(service.updateStatus(id, request.operationId(), request.status(),
+                request.baseVersion(), user.getId(), null));
     }
 }

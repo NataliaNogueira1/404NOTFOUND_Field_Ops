@@ -138,7 +138,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <div className="rounded-full bg-primary/20 p-6">
                 <ZoomIn size={48} className="text-primary-light" />
               </div>
-              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.loadError ? 'Nao foi possivel carregar a evidencia.' : 'Evidencia indisponivel'}</p>
+              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.loadError ? 'Não foi possível carregar a evidência.' : 'Evidência indisponível'}</p>
             </div>
           )}
         </div>
@@ -146,7 +146,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
         {/* Next button */}
         {photos.length > 1 && (
           <button
-            aria-label="Proxima foto"
+            aria-label="Próxima foto"
             onClick={next}
             style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: 'rgba(0,0,0,0.4)', border: 'none', borderRadius: '50%', padding: '8px', color: 'white', cursor: 'pointer' }}
           >
@@ -168,8 +168,8 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <span>{formatDate(photo.capturedAt)}</span>
             </span>
           )}
-          <span className="flex items-center gap-1.5"><MapPin size={14} className="shrink-0 text-primary-light" /><span>{photo.location ?? 'Localizacao nao informada'}</span></span>
-          {photo.description && <span className="flex items-center gap-1.5"><span className="font-medium text-white/80">Descricao:</span><span>{photo.description}</span></span>}
+          <span className="flex items-center gap-1.5"><MapPin size={14} className="shrink-0 text-primary-light" /><span>{photo.location ?? 'Localização não informada'}</span></span>
+          {photo.description && <span className="flex items-center gap-1.5"><span className="font-medium text-white/80">Descrição:</span><span>{photo.description}</span></span>}
         </div>
       </div>
 
@@ -191,7 +191,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               {!thumbnail.loadError && (thumbnail.src.startsWith('http') || thumbnail.src.startsWith('blob') || thumbnail.src.startsWith('data')) ? (
                 <img src={thumbnail.src} alt={thumbnail.item} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">Indisponivel</div>
+                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">Indisponível</div>
               )}
             </button>
           ))}

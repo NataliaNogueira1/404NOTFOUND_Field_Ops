@@ -28,7 +28,7 @@ export function useTechnicianInspections(): TechnicianInspectionsResult {
       setState({ type: 'ready', inspections })
     } catch (error) {
       const message =
-        error instanceof ApiError ? error.message : 'Nao foi possivel carregar as inspecoes.'
+        error instanceof ApiError ? error.message : 'Não foi possível carregar as inspeções.'
       setState({ type: 'error', message })
     }
   }, [])

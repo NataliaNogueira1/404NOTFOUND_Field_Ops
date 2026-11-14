@@ -75,7 +75,7 @@ describe('Lightbox', () => {
     render(<Lightbox photos={photos} initialIndex={1} onClose={() => {}} />)
     expect(getMainPhoto().alt).toBe('Botao de emergencia')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Proxima foto' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima foto' }))
 
     expect(getMainPhoto().alt).toBe('Painel eletrico')
   })
@@ -163,7 +163,7 @@ describe('Lightbox', () => {
     render(<Lightbox photos={photos} initialIndex={2} onClose={() => {}} />)
     expect(getMainPhoto().alt).toBe('Painel eletrico')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Proxima foto' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima foto' }))
 
     expect(getMainPhoto().alt).toBe('Extintor de incendio')
   })
@@ -172,7 +172,7 @@ describe('Lightbox', () => {
     render(<Lightbox photos={[photos[0]]} initialIndex={0} onClose={() => {}} />)
 
     expect(screen.queryByRole('button', { name: 'Foto anterior' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Proxima foto' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Próxima foto' })).toBeNull()
     expect(getMainPhoto().alt).toBe('Extintor de incendio')
   })
 })

@@ -47,12 +47,38 @@ export interface Inspection {
   startLongitude?: number;
   /** GPS accuracy (in metres) captured when the inspection was started. */
   startAccuracy?: number;
+  /** GPS latitude captured when the inspection was concluded (PBI-045). */
+  endLatitude?: number;
+  /** GPS longitude captured when the inspection was concluded (PBI-045). */
+  endLongitude?: number;
+  /** GPS accuracy (in metres) captured when the inspection was concluded. */
+  endAccuracy?: number;
   /** Supervisor's reason when the inspection was REJECTED. */
   rejectionReason?: string;
   /** Who rejected the inspection (supervisor name). */
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /**
+   * SVG data URI (base64) or local file path of the technician's handwritten
+   * signature captured at conclusion (PBI-086).
+   */
+  signatureUri?: string;
+  /**
+   * Raw strokes serialised as JSON for the on-device SignaturePreview (issue #334).
+   * React Native's <Image> cannot decode SVG data URIs, so the preview component
+   * redraws the strokes directly instead of using signatureUri.
+   */
+  signatureStrokes?: string;
+  /** Canvas width at capture time, needed to scale the preview correctly. */
+  signatureWidth?: number;
+  /** Canvas height at capture time, needed to scale the preview correctly. */
+  signatureHeight?: number;
+  /**
+   * When true, the conclusion flow requires a non-empty signature before
+   * submitting (PBI-086, configurable per inspection template).
+   */
+  signatureRequired?: boolean;
 }
 export interface Evidence {
   id: string;

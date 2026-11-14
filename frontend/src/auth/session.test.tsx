@@ -62,11 +62,11 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'carlos@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), '123456')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), '123456')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     // The technician portal is a lazy-loaded route, so give the chunk time to resolve under load.
-    expect(await screen.findByText(/ola, carlos/i, {}, { timeout: 5000 })).not.toBeNull()
+    expect(await screen.findByText(/olá, carlos/i, {}, { timeout: 5000 })).not.toBeNull()
     expect(tokenStorage.get()).toBe('access-TECHNICIAN')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-TECHNICIAN')
   })
@@ -78,7 +78,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), '123456')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), '123456')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
@@ -92,10 +92,10 @@ describe('real auth session and route guards', () => {
     renderRoute('/login')
 
     await userEvent.type(screen.getByLabelText(/e-mail/i), 'marina@fieldops.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'errada123')
+    await userEvent.type(screen.getByLabelText('Senha', { selector: 'input' }), 'errada123')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
-    expect(await screen.findByText(/e-mail ou senha invalidos/i, {}, { timeout: 5000 })).not.toBeNull()
+    expect(await screen.findByText(/e-mail ou senha inválidos/i, {}, { timeout: 5000 })).not.toBeNull()
     expect(tokenStorage.get()).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
   }, 10000)
@@ -144,7 +144,7 @@ describe('real auth session and route guards', () => {
     await authSession.login('carlos@fieldops.com', '123456')
     renderRoute('/app/dashboard')
 
-    expect(await screen.findByText(/ola, carlos/i)).not.toBeNull()
+    expect(await screen.findByText(/olá, carlos/i)).not.toBeNull()
   })
 
   it('blocks supervisor access to technician routes', async () => {
@@ -153,7 +153,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/technician/home')
 
     await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
-    expect(screen.queryByText(/portal do tecnico/i)).toBeNull()
+    expect(screen.queryByText(/portal do técnico/i)).toBeNull()
   })
 
   it('allows only administrators to access user management', async () => {
@@ -164,7 +164,7 @@ describe('real auth session and route guards', () => {
     renderRoute('/app/users')
 
     await waitFor(() => expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0))
-    expect(screen.queryByText(/^usuarios$/i)).toBeNull()
+    expect(screen.queryByText(/^usuários$/i)).toBeNull()
   })
 
   it('logout clears local session data', async () => {

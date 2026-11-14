@@ -69,7 +69,7 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
     return (
       <Card className="flex min-h-40 items-center justify-center gap-2 p-6 text-sm text-muted" role="status">
         <Loader2 className="animate-spin" size={18} />
-        Carregando historico de respostas...
+        Carregando histórico de respostas...
       </Card>
     )
   }
@@ -79,7 +79,7 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
       <Card className="flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
         <div className="flex items-center gap-2 text-sm font-medium text-danger">
           <AlertCircle size={18} />
-          Nao foi possivel carregar o historico de respostas.
+          Não foi possível carregar o histórico de respostas.
         </div>
         <Button variant="secondary" onClick={() => void load()}>
           Tentar novamente
@@ -92,8 +92,8 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
     return (
       <EmptyState
         icon={AlertCircle}
-        title="Inspecao nao encontrada"
-        description="A inspecao solicitada nao existe ou foi removida."
+        title="Inspeção não encontrada"
+        description="A inspeção solicitada não existe ou foi removida."
       />
     )
   }
@@ -102,8 +102,8 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
     return (
       <EmptyState
         icon={History}
-        title="Nenhum historico de respostas encontrado"
-        description="Esta inspecao ainda nao possui respostas registradas."
+        title="Nenhum histórico de respostas encontrado"
+        description="Esta inspeção ainda não possui respostas registradas."
       />
     )
   }
@@ -128,7 +128,7 @@ export function AnswerHistoryTab({ inspectionId }: AnswerHistoryTabProps) {
                         {version.value ?? '-'}
                       </p>
                       <p className="mt-1 text-muted">
-                        <span className="font-semibold text-text">Observacao:</span>{' '}
+                        <span className="font-semibold text-text">Observação:</span>{' '}
                         {version.observation ?? '-'}
                       </p>
                       <p className="mt-1 text-muted">

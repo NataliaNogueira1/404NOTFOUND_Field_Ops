@@ -5,6 +5,7 @@ import { getDatabase } from '@/infrastructure/database';
 import { InspectionRepository } from '@/infrastructure/database/repositories';
 import { biometricStorage, tokenStorage } from '@/infrastructure/storage/tokenStorage';
 import { registerPushToken } from '@/infrastructure/notifications/pushNotifications';
+import { requestNotificationPermission } from '@/infrastructure/notifications/localNotifications';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -254,6 +255,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!authState.isAuthenticated || !authState.token) return;
     void registerPushToken(authState.token).catch(() => undefined);
+    // Request local notification permission on first authenticated session.
+    // Degrades gracefully if denied — never throws (PBI-084).
+    void requestNotificationPermission().catch(() => undefined);
   }, [authState.isAuthenticated, authState.token]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────

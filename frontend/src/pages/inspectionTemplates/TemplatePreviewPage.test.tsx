@@ -30,12 +30,12 @@ describe('TemplatePreviewPage', () => {
     vi.stubGlobal('fetch', fetchMock)
     renderPreview('99')
 
-    expect(await screen.findByRole('heading', { name: 'Previa: Modelo de campo' })).not.toBeNull()
+    expect(await screen.findByRole('heading', { name: 'Prévia: Modelo de campo' })).not.toBeNull()
     expect(screen.getByText('Categoria: Seguranca')).not.toBeNull()
-    expect(screen.getByText('Secoes: 2 | Itens: 7')).not.toBeNull()
+    expect(screen.getByText('Seções: 2 | Itens: 7')).not.toBeNull()
     expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
-      'Secao 1: Primeira',
-      'Secao 2: Segunda',
+      'Seção 1: Primeira',
+      'Seção 2: Segunda',
     ])
     expect(screen.getByText('1. Confirmacao *')).not.toBeNull()
     expect(screen.getByText('2. Comentario')).not.toBeNull()
@@ -43,23 +43,23 @@ describe('TemplatePreviewPage', () => {
     expect(screen.getByText('Evid. na falha')).not.toBeNull()
 
     expect(screen.getByRole('button', { name: 'Conforme' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Nao Conforme' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Não Conforme' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'N/A' })).toBeDisabled()
     expect(screen.getByLabelText('Resposta curta')).toBeDisabled()
     expect(screen.getByLabelText('Resposta longa')).toBeDisabled()
-    expect(screen.getByLabelText('Numero')).toBeDisabled()
+    expect(screen.getByLabelText('Número')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Sim' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Nao' })).toBeDisabled()
-    expect(screen.getByLabelText('Selecao unica')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Não' })).toBeDisabled()
+    expect(screen.getByLabelText('Seleção única')).toBeDisabled()
     expect(screen.getByLabelText('Data')).toBeDisabled()
 
-    expect(screen.getByRole('link', { name: 'Voltar para edicao' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Voltar para edição' })).toHaveAttribute(
       'href',
       '/app/inspection-templates/99/edit',
     )
-    expect(screen.getByRole('button', { name: 'Publicar versao' })).toBeEnabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Publicar versao' }))
-    expect(screen.getByText('Ao publicar, a versao nao podera ser alterada. Continuar?')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Publicar versão' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Publicar versão' }))
+    expect(screen.getByText('Ao publicar, a versão não poderá ser alterada. Continuar?')).not.toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Continuar e publicar' }))
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining('/api/v1/inspection-templates/99/publish'),
@@ -73,10 +73,10 @@ describe('TemplatePreviewPage', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(template)))
     renderPreview('100')
 
-    expect(await screen.findByRole('button', { name: 'Publicar versao' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Ver pendencias' }))
-    expect(screen.getByRole('heading', { name: 'Pendencias para publicacao' })).not.toBeNull()
-    expect(screen.getByText('Todas as secoes precisam de pelo menos um item.')).not.toBeNull()
+    expect(await screen.findByRole('button', { name: 'Publicar versão' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Ver pendências' }))
+    expect(screen.getByRole('heading', { name: 'Pendências para publicação' })).not.toBeNull()
+    expect(screen.getByText('Todas as seções precisam de pelo menos um item.')).not.toBeNull()
   })
 })
 

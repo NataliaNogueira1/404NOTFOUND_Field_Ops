@@ -1,6 +1,6 @@
 # Auditoria do Frontend Web FieldOps - Sprint 1
 
-Fonte da auditoria: codigo atual do repositorio em `frontend/`, documentacao em `docs/` e validacoes locais executadas em 25/08/2026. Esta analise nao usa `docs/analise-sprint1-back-web.md` como verdade, apenas como referencia historica.
+Fonte da auditoria: codigo atual do repositorio em `frontend/`, documentacao em `docs/` e validacoes locais executadas em 25/08/2026. Esta analise nao usa `docs/analises/sprints/analise-sprint1-back-web.md` como verdade, apenas como referencia historica.
 
 ## A. Resumo executivo
 
@@ -58,7 +58,7 @@ Evidencias:
 
 - `README.md`
 - `docs/cronograma.md`
-- `docs/analise-sprint1-back-web.md`
+- `docs/analises/sprints/analise-sprint1-back-web.md`
 
 O que falta:
 

@@ -28,7 +28,7 @@ export function TemplatePreviewPage() {
     setLoading(true); setLoadError('')
     void adminCatalogApi.previewTemplate(id)
       .then((response) => { setTemplate(toInspectionTemplate(response.template)); setPublicationIssues(response.issues); setValidForPublication(response.validForPublication) })
-      .catch(() => setLoadError('Nao foi possivel carregar a previa do modelo.'))
+      .catch(() => setLoadError('Não foi possível carregar a prévia do modelo.'))
       .finally(() => setLoading(false))
   }, [id])
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer) }, [load])
@@ -42,13 +42,13 @@ export function TemplatePreviewPage() {
       setConfirmPublish(false)
       navigate('/app/inspection-templates')
     } catch {
-      setPublishError('Nao foi possivel publicar o modelo.')
+      setPublishError('Não foi possível publicar o modelo.')
     } finally {
       setPublishing(false)
     }
   }
 
-  if (loading) return <Card className="p-8 text-center text-sm text-muted">Carregando previa...</Card>
+  if (loading) return <Card className="p-8 text-center text-sm text-muted">Carregando prévia...</Card>
   if (loadError)
     return (
       <div role="alert" className="space-y-3 text-sm font-medium text-danger"><p>{loadError}</p><Button variant="secondary" onClick={load}>Tentar novamente</Button></div>
@@ -56,7 +56,7 @@ export function TemplatePreviewPage() {
   if (!template)
     return (
       <p role="alert" className="text-sm font-medium text-danger">
-        Modelo nao encontrado.
+        Modelo não encontrado.
       </p>
     )
 
@@ -66,11 +66,11 @@ export function TemplatePreviewPage() {
   return (
     <div className="space-y-6">
       <Card className="p-5">
-        <h1 className="text-2xl font-semibold">Previa: {template.title}</h1>
+        <h1 className="text-2xl font-semibold">Prévia: {template.title}</h1>
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
           <p>Categoria: {template.category}</p>
           <p>
-            Secoes: {sections.length} | Itens: {itemCount}
+            Seções: {sections.length} | Itens: {itemCount}
           </p>
         </div>
       </Card>
@@ -80,9 +80,9 @@ export function TemplatePreviewPage() {
           className="flex flex-wrap items-center justify-between gap-3 border-danger-light/40 bg-danger-light/10 p-4 text-sm font-medium text-danger-dark"
           role="alert"
         >
-          <p>O modelo possui {publicationIssues.length} pendencia(s) para publicacao.</p>
+          <p>O modelo possui {publicationIssues.length} pendência(s) para publicação.</p>
           <Button variant="secondary" onClick={() => setShowPublicationIssues(true)}>
-            Ver pendencias
+            Ver pendências
           </Button>
         </Card>
       )}
@@ -94,7 +94,7 @@ export function TemplatePreviewPage() {
 
       <div
         className="mx-auto max-w-[460px] rounded-[28px] border border-border bg-border p-3 shadow-fieldops"
-        aria-label="Previa do aplicativo do tecnico"
+        aria-label="Prévia do aplicativo do técnico"
       >
         <div className="overflow-hidden rounded-[22px] bg-app-bg">
           <div className="bg-primary px-5 py-5 text-white">
@@ -113,7 +113,7 @@ export function TemplatePreviewPage() {
               return (
                 <Card key={section.id} className="p-4 shadow-none">
                   <h3 className="mb-1 font-semibold">
-                    Secao {sectionIndex + 1}: {section.title}
+                    Seção {sectionIndex + 1}: {section.title}
                   </h3>
                   {section.description && <p className="mb-3 text-xs text-muted">{section.description}</p>}
                   <div className="space-y-4">
@@ -132,21 +132,21 @@ export function TemplatePreviewPage() {
         <Link to={`/app/inspection-templates/${template.id}/edit`}>
           <Button variant="secondary">
             <ArrowLeft size={16} />
-            Voltar para edicao
+            Voltar para edição
           </Button>
         </Link>
         <Button
           disabled={template.status !== 'Rascunho' || !validForPublication || publishing}
           onClick={() => setConfirmPublish(true)}
         >
-          {publishing ? 'Publicando...' : 'Publicar versao'}
+          {publishing ? 'Publicando...' : 'Publicar versão'}
         </Button>
       </div>
 
       <ConfirmDialog
         open={confirmPublish}
         title="Publicar modelo?"
-        description="Ao publicar, a versao nao podera ser alterada. Continuar?"
+        description="Ao publicar, a versão não poderá ser alterada. Continuar?"
         confirmLabel="Continuar e publicar"
         onCancel={() => setConfirmPublish(false)}
         onConfirm={() => void publishTemplate()}
@@ -193,7 +193,7 @@ function previewControl(item: TemplateItem): ReactNode {
   if (item.responseType === ResponseType.TEXT_LONG)
     return <Textarea label="Resposta longa" id={`preview-${item.id}`} placeholder="Texto longo" disabled />
   if (item.responseType === ResponseType.NUMBER)
-    return <Input label="Numero" id={`preview-${item.id}`} type="number" placeholder="0" disabled />
+    return <Input label="Número" id={`preview-${item.id}`} type="number" placeholder="0" disabled />
   if (item.responseType === ResponseType.BOOLEAN)
     return (
       <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
@@ -201,7 +201,7 @@ function previewControl(item: TemplateItem): ReactNode {
           Sim
         </Button>
         <Button variant="secondary" className="h-9 px-2 text-xs" disabled>
-          Nao
+          Não
         </Button>
       </div>
     )
@@ -212,7 +212,7 @@ function previewControl(item: TemplateItem): ReactNode {
           Conforme
         </Button>
         <Button variant="secondary" className="h-9 px-2 text-xs" disabled>
-          Nao Conforme
+          Não Conforme
         </Button>
         <Button variant="secondary" className="h-9 px-2 text-xs" disabled>
           N/A
@@ -221,7 +221,7 @@ function previewControl(item: TemplateItem): ReactNode {
     )
   if (item.responseType === ResponseType.SINGLE_CHOICE)
     return (
-      <Select label="Selecao unica" id={`preview-${item.id}`} disabled>
+      <Select label="Seleção única" id={`preview-${item.id}`} disabled>
         <option>Selecione</option>
         {(item.options ?? []).map((option) => (
           <option key={option}>{option}</option>
