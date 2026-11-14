@@ -379,7 +379,7 @@ class MobileSyncBatchTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results[0].status").value("APPLIED"));
 
-        assertThat(nonConformityRepository.findByInspectionIdOrderByCreatedAtAsc(inspection.getId()))
+        assertThat(nonConformityRepository.findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(inspection.getId()))
                 .singleElement()
                 .satisfies(nonConformity -> {
                     assertThat(nonConformity.getInspectionItemSnapshot().getId()).isEqualTo(item.getId());
