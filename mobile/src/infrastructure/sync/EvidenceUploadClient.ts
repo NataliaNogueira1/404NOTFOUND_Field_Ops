@@ -1,37 +1,51 @@
 import { File, UploadType } from 'expo-file-system';
 
 /**
- * Uploads an evidence photo to the backend using the two-step protocol (issue #229 / RN-078):
+ * Uploads an evidence photo to the backend in a single multipart request
+ * (issue #229 / RN-078), matching the real endpoint (EvidenceUploadController):
  *
- *  Step 1 — Binary upload via File.createUploadTask (multipart/form-data):
- *    POST /api/v1/mobile/evidence/upload
- *    ← { fileRef: "abc123.jpg" }
+ *   POST /api/v1/inspections/{inspectionId}/evidence   (multipart/form-data)
+ *     file              the photo binary
+ *     itemId            template item id (numeric, unscoped)
+ *     mimeType          e.g. image/jpeg
+ *     description       optional
+ *     latitude/longitude optional, only both together
+ *     capturedAtDevice  ISO-8601 device capture time
+ *     operationId       UUID idempotency key: a resend returns the first result
+ *                       and never creates a second evidence (RN-068)
+ *   ← 201 { id, checksum }
  *
- *  Step 2 — Metadata sync via POST /api/v1/mobile/sync/push (EVIDENCE_CREATE):
- *    ← { results: [{ status: "APPLIED" | "ALREADY_APPLIED" | ... }] }
- *
- * expo-file-system v57 removed FileSystemUploadType and the legacy uploadAsync
- * from the package's main entrypoint (they throw at runtime). The new API is:
- *   new File(uri).createUploadTask(url, { uploadType: UploadType.MULTIPART, ... })
+ * expo-file-system v57 removed the legacy uploadAsync (it throws at runtime).
+ * The replacement is `new File(uri).createUploadTask(url, options)` with
+ * `parameters` for the extra multipart fields.
  * See: https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
  *
- * Resolves only when the server confirms APPLIED or ALREADY_APPLIED; any other
- * outcome throws so the outbox keeps the photo as FAILED and available for retry
- * (PBI-044 / RN-047).
+ * Resolves only on a 2xx response; any other outcome throws so the outbox keeps
+ * the photo as FAILED and available for retry (PBI-044 / RN-047).
  *
  * itemId note: the mobile stores item ids as "<inspectionId>::<templateItemId>"
  * (scopedId). The server expects the numeric templateItemId only.
- * extractTemplateItemId() strips the scope prefix before sending.
  */
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+};
+
 export interface EvidenceUploadInput {
+  /** UUID idempotency key, stable across retries of the same photo. */
   operationId: string;
+  /** Server inspection id (numeric string). */
   inspectionId: string;
   /** Scoped local item id: "<inspectionId>::<templateItemId>" or plain numeric string */
   itemId: string;
-  responseId?: string;
   localUri: string;
   description?: string;
   mimeType?: string;
@@ -41,140 +55,89 @@ export interface EvidenceUploadInput {
 }
 
 export interface EvidenceUploadResult {
-  status: 'APPLIED' | 'ALREADY_APPLIED';
-  fileRef: string;
+  status: 'APPLIED';
+  evidenceId: number;
+  checksum: string;
 }
 
 // ─── Public client class ───────────────────────────────────────────────────────
 
 export class EvidenceUploadClient {
   /**
-   * Uploads a single evidence photo end-to-end (binary + metadata).
-   * Throws on any non-terminal server outcome so the outbox marks it FAILED.
+   * Uploads a single evidence photo (binary + metadata in one request).
+   * Throws on any non-2xx outcome so the outbox marks it FAILED.
    */
   async upload(token: string, input: EvidenceUploadInput): Promise<EvidenceUploadResult> {
     if (!input.localUri) {
       throw new Error('Evidence has no local file to upload.');
     }
+    if (!UUID_PATTERN.test(input.operationId)) {
+      throw new Error(`operationId must be a UUID, got "${input.operationId}".`);
+    }
+    const inspectionId = Number(input.inspectionId);
+    if (!Number.isInteger(inspectionId) || inspectionId <= 0) {
+      throw new Error(`Cannot upload evidence: invalid inspection id "${input.inspectionId}".`);
+    }
 
-    // Step 1 — upload the binary via FileSystem.uploadAsync and get the fileRef.
-    const fileRef = await this.uploadBinary(token, input);
-
-    // Step 2 — push the EVIDENCE_CREATE metadata through the sync batch endpoint.
-    const status = await this.pushMetadata(token, input, fileRef);
-
-    return { status, fileRef };
-  }
-
-  // ─── Step 1: multipart binary upload via File.createUploadTask (Expo v57) ──
-
-  private async uploadBinary(token: string, input: EvidenceUploadInput): Promise<string> {
-    const uploadUrl = `${BASE_URL}/api/v1/mobile/evidence/upload`;
-
-    // expo-file-system v57 removed FileSystemUploadType from the main entrypoint
-    // and deprecated FileSystem.uploadAsync (throws at runtime). The replacement
-    // is new File(uri).createUploadTask(url, options).
-    // See: https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
-    const file = new File(input.localUri);
-    const task = file.createUploadTask(uploadUrl, {
-      uploadType: UploadType.MULTIPART,
-      fieldName: 'file',
-      mimeType: input.mimeType ?? 'image/jpeg',
-      httpMethod: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const mimeType = input.mimeType ?? mimeTypeFromUri(input.localUri);
+    const task = new File(input.localUri).createUploadTask(
+      `${BASE_URL}/api/v1/inspections/${inspectionId}/evidence`,
+      {
+        uploadType: UploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType,
+        httpMethod: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        parameters: buildParameters(input, mimeType),
       },
-    });
+    );
 
     const result = await task.uploadAsync();
-
     if (!result) {
-      throw new Error('Binary upload failed: no response from server (network error).');
+      throw new Error('Evidence upload failed: no response from server (network error).');
     }
     if (result.status < 200 || result.status >= 300) {
-      throw new Error(`Binary upload failed (API ${result.status}): ${result.body}`);
+      throw new Error(`Evidence upload failed (API ${result.status}): ${result.body}`);
     }
-
-    let data: { fileRef?: string } = {};
-    try {
-      data = JSON.parse(result.body) as { fileRef?: string };
-    } catch {
-      throw new Error('Binary upload succeeded but server returned invalid JSON.');
-    }
-
-    if (!data.fileRef) {
-      throw new Error('Binary upload succeeded but server returned no fileRef.');
-    }
-
-    return data.fileRef;
-  }
-
-  // ─── Step 2: EVIDENCE_CREATE via sync/push ────────────────────────────────
-
-  private async pushMetadata(
-    token: string,
-    input: EvidenceUploadInput,
-    fileRef: string,
-  ): Promise<'APPLIED' | 'ALREADY_APPLIED'> {
-    // The server expects the numeric templateItemId, not the scoped local id.
-    const templateItemId = extractTemplateItemId(input.itemId);
-
-    const body = {
-      operations: [
-        {
-          operationId: input.operationId,
-          type: 'EVIDENCE_CREATE' as const,
-          baseVersion: 0,
-          dependencyIds: input.responseId ? [input.responseId] : [],
-          payload: {
-            inspectionId: Number(input.inspectionId),
-            itemId: templateItemId,
-            fileRef,
-            capturedAt: input.capturedAt,
-            latitude: input.latitude ?? null,
-            longitude: input.longitude ?? null,
-            description: input.description ?? null,
-          },
-        },
-      ],
-    };
-
-    const response = await fetch(`${BASE_URL}/api/v1/mobile/sync/push`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const message = await response.text().catch(() => response.statusText);
-      throw new Error(`Metadata sync failed (API ${response.status}): ${message}`);
-    }
-
-    const data = (await response.json()) as {
-      results?: Array<{
-        operationId: string;
-        status: 'APPLIED' | 'ALREADY_APPLIED' | 'CONFLICT' | 'DEFERRED' | 'FAILED';
-        detail?: string | null;
-      }>;
-    };
-    const result = data.results?.[0];
-
-    if (!result) {
-      throw new Error('Server returned no result for EVIDENCE_CREATE operation.');
-    }
-    if (result.status === 'APPLIED' || result.status === 'ALREADY_APPLIED') {
-      return result.status;
-    }
-    throw new Error(
-      `EVIDENCE_CREATE ${result.status}: ${result.detail ?? 'no detail'}`,
-    );
+    return parseResponse(result.body);
   }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildParameters(input: EvidenceUploadInput, mimeType: string): Record<string, string> {
+  const parameters: Record<string, string> = {
+    itemId: String(extractTemplateItemId(input.itemId)),
+    mimeType,
+    capturedAtDevice: input.capturedAt,
+    operationId: input.operationId,
+  };
+  if (input.description) parameters.description = input.description;
+  // The backend rejects latitude without longitude (and vice versa).
+  if (input.latitude !== undefined && input.longitude !== undefined) {
+    parameters.latitude = String(input.latitude);
+    parameters.longitude = String(input.longitude);
+  }
+  return parameters;
+}
+
+function parseResponse(body: string): EvidenceUploadResult {
+  let data: { id?: number; checksum?: string };
+  try {
+    data = JSON.parse(body) as { id?: number; checksum?: string };
+  } catch {
+    throw new Error('Evidence upload succeeded but server returned invalid JSON.');
+  }
+  if (typeof data.id !== 'number') {
+    throw new Error('Evidence upload succeeded but server returned no evidence id.');
+  }
+  return { status: 'APPLIED', evidenceId: data.id, checksum: data.checksum ?? '' };
+}
+
+function mimeTypeFromUri(uri: string): string {
+  const extension = uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  return MIME_BY_EXTENSION[extension] ?? 'image/jpeg';
+}
 
 /**
  * Extracts the numeric templateItemId from a scoped local item id.
