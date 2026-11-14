@@ -2,7 +2,7 @@
 
 Aplicativo dos técnicos de campo da plataforma FieldOps. Permite baixar as inspeções atribuídas, executar checklists dinâmicos, registrar evidências e não conformidades, e trabalhar offline com sincronização ao reconectar.
 
-- **Expo SDK 57** · React Native · TypeScript (strict)
+- **Expo SDK 58** · React Native · TypeScript (strict)
 - **Expo Router** (rotas baseadas em arquivos, `typedRoutes`)
 - **SQLite** (`expo-sqlite`) para persistência local e modo offline
 - **Secure Store** (`expo-secure-store`) para tokens de sessão
