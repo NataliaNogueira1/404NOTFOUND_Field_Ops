@@ -6,9 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+/** Local-disk evidence storage; the default for dev and tests (selected unless {@code fieldops.storage.type=s3}). */
 @Service
+@ConditionalOnProperty(name = "fieldops.storage.type", havingValue = "filesystem", matchIfMissing = true)
 public class FileSystemEvidenceStorage implements EvidenceStorage {
     private final Path root;
 
@@ -17,7 +20,11 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
     }
 
     @Override
-    public Optional<Path> find(String reference) {
+    public Optional<EvidenceContent> open(String reference) {
+        return resolve(reference).map(this::toContent);
+    }
+
+    private Optional<Path> resolve(String reference) {
         if (reference == null || reference.isBlank()) return Optional.empty();
         Path candidate;
         try {
@@ -29,6 +36,14 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
         }
         if (!candidate.startsWith(root) || !Files.isRegularFile(candidate)) return Optional.empty();
         return Optional.of(candidate);
+    }
+
+    private EvidenceContent toContent(Path file) {
+        try {
+            return new EvidenceContent(Files.newInputStream(file), Files.size(file), Files.probeContentType(file));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Failed to open evidence binary: " + file.getFileName(), exception);
+        }
     }
 
     @Override
