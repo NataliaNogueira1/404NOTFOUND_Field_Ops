@@ -7,10 +7,11 @@
 | Funcionalidade | Envio de evidências fotográficas do app mobile para o servidor |
 | Módulos | App Mobile (sincronização) e API REST (evidências e status da inspeção) |
 | Perfil de usuário | TECHNICIAN |
-| Versão testada | Branch `feat/mobile-evidence-upload-sync`, commit `864635b` |
+| Versão testada em aparelho | Branch `feat/mobile-evidence-upload-sync`, commit `864635b` |
+| Versão dos testes automatizados | Branch `feat/mobile-evidence-upload-sync` integrada à `develop` (Expo SDK 58) |
 | Data da execução | 14/11/2026 |
 | Tipo de teste | Funcional manual em aparelho + testes automatizados de apoio |
-| Resultado geral | ✅ Aprovado (9/9 casos de teste) |
+| Resultado geral | ✅ Aprovado (8/8 casos de teste) |
 
 ## 2. Objetivo
 
@@ -30,7 +31,7 @@ Verificar que as fotos capturadas pelo técnico durante a inspeção são enviad
 
 | Item | Configuração |
 |---|---|
-| Aparelho | Smartphone Android com o app FieldOps (Expo SDK 57) |
+| Aparelho | Smartphone Android com o app FieldOps (Expo SDK 57, antes da integração com a `develop`) |
 | API | Container `fieldops-api`, porta 8085 |
 | Banco de dados | Container `fieldops-db` (PostgreSQL 16) |
 | Armazenamento de arquivos | `/app/evidences` no container `fieldops-api` |
@@ -49,7 +50,6 @@ Verificar que as fotos capturadas pelo técnico durante a inspeção são enviad
 | CT-06 | Manter a foto na fila sem conexão e permitir "Tentar novamente" | Automatizado | ✅ Aprovado |
 | CT-07 | Concluir a inspeção e sincronizar o status | Manual | ✅ Aprovado |
 | CT-08 | Aceitar o reenvio de uma mudança de status já aplicada | Automatizado | ✅ Aprovado |
-| CT-09 | Validar os dados antes de enviar a foto | Automatizado | ✅ Aprovado |
 
 ## 6. Casos de teste detalhados
 
@@ -105,9 +105,9 @@ Verificar que as fotos capturadas pelo técnico durante a inspeção são enviad
 ### CT-06 — Manter a foto na fila sem conexão e permitir "Tentar novamente"
 
 - **Pré-condição:** foto capturada e operação de envio na fila.
-- **Passos:** simular falha de envio (sem resposta e resposta de erro do servidor) e acionar "Tentar novamente".
+- **Passos:** simular falha no envio da foto e acionar "Tentar novamente".
 - **Resultado esperado:** a foto continua no aparelho e na fila; a nova tentativa reaproveita o mesmo arquivo sem criar outra evidência.
-- **Resultado obtido:** testes `throws when the upload task yields no response`, `throws on a non-2xx response` e os testes do PBI-044 (arquivo preservado, "Tentar novamente" sem duplicar, estado mantido após reiniciar o app) passaram.
+- **Resultado obtido:** os testes do PBI-044 em `pbi044.test.ts` passaram: a operação fica com erro e o motivo é registrado, o arquivo local é preservado, "Tentar novamente" reenvia a mesma operação sem duplicar a foto e o estado é mantido após reiniciar o app.
 - **Status:** ✅ Aprovado.
 
 ### CT-07 — Concluir a inspeção e sincronizar o status
@@ -129,31 +129,26 @@ Verificar que as fotos capturadas pelo técnico durante a inspeção são enviad
 - **Resultado obtido:** teste `treatsTransitionToCurrentStatusAsAlreadyApplied` passou.
 - **Status:** ✅ Aprovado.
 
-### CT-09 — Validar os dados antes de enviar a foto
-
-- **Pré-condição:** nenhuma.
-- **Passos:** tentar enviar uma foto com chave de operação fora do formato UUID e com id de inspeção não numérico.
-- **Resultado esperado:** o envio é bloqueado no app, sem chamada ao servidor.
-- **Resultado obtido:** testes `rejects an operationId that is not a UUID` e `rejects a non-numeric inspection id` passaram.
-- **Status:** ✅ Aprovado.
-
 ## 7. Testes automatizados de apoio
+
+Executados com Node 22 (`mobile/.nvmrc`), após a integração com a `develop`.
 
 | Conjunto | Comando | Resultado |
 |---|---|---|
-| Mobile (Jest) | `cd mobile` e `npx jest` | 89/89 testes, 8/8 suítes |
-| Mobile (lint) | `npx eslint src/infrastructure/sync src/test-stubs jest.config.js --max-warnings 0` | Sem avisos |
-| Backend (Maven) | `cd api` e `.\mvnw.cmd test -Dtest=MobileStatusUpdateTest` | 4/4 testes, `BUILD SUCCESS` |
+| Mobile (Jest) | `cd mobile` e `npx jest` | 173/173 testes, 17/17 suítes |
+| Mobile (lint) | `npx eslint src/infrastructure/sync src/components/fieldops/ChecklistItemCard.tsx jest.config.js --max-warnings 0` | Sem avisos |
+| Backend (Maven) | `cd api` e `.\mvnw.cmd test "-Dtest=MobileStatusUpdateTest,MobileSyncBatchTest"` | `BUILD SUCCESS` |
 
-Principais testes do envio de evidências (`mobile/src/infrastructure/sync/__tests__/evidenceUploadClient.test.ts`):
+Principais testes da funcionalidade:
 
-| Teste | Verifica |
-|---|---|
-| posts multipart to /api/v1/inspections/{id}/evidence with the backend field names | Endereço, arquivo, autenticação e campos `itemId`, `mimeType`, `description`, `latitude`, `longitude`, `capturedAtDevice`, `operationId` |
-| omits latitude/longitude unless both are present | Localização enviada somente com as duas coordenadas |
-| derives the mime type from the file extension | Tipo do arquivo identificado pela extensão |
-| returns the server evidence id and checksum on 201 | Leitura da confirmação do servidor |
-| deterministicUuid is stable per seed | Chave de idempotência estável e única por foto |
+| Arquivo | Teste | Verifica |
+|---|---|---|
+| `mobile/.../sync/__tests__/pbi044.test.ts` | sends the same UUID operationId on every attempt of the same photo | Chave de idempotência estável entre tentativas |
+| idem | marks the evidence SYNCED when the server confirms the upload | Foto sai de pendente após a confirmação |
+| idem | retries the existing upload operation without capturing a new photo | "Tentar novamente" reaproveita o arquivo |
+| idem | does not duplicate the evidence or its operation on retry | Nenhuma evidência duplicada |
+| `api/.../MobileStatusUpdateTest.java` | treatsTransitionToCurrentStatusAsAlreadyApplied | Reenvio de status já aplicado retorna `ALREADY_APPLIED` |
+| `api/.../MobileSyncBatchTest.java` | (suíte completa) | Sincronização em lote de respostas, não conformidades e status |
 
 ## 8. Evidências da execução
 
@@ -173,7 +168,7 @@ Arquivos em `/app/evidences`:
 
 ## 9. Conclusão
 
-A funcionalidade de envio de evidências fotográficas foi aprovada nos 9 casos de teste. As fotos capturadas no app chegam ao servidor na sincronização, vinculadas à inspeção e ao item corretos, com data de captura do aparelho, arquivo armazenado com checksum e sem duplicidade em reenvios. A inspeção concluída no app também chega ao servidor com status `SUBMITTED`.
+A funcionalidade de envio de evidências fotográficas foi aprovada nos 8 casos de teste. As fotos capturadas no app chegam ao servidor na sincronização, vinculadas à inspeção e ao item corretos, com data de captura do aparelho, arquivo armazenado com checksum e sem duplicidade em reenvios. A inspeção concluída no app também chega ao servidor com status `SUBMITTED`.
 
 ## 10. Rastreabilidade
 
@@ -182,4 +177,5 @@ A funcionalidade de envio de evidências fotográficas foi aprovada nos 9 casos 
 | Issue | [#229](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/229) |
 | Endpoint | `POST /api/v1/inspections/{id}/evidence` ([#221](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/221)) |
 | PBIs relacionados | PBI-042, PBI-043, PBI-044 (`docs/cronograma.md`) |
-| Commits | `8265460`, `491696c`, `cf8bc06`, `864635b` |
+| Commits | `864635b` (status já aplicado) e merge com a `develop` (cliente de upload dos PRs #253/#254) |
+| Pull request | [#356](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/pull/356) |
