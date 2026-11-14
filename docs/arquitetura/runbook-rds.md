@@ -31,8 +31,14 @@ Crie primeiro o SG da EC2, para o RDS poder referenciá-lo.
 
 | Tipo | Porta | Origem | Motivo |
 |---|---|---|---|
-| SSH | 22 | Seu IP (`/32`) | Administração |
+| SSH | 22 | `18.206.107.24/29` (faixa do EC2 Instance Connect em `us-east-1`) | Administração pelo console |
 | Custom TCP | 8080 | `0.0.0.0/0` por enquanto | Será restrito ao CloudFront na #312 |
+
+> **Divergência da prática:** conectar pelo botão "Conectar" do console (EC2 Instance
+> Connect) exige a regra de SSH para a faixa acima, e não para o seu IP. Se a regra for só
+> para o seu IP, o console não consegue abrir a sessão.
+>
+> Ambos os SGs precisam de regra de saída "Todo o tráfego" `0.0.0.0/0`.
 
 **SG do RDS** — `fieldops-rds-sg` (mesma VPC):
 
@@ -57,7 +63,7 @@ RDS > **Create database** > **Standard create**:
 | Availability | **Single-AZ** (sem standby) |
 | DB instance identifier | `fieldops-db` |
 | Master username | `fieldops` |
-| Credentials | Self managed; **senha forte**, guardada só no `.env` da EC2 |
+| Credentials | **Self managed**; **senha forte**, guardada só no `.env` da EC2 |
 | Instance class | `db.t3.micro` |
 | Storage | gp3, 20 GiB, sem autoscaling |
 | VPC / Subnet group | default / `fieldops-db-subnet-group` |
@@ -67,6 +73,11 @@ RDS > **Create database** > **Standard create**:
 | Backup retention | 0 ou 1 dia (economia de créditos) |
 | Encryption | padrão |
 | Enhanced monitoring / Performance Insights | desligados |
+
+> **Divergência da prática:** o console pode vir com "Gerenciada no AWS Secrets Manager"
+> selecionado. Nesse modo a senha gira a cada 7 dias e quebra o `.env` da EC2. Escolha
+> **Autogerenciada** e defina a senha. Se já criou assim, ajuste em **Modificar >
+> Gerenciamento de credenciais** com aplicação imediata.
 
 Aguarde o status **Available** (5 a 10 min) e copie o **Endpoint** (host).
 
@@ -97,20 +108,22 @@ Esperado: retorna `PostgreSQL 16.x`.
 
 Prova de que está privado (do seu computador):
 
-```bash
-nc -vz <endpoint-do-rds> 5432
+```powershell
+Test-NetConnection <endpoint-do-rds> -Port 5432
 ```
 
-Esperado: **timeout/falha** (o RDS não é acessível pela internet).
+Esperado: `TcpTestSucceeded : False`. O endpoint resolve para um IP privado da VPC
+(`172.31.x.x`) e a conexão expira (o RDS não é acessível pela internet).
+Em Linux/macOS, use `nc -vz <endpoint-do-rds> 5432`.
 
 ## 6. Critérios de aceite da #305
 
-- [ ] Instância `fieldops-db` Available, PostgreSQL 16, `db.t3.micro`, Single-AZ.
-- [ ] `Publicly accessible = No`.
-- [ ] 5432 liberada só para o SG da EC2.
-- [ ] DB subnet group criado.
-- [ ] Conexão a partir da EC2 funcionando.
-- [ ] Nenhuma senha no repositório.
+- [x] Instância `fieldops-db` Available, PostgreSQL 16, `db.t3.micro`, Single-AZ.
+- [x] `Publicly accessible = No`.
+- [x] 5432 liberada só para o SG da EC2.
+- [x] DB subnet group criado.
+- [x] Conexão a partir da EC2 funcionando (`PostgreSQL 16.15`, 29 migrations aplicadas).
+- [x] Nenhuma senha no repositório.
 
 ## 7. Reset do Learner Lab (~4h)
 
