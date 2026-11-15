@@ -2,7 +2,7 @@
 
 > Arquivo de continuidade para retomar em outro computador.
 > Última atualização: 14/11/2026. Região: `us-east-1` (Norte da Virgínia).
-> **Nunca registrar aqui:** senha do banco, `JWT_SECRET`, arquivo `.pem`, chaves AWS, IP público da EC2.
+> **Nunca registrar aqui:** senha do banco, `JWT_SECRET`, arquivo `.pem`, chaves AWS, IP público da EC2, endpoint real do RDS (expõe o identificador da conta).
 > Runbooks de referência: `runbook-rds.md`, `runbook-ec2.md` e `arquitetura-aws.md`.
 
 ## Situação
@@ -37,7 +37,7 @@ Falta apenas o trabalho de repositório e board (ver "Pendências").
 
 ## Dados do ambiente (sem segredos)
 
-- RDS endpoint (`DB_HOST`): `fieldops-db.c5cm6usmijco.us-east-1.rds.amazonaws.com`
+- RDS endpoint (`DB_HOST`): `<endpoint-do-rds>` (copie do console: RDS > Databases > `fieldops-db` > Connectivity & security; não registrar o valor real aqui)
 - Banco / usuário: `fieldops` / `fieldops`. Porta `5432`.
 - Credencial do RDS: **autogerenciada** (senha própria, só no `.env` da EC2).
 - EC2: nome `fieldops-api`. O IP público muda a cada reinício do Lab; consulte no console.
