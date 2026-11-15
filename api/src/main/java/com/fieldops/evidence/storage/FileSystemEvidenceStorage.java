@@ -37,6 +37,12 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
         return Optional.of(candidate);
     }
 
+    /** Local files have no public address; the API streams them through {@link #open(String)}. */
+    @Override
+    public Optional<TemporaryEvidenceUrl> temporaryDownloadUrl(String reference) {
+        return Optional.empty();
+    }
+
     private EvidenceContent toContent(Path file) {
         try {
             return new EvidenceContent(Files.newInputStream(file), Files.size(file), Files.probeContentType(file));

@@ -1,5 +1,7 @@
 package com.fieldops.evidence.storage;
 
+import java.net.URI;
+import java.time.Duration;
 import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
@@ -11,6 +13,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 /**
  * Evidence storage on a private S3 bucket (#309). The object key is the evidence reference, so
@@ -20,11 +25,26 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
  */
 public class S3EvidenceStorage implements EvidenceStorage {
     private final S3Client s3;
+    private final S3Presigner presigner;
     private final String bucket;
+    private final Duration presignTtl;
 
-    public S3EvidenceStorage(S3Client s3, String bucket) {
+    public S3EvidenceStorage(S3Client s3, S3Presigner presigner, String bucket, Duration presignTtl) {
         this.s3 = s3;
+        this.presigner = presigner;
         this.bucket = bucket;
+        this.presignTtl = presignTtl;
+    }
+
+    @Override
+    public Optional<TemporaryEvidenceUrl> temporaryDownloadUrl(String reference) {
+        if (reference == null || reference.isBlank()) return Optional.empty();
+        GetObjectPresignRequest request = GetObjectPresignRequest.builder()
+                .signatureDuration(presignTtl)
+                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(reference).build())
+                .build();
+        PresignedGetObjectRequest presigned = presigner.presignGetObject(request);
+        return Optional.of(new TemporaryEvidenceUrl(URI.create(presigned.url().toString()), presigned.expiration()));
     }
 
     @Override

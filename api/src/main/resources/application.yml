@@ -40,6 +40,8 @@ fieldops:
     s3:
       bucket: ${EVIDENCE_S3_BUCKET:}
       region: ${AWS_REGION:us-east-1}
+      # Validity of the presigned download links handed to the Web Admin (ISO-8601 duration)
+      presign-ttl: ${EVIDENCE_S3_PRESIGN_TTL:PT5M}
   bootstrap:
     admin-email: ${BOOTSTRAP_ADMIN_EMAIL:}
     admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:}

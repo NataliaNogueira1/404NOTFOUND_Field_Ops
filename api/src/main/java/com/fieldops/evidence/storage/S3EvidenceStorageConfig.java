@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 /** Registers the S3 evidence backend only when {@code fieldops.storage.type=s3}. */
 @Configuration
@@ -24,8 +25,14 @@ public class S3EvidenceStorageConfig {
         return S3Client.builder().region(Region.of(properties.getRegion())).build();
     }
 
+    /** Signs locally with the same default credential chain; no network call is made to sign. */
+    @Bean(destroyMethod = "close")
+    S3Presigner s3Presigner(S3StorageProperties properties) {
+        return S3Presigner.builder().region(Region.of(properties.getRegion())).build();
+    }
+
     @Bean
-    S3EvidenceStorage s3EvidenceStorage(S3Client s3Client, S3StorageProperties properties) {
-        return new S3EvidenceStorage(s3Client, properties.getBucket());
+    S3EvidenceStorage s3EvidenceStorage(S3Client s3Client, S3Presigner presigner, S3StorageProperties properties) {
+        return new S3EvidenceStorage(s3Client, presigner, properties.getBucket(), properties.getPresignTtl());
     }
 }
