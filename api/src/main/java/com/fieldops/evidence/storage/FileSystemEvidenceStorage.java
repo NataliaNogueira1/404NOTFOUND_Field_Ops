@@ -5,10 +5,12 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+/** Local-disk evidence storage; the default for dev and tests (selected unless {@code fieldops.storage.type=s3}). */
 @Service
+@ConditionalOnProperty(name = "fieldops.storage.type", havingValue = "filesystem", matchIfMissing = true)
 public class FileSystemEvidenceStorage implements EvidenceStorage {
     private final Path root;
 
@@ -17,7 +19,11 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
     }
 
     @Override
-    public Optional<Path> find(String reference) {
+    public Optional<EvidenceContent> open(String reference) {
+        return resolve(reference).map(this::toContent);
+    }
+
+    private Optional<Path> resolve(String reference) {
         if (reference == null || reference.isBlank()) return Optional.empty();
         Path candidate;
         try {
@@ -31,9 +37,17 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
         return Optional.of(candidate);
     }
 
+    private EvidenceContent toContent(Path file) {
+        try {
+            return new EvidenceContent(Files.newInputStream(file), Files.size(file), Files.probeContentType(file));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Failed to open evidence binary: " + file.getFileName(), exception);
+        }
+    }
+
     @Override
     public String store(byte[] content, String fileExtension) {
-        String reference = UUID.randomUUID() + "." + sanitizeExtension(fileExtension);
+        String reference = EvidenceReference.create(fileExtension);
         Path target = root.resolve(reference).normalize();
         if (!target.startsWith(root)) {
             throw new IllegalStateException("Resolved evidence path escapes the storage root: " + reference);
@@ -45,12 +59,5 @@ public class FileSystemEvidenceStorage implements EvidenceStorage {
             throw new UncheckedIOException("Failed to store evidence binary: " + reference, exception);
         }
         return reference;
-    }
-
-    /** Keeps only ASCII alphanumerics so the extension can never introduce a path segment. */
-    private String sanitizeExtension(String fileExtension) {
-        if (fileExtension == null) return "bin";
-        String normalized = fileExtension.replaceAll("[^A-Za-z0-9]", "");
-        return normalized.isBlank() ? "bin" : normalized.toLowerCase();
     }
 }

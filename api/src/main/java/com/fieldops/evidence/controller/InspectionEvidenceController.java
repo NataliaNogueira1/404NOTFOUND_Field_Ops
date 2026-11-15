@@ -2,6 +2,7 @@ package com.fieldops.evidence.controller;
 
 import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.evidence.repository.InspectionEvidenceRepository;
+import com.fieldops.evidence.storage.EvidenceContent;
 import com.fieldops.evidence.storage.EvidenceStorage;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,10 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,13 +44,14 @@ public class InspectionEvidenceController {
             @ApiResponse(responseCode = "404", description = "Evidence or stored file not found")
     })
     @GetMapping("/{id}/content")
-    public ResponseEntity<FileSystemResource> content(@Parameter(description = "Evidence ID") @PathVariable Long id) throws IOException {
+    public ResponseEntity<InputStreamResource> content(@Parameter(description = "Evidence ID") @PathVariable Long id) {
         InspectionEvidence evidence = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection evidence not found: " + id));
-        Path file = storage.find(evidence.getReference())
+        EvidenceContent content = storage.open(evidence.getReference())
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence content not found: " + id));
-        String contentType = Files.probeContentType(file);
-        MediaType mediaType = contentType == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(contentType);
-        return ResponseEntity.ok().contentType(mediaType).contentLength(Files.size(file)).body(new FileSystemResource(file));
+        MediaType mediaType = content.contentType() == null
+                ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(content.contentType());
+        return ResponseEntity.ok().contentType(mediaType).contentLength(content.contentLength())
+                .body(new InputStreamResource(content.stream()));
     }
 }
