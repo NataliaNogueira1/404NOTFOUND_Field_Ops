@@ -92,9 +92,11 @@ No navegador:
 
 ## 6. Critérios de aceite da #311
 
-- [ ] Bucket S3 com o `dist/` publicado.
-- [ ] SPA funciona: recarregar uma rota profunda abre o app (o status `200` limpo vem com o CloudFront, #312).
-- [ ] Web Admin abre pela URL do S3; pelo CloudFront depois da #312.
+- [x] Bucket S3 com o `dist/` publicado — 60 arquivos (1,1 MB) em `fieldops-web-404nf`, validado em 16/11/2026.
+- [x] SPA funciona: `F5` em `/login` reabre o app. O documento chega com status `404` do S3 e corpo `index.html`
+      (o erro `Failed to load resource ... 404` no console é essa requisição); o `200` limpo vem com o CloudFront (#312).
+- [x] Web Admin abre pela URL do S3 (`curl`: raiz `200 text/html`, rota profunda `404 text/html`; tela de login renderizada).
+- [ ] Web Admin abre pelo CloudFront — depende da #312. O login só funciona depois dele (`/api/*` no mesmo domínio).
 
 ## 7. Atualizar o site
 
