@@ -145,9 +145,22 @@ uma imagem que já existe (previsível durante a demonstração).
 
 ## 7. Critérios de aceite da #315
 
-- [ ] `user-data` sobe a API automaticamente após (re)iniciar a EC2 — validar na EC2 (seção 4).
-- [ ] Flyway + seed `demo` repopulam o dado sozinhos — a primeira subida (#306) aplicou 29 migrations e o
-      seed em banco vazio; o boot automático reaproveita o mesmo caminho.
-- [ ] `GET /actuator/health` fica `UP` sem intervenção manual — validar na EC2 (seção 4).
-- [ ] Runbook escrito e validado em uma sessão real — este documento; validação pendente.
+- [x] `user-data` sobe a API automaticamente após (re)iniciar a EC2 — validado em 16/11/2026: depois de
+      interromper e iniciar a instância, a unit `fieldops-boot` rodou sozinha (`active (exited)`, status 0).
+- [ ] Flyway + seed `demo` repopulam o dado sozinhos — validado em parte: a primeira subida (#306) aplicou
+      29 migrations e o seed em banco vazio, e o boot automático confirmou a idempotência
+      (`Demo seed already present`). A repopulação de um banco vazio pelo boot automático não foi exercitada.
+- [x] `GET /actuator/health` fica `UP` sem intervenção manual — validado em 16/11/2026 (`{"status":"UP"}`
+      de fora da EC2, sem abrir terminal depois de iniciar a instância).
+- [x] Runbook escrito e validado em uma sessão real — instalação (seção 1) e parada/início da EC2
+      (seção 4) validados em 16/11/2026. A parada do RDS (seção 3) não foi exercitada.
 - [ ] Confirmar que o domínio estável do CloudFront mantém o APK entre sessões — depende da #312 e da #314.
+
+### Evidência da validação (16/11/2026)
+
+- Instalação: `swap already active`, `container is outdated ... recreating`, `API healthy (UP)`, `boot done`
+  (cerca de 27 s até o health `UP`, com a imagem existente reaproveitada).
+- Depois de interromper e iniciar a EC2: `swap already active` (o `/etc/fstab` manteve o swap),
+  `container already running`, `API healthy (UP)`, `boot done`. O Docker já havia reiniciado o container
+  pela política `unless-stopped`; o `fieldops-boot` confirmou a imagem e o `.env`, e esperou o health.
+- `systemctl is-enabled fieldops-boot` retornou `enabled` e a unit ficou `active (exited)`.
