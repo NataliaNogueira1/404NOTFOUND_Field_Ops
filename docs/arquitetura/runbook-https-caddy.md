@@ -138,9 +138,29 @@ O proxy é removido e a API volta a publicar a porta 8080 (reabra a regra no Sec
 
 ## 8. Critérios de aceite da #312 (adaptados)
 
-- [ ] Web Admin abre em `https://<nome>.sslip.io` sem aviso de certificado.
-- [ ] Chamadas `https://<nome>.sslip.io/api/v1/...` chegam na API (EC2).
-- [ ] O header `Authorization` é repassado para a API.
-- [ ] Domínio estável confirmado (não muda ao reiniciar a EC2).
+- [x] Web Admin abre em `https://<nome>.sslip.io` sem aviso de certificado.
+- [x] Chamadas `https://<nome>.sslip.io/api/v1/...` chegam na API (EC2).
+- [x] O header `Authorization` é repassado para a API.
+- [x] Domínio estável confirmado (não muda ao reiniciar a EC2).
+- [ ] Acesso a partir da rede da empresa (a DuckDNS é bloqueada por ela; o `sslip.io` **não foi testado** lá).
 
-Os quatro estão pendentes de validação na EC2 (seção 4).
+### Evidência da validação (16/11/2026)
+
+| Teste | Resultado |
+|---|---|
+| Instalação | `container is outdated ... recreating`, `starting the HTTPS proxy`, `API healthy (UP)`, `HTTPS proxy healthy`, `boot done`. O certificado foi emitido em cerca de 7 s |
+| Site | `200 text/html` (`curl` sem `-k`, o certificado foi validado) |
+| Rota profunda `/app/inspections/1/review` | `200 text/html` (no S3 puro era `404`) |
+| `/actuator/health` | `{"status":"UP"}` |
+| `/api/v1/...` sem token | `401 application/json`: chegou na API |
+| `http://<elastic-ip>:8080` de fora | `curl: (7) Failed to connect`. Era `200` antes do proxy |
+| `POST /api/v1/auth/login` com `Origin` | `403 Invalid CORS request` antes de listar o domínio; `400` de validação depois |
+| Login no navegador (supervisor) | Entrou e a lista de inspeções carregou da API: o `Authorization` chega |
+| Interromper e iniciar a EC2 | O mesmo endereço voltou a responder `{"status":"UP"}`, sem abrir terminal |
+
+### Pendências
+
+- Testar o acesso pela rede da empresa (seção 1).
+- Remover do `fieldops-ec2-sg` a regra da 8080, que ficou sem uso.
+- Trocar as senhas padrão dos usuários demo (`FIELDOPS_DEV_*_PASSWORD`), porque a API agora é pública.
+- A #313 ainda precisa revisar o `CORS_ALLOWED_ORIGINS` definitivo e o APK (#314) deve usar a URL `https`.
