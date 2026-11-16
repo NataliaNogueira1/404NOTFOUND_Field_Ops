@@ -96,7 +96,10 @@ Se o log mostrar `ERROR: /opt/fieldops/.env not found`, volte ao passo 1.
 ```bash
 curl http://<ip-publico>:8080/actuator/health
 ```
-Esperado: `{"status":"UP"}`. No PowerShell use `curl.exe`. Se não responder, conecte na EC2 e rode:
+Esperado: `{"status":"UP"}`. No PowerShell use `curl.exe`.
+
+Com o HTTPS ativo (`FIELDOPS_DOMAIN` em `/etc/fieldops/boot.conf`, veja `runbook-https-caddy.md`), a API não
+escuta mais na 8080 pela internet. Verifique por `https://<nome>.sslip.io/actuator/health`. Se não responder, conecte na EC2 e rode:
 ```bash
 sudo systemctl status fieldops-boot --no-pager
 sudo tail -n 40 /var/log/fieldops-boot.log
