@@ -10,6 +10,9 @@ import { InspectionStatus, useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
+// Approximate header + safe area height per platform used as KeyboardAvoidingView offset.
+const KEYBOARD_VERTICAL_OFFSET = Platform.OS === 'ios' ? 90 : 56;
+
 // Inspection states whose checklist is viewable but never editable (#273/#277).
 const READ_ONLY_STATUSES: InspectionStatus[] = [
   InspectionStatus.SUBMITTED,
@@ -57,6 +60,11 @@ export default function ChecklistScreen() {
     scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
   }, [allItems, answers, template]);
 
+  // Scroll the focused card's Y position into view above the keyboard.
+  const handleItemFocus = useCallback((itemY: number) => {
+    scrollRef.current?.scrollTo({ y: itemY, animated: true });
+  }, []);
+
   if (templateLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
@@ -94,19 +102,23 @@ export default function ChecklistScreen() {
        * on both iOS and Android (issue #333).
        *
        * iOS:    behavior="padding" adds bottom padding equal to the keyboard height.
-       * Android: behavior is omitted — the OS already adjusts the window via
-       *          android:windowSoftInputMode, so adding extra padding would
-       *          double-offset the layout.
+       * Android: behavior="height" shrinks the view to the available height.
+       *
+       * keyboardVerticalOffset accounts for the header + safe area height so the
+       * view is not over-shifted. ScrollView also scrolls to the focused card via
+       * onFocus callbacks, ensuring the field stays above the keyboard even when
+       * it is in the middle or end of a long list.
        */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={KEYBOARD_VERTICAL_OFFSET}
       >
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           <Text style={[styles.title, { color: c.text }]}>{template.title}</Text>
           <Text style={{ color: c.textSecondary }}>
@@ -144,6 +156,7 @@ export default function ChecklistScreen() {
                   onRetryEvidence={retryEvidenceUpload}
                   reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
                   readOnly={readOnly}
+                  onInputFocus={handleItemFocus}
                 />
               ))}
             </View>
@@ -180,7 +193,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   keyboardAvoiding: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
-  container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
+  container: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl * 2 },
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold },
   card: { gap: Spacing.sm },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
