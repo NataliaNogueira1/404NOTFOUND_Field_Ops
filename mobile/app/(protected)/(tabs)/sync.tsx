@@ -22,7 +22,7 @@ export default function SyncScreen() {
   const view = buildSyncScreenViewModel({ isOnline, isSyncing, pendingCount, operations });
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
       {view.offlineBanner ? (
         <View style={[styles.offlineBanner, { backgroundColor: c.gray800 }]} accessibilityRole="alert">
           <Text style={styles.offlineText}>{`⚠️ ${view.offlineBanner}`}</Text>
