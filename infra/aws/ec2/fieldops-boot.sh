@@ -10,6 +10,7 @@
 #   4. API image built (only when absent, or with --update when the ref moved)
 #   5. API container running with the secrets in the env file (recreated when image/.env changed)
 #   6. waits until /actuator/health is UP (Flyway migrations + demo seed run inside the app boot)
+#   7. with FIELDOPS_DOMAIN set: Caddy proxy in front (HTTPS, Web Admin + /api), API only on loopback
 #
 # Secrets never live in this script or in the EC2 user-data: they stay in FIELDOPS_ENV_FILE.
 # Optional overrides go in /etc/fieldops/boot.conf (plain KEY=value lines, no secrets).
@@ -33,6 +34,19 @@ SWAP_FILE="${FIELDOPS_SWAP_FILE:-/swapfile}"
 SWAP_MB="${FIELDOPS_SWAP_MB:-2048}"
 HEALTH_TIMEOUT="${FIELDOPS_HEALTH_TIMEOUT:-240}"
 UPDATE="${FIELDOPS_UPDATE:-0}"
+
+# HTTPS front (#312): set FIELDOPS_DOMAIN in boot.conf to run the Caddy proxy. Empty = no proxy.
+DOMAIN="${FIELDOPS_DOMAIN:-}"
+WEB_HOST="${FIELDOPS_WEB_HOST:-fieldops-web-404nf.s3-website-us-east-1.amazonaws.com}"
+PROXY_CONTAINER="${FIELDOPS_PROXY_CONTAINER:-fieldops-proxy}"
+PROXY_IMAGE="${FIELDOPS_PROXY_IMAGE:-caddy:2}"
+PROXY_WAIT="${FIELDOPS_PROXY_WAIT:-180}"
+# Behind the proxy the API only listens on loopback; without a proxy it stays reachable on the port.
+if [[ -n "$DOMAIN" ]]; then
+  BIND_ADDR=127.0.0.1
+else
+  BIND_ADDR=0.0.0.0
+fi
 
 if [[ "${1:-}" == "--update" ]]; then
   UPDATE=1
@@ -112,7 +126,8 @@ ensure_image() {
 ensure_container() {
   local image_id env_hash current_image current_hash
   image_id="$(docker image inspect -f '{{.Id}}' "$IMAGE")"
-  env_hash="$(sha256sum "$ENV_FILE" | cut -d' ' -f1)"
+  # Hash of everything that is baked into the container: the env file and the published address.
+  env_hash="$({ printf '%s\n' "$BIND_ADDR"; cat "$ENV_FILE"; } | sha256sum | cut -d' ' -f1)"
   if docker container inspect "$CONTAINER" > /dev/null 2>&1; then
     current_image="$(docker container inspect -f '{{.Image}}' "$CONTAINER")"
     current_hash="$(docker container inspect -f '{{ index .Config.Labels "fieldops.env.sha256" }}' "$CONTAINER" 2> /dev/null || true)"
@@ -129,7 +144,7 @@ ensure_container() {
     docker rm -f "$CONTAINER" > /dev/null
   fi
   log "creating container $CONTAINER"
-  docker run -d --name "$CONTAINER" --restart unless-stopped -p "$PORT:8080" \
+  docker run -d --name "$CONTAINER" --restart unless-stopped -p "$BIND_ADDR:$PORT:8080" \
     --env-file "$ENV_FILE" --label "fieldops.env.sha256=$env_hash" "$IMAGE" > /dev/null
 }
 
@@ -146,6 +161,50 @@ wait_healthy() {
   log "API healthy (UP)"
 }
 
+ensure_proxy() {
+  if [[ -z "$DOMAIN" ]]; then
+    if docker container inspect "$PROXY_CONTAINER" > /dev/null 2>&1; then
+      log "FIELDOPS_DOMAIN not set; removing the HTTPS proxy"
+      docker rm -f "$PROXY_CONTAINER" > /dev/null
+    fi
+    return
+  fi
+  local caddyfile="$REPO_DIR/infra/aws/ec2/Caddyfile" config_hash current_hash
+  if [[ ! -f "$caddyfile" ]]; then
+    log "ERROR: $caddyfile not found at ref $GIT_REF"
+    exit 1
+  fi
+  config_hash="$({ printf '%s\n%s\n%s\n' "$DOMAIN" "$WEB_HOST" "$PROXY_IMAGE"; cat "$caddyfile"; } | sha256sum | cut -d' ' -f1)"
+  current_hash="$(docker container inspect -f '{{ index .Config.Labels "fieldops.proxy.sha256" }}' "$PROXY_CONTAINER" 2> /dev/null || true)"
+  if [[ "$current_hash" == "$config_hash" ]]; then
+    docker start "$PROXY_CONTAINER" > /dev/null
+    log "HTTPS proxy already configured for $DOMAIN"
+    return
+  fi
+  docker rm -f "$PROXY_CONTAINER" > /dev/null 2>&1 || true
+  log "starting the HTTPS proxy for $DOMAIN (certificate is issued on the first request)"
+  docker run -d --name "$PROXY_CONTAINER" --restart unless-stopped --network host \
+    -e FIELDOPS_DOMAIN="$DOMAIN" -e FIELDOPS_WEB_HOST="$WEB_HOST" \
+    -v "$caddyfile:/etc/caddy/Caddyfile:ro" -v fieldops-caddy-data:/data -v fieldops-caddy-config:/config \
+    --label "fieldops.proxy.sha256=$config_hash" "$PROXY_IMAGE" > /dev/null
+}
+
+# A missing certificate must not fail the boot: the API is already up, so this only warns.
+wait_proxy() {
+  [[ -n "$DOMAIN" ]] || return 0
+  local deadline=$((SECONDS + PROXY_WAIT))
+  # --resolve keeps the check on this machine, so it does not depend on the public address looping back.
+  until curl -fsS --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/actuator/health" 2> /dev/null | grep -q '"status":"UP"'; do
+    if ((SECONDS >= deadline)); then
+      log "WARNING: https://$DOMAIN did not answer within ${PROXY_WAIT}s (certificate pending, DNS or ports 80/443 blocked). Proxy logs:"
+      docker logs --tail 20 "$PROXY_CONTAINER" 2>&1 || true
+      return 0
+    fi
+    sleep 5
+  done
+  log "HTTPS proxy healthy: https://$DOMAIN"
+}
+
 main() {
   log "boot start (ref=$GIT_REF, update=$UPDATE)"
   require_env_file
@@ -155,6 +214,8 @@ main() {
   ensure_image
   ensure_container
   wait_healthy
+  ensure_proxy
+  wait_proxy
   log "boot done"
 }
 
