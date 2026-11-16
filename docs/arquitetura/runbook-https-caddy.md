@@ -22,8 +22,13 @@ A alternativa foi aprovada pela gestão em 16/11/2026.
 | `infra/aws/ec2/Caddyfile` | `/api/*` e `/actuator/health` vão para a API em `127.0.0.1:8080`; o resto vem do site estático do S3 (#311), com fallback de SPA |
 | `fieldops-boot` (#315) | Sobe e mantém o proxy a cada boot quando `FIELDOPS_DOMAIN` está definido |
 
-O Web Admin e a API ficam no **mesmo domínio**, então o build mantém `VITE_API_URL` vazio e não há CORS entre
-eles. Com o proxy ativo, a API só escuta em `127.0.0.1`: a porta 8080 deixa de ser acessível pela internet.
+O Web Admin e a API ficam no **mesmo domínio**, então o build mantém `VITE_API_URL` vazio. Mesmo assim o
+`CORS_ALLOWED_ORIGINS` da API **precisa listar `https://<nome>.sslip.io`**: o navegador envia o cabeçalho `Origin` nos
+`POST`, o Caddy fala HTTP com a API (que não lê o `X-Forwarded-Proto`) e ela enxerga uma origem diferente da sua, então
+aplica a lista e responde `403 Invalid CORS request`. O front classifica essa resposta como "Servidor indisponível" ao
+entrar. Veja a seção 3.
+
+Com o proxy ativo, a API só escuta em `127.0.0.1`: a porta 8080 deixa de ser acessível pela internet.
 
 Não use DuckDNS: a rede da empresa derruba esse domínio. Se o `sslip.io` também for bloqueado, veja a seção 5.
 
@@ -63,6 +68,16 @@ sudo FIELDOPS_GIT_REF=feat/312-https-caddy FIELDOPS_DOMAIN=A-B-C-D.sslip.io bash
 sudo tail -f /var/log/fieldops-boot.log
 ```
 
+Antes de instalar, ou depois, acrescente o domínio ao CORS da API (a linha não contém segredo):
+
+```bash
+sudo grep -q 'https://A-B-C-D.sslip.io' /opt/fieldops/.env || sudo sed -i 's|^CORS_ALLOWED_ORIGINS=.*|&,https://A-B-C-D.sslip.io|' /opt/fieldops/.env
+sudo grep '^CORS_ALLOWED_ORIGINS=' /opt/fieldops/.env
+sudo systemctl restart fieldops-boot
+```
+
+O `fieldops-boot` percebe que o `.env` mudou e recria o container da API.
+
 Troque `A-B-C-D` pelo Elastic IP. Esperado no log, em ordem: `container is outdated (image or env file changed)`
 (a API passa a publicar só em loopback), `starting the HTTPS proxy for ...`, `API healthy (UP)` e
 `HTTPS proxy healthy: https://...`, depois `boot done`. A primeira emissão do certificado leva de 10 a 60 segundos.
@@ -78,6 +93,8 @@ curl.exe -sS -o NUL -w "site: %{http_code} %{content_type}`n" "$d/"
 curl.exe -sS -o NUL -w "rota profunda: %{http_code} %{content_type}`n" "$d/app/inspections/1/review"
 curl.exe -sS "$d/actuator/health"
 curl.exe -sS -i "$d/api/v1/inspection-evidences/1/download-url" | Select-String "HTTP/|Cache|WWW"
+# CORS do login (o navegador envia Origin): esperado 400 de validação, nunca 403
+curl.exe -sS -w "`ncom Origin: %{http_code}`n" -X POST "$d/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $d" --data-raw "{}"
 ```
 
 | Critério | Como provar | Esperado |
@@ -112,6 +129,7 @@ Nomes `*.amazonaws.com` (como o DNS público da EC2) **não** recebem certificad
 | `502 Bad Gateway` em `/` | O endpoint do site do S3 não responde. Confira o bucket do #311 |
 | `502` em `/api/...` | A API não está de pé: `docker ps` e `sudo tail /var/log/fieldops-boot.log` |
 | `curl` direto no IP:8080 falha depois da ativação | Esperado: a API agora só escuta em loopback |
+| "Servidor indisponível" ao entrar, e `403 Invalid CORS request` com `Origin` | O domínio não está em `CORS_ALLOWED_ORIGINS` (seção 3) |
 
 ## 7. Voltar ao modo sem HTTPS
 
