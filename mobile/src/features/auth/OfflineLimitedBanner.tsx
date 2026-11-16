@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Button } from '@/design-system';
@@ -10,13 +9,13 @@ import { useAuth } from './AuthContext';
  * Banner shown when the user's session has expired but the app is offline,
  * allowing them to continue browsing locally-cached inspections.
  *
- * useSafeAreaInsets ensures the banner appears below the native status bar,
- * notch, or punch-hole camera on both iOS and Android (issue #332).
+ * The top safe-area inset is NOT applied here — it is applied once in the
+ * parent ProtectedLayout container (issue #332). Adding it here too would
+ * duplicate the offset when OfflineBanner is also visible at the same time.
  */
 export function OfflineLimitedBanner() {
   const { isOfflineLimited, signOut } = useAuth();
   const c = useThemeColors();
-  const insets = useSafeAreaInsets();
 
   if (!isOfflineLimited) return null;
 
@@ -24,7 +23,7 @@ export function OfflineLimitedBanner() {
     <View
       style={[
         styles.banner,
-        { backgroundColor: c.warningLight, borderBottomColor: c.warning, paddingTop: insets.top + Spacing.md },
+        { backgroundColor: c.warningLight, borderBottomColor: c.warning },
       ]}
     >
       <Text style={[styles.title, { color: c.warningDark }]}>Sessão expirada — modo offline</Text>
@@ -40,6 +39,7 @@ export function OfflineLimitedBanner() {
 const styles = StyleSheet.create({
   banner: {
     borderBottomWidth: 1,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
