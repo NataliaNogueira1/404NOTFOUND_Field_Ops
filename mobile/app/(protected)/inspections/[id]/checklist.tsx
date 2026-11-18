@@ -70,7 +70,7 @@ export default function ChecklistScreen() {
 
   if (templateLoading) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={{ color: c.textSecondary }}>Carregando checklist...</Text>
@@ -84,7 +84,7 @@ export default function ChecklistScreen() {
   // freezing forever on the spinner.
   if (!template || !hasChecklist) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <Text style={[styles.title, { color: c.text }]}>Checklist indisponível</Text>
           <Text style={{ color: c.textSecondary, textAlign: 'center' }}>
@@ -98,7 +98,7 @@ export default function ChecklistScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       {/*
        * KeyboardAvoidingView pushes the ScrollView up when the software keyboard
        * opens so text/number fields stay visible (issue #333).
