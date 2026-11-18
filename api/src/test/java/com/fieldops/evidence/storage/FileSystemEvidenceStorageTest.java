@@ -40,6 +40,14 @@ class FileSystemEvidenceStorageTest {
     }
 
     @Test
+    void hasNoTemporaryDownloadUrlBecauseTheBinaryIsOnlyServedThroughTheApi() throws Exception {
+        FileSystemEvidenceStorage storage = storage();
+        String reference = storage.store(new byte[] {1}, "jpg");
+
+        assertThat(storage.temporaryDownloadUrl(reference)).isEmpty();
+    }
+
+    @Test
     void storesBytesUnderRootAndReturnsARelativeReferenceRetrievableByOpen() throws Exception {
         FileSystemEvidenceStorage storage = storage();
         byte[] content = {10, 20, 30, 40};

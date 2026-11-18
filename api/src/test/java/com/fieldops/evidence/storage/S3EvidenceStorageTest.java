@@ -9,10 +9,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.AbortableInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -25,13 +31,39 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 class S3EvidenceStorageTest {
     private static final String BUCKET = "fieldops-evidencias-test";
 
+    private static final Duration PRESIGN_TTL = Duration.ofMinutes(5);
+
     private S3Client s3;
     private S3EvidenceStorage storage;
 
     @BeforeEach
     void setUp() {
         s3 = mock(S3Client.class);
-        storage = new S3EvidenceStorage(s3, BUCKET);
+        // Real presigner with fake static credentials: signing is local, no network call is made.
+        S3Presigner presigner = S3Presigner.builder().region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create("test-access-key", "test-secret-key")))
+                .build();
+        storage = new S3EvidenceStorage(s3, presigner, BUCKET, PRESIGN_TTL);
+    }
+
+    @Test
+    void createsATemporaryDownloadUrlForTheObjectThatExpiresAfterTheConfiguredTtl() {
+        Instant before = Instant.now();
+
+        TemporaryEvidenceUrl temporary = storage.temporaryDownloadUrl("abc.png").orElseThrow();
+
+        assertThat(temporary.url().getHost()).contains(BUCKET);
+        assertThat(temporary.url().getPath()).isEqualTo("/abc.png");
+        assertThat(temporary.url().getQuery()).contains("X-Amz-Expires=300").contains("X-Amz-Signature=");
+        assertThat(temporary.expiresAt()).isBetween(before.plus(PRESIGN_TTL).minusSeconds(5),
+                Instant.now().plus(PRESIGN_TTL).plusSeconds(5));
+    }
+
+    @Test
+    void doesNotCreateTemporaryUrlsForBlankOrNullReferences() {
+        assertThat(storage.temporaryDownloadUrl(null)).isEmpty();
+        assertThat(storage.temporaryDownloadUrl("   ")).isEmpty();
     }
 
     @Test

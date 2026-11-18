@@ -387,6 +387,33 @@ class ReviewInspectionControllerTest {
         assertThat(evidenceA.getInspection().getId()).isNotEqualTo(evidenceB.getInspection().getId());
     }
 
+    @Test
+    void exposesTheEvidenceDownloadUrlOnlyToReviewersAndFallsBackToTheContentEndpointOnLocalStorage() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.UNDER_REVIEW);
+        TemplateSection section = persistSection("Evidence", 1);
+        TemplateItem item = persistItem(section, "Photograph", 1);
+        InspectionItemSnapshot snapshot = saveSnapshot(inspection, section, item);
+        InspectionEvidence evidence = evidenceRepository.save(InspectionEvidence.create(inspection, snapshot,
+                "inspection-a/photo.jpg", "checksum-a", "Photo", null, Instant.parse("2026-02-01T10:00:00Z"), technician));
+
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/download-url", evidence.getId()))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/download-url", evidence.getId())
+                        .header("Authorization", "Bearer " + obtainTechnicianToken()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/download-url", evidence.getId())
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$.presigned").value(false))
+                .andExpect(jsonPath("$.url").value("/api/v1/inspection-evidences/" + evidence.getId() + "/content"))
+                .andExpect(jsonPath("$.expiresAt").doesNotExist());
+        mockMvc.perform(get("/api/v1/inspection-evidences/{id}/download-url", Long.MAX_VALUE)
+                        .header("Authorization", "Bearer " + obtainToken()))
+                .andExpect(status().isNotFound());
+    }
+
     private static Path createEvidenceRoot() {
         try { return Files.createTempDirectory("fieldops-evidence-"); }
         catch (java.io.IOException exception) { throw new IllegalStateException(exception); }
