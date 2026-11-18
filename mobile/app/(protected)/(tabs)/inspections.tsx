@@ -75,6 +75,7 @@ export default function InspectionsScreen() {
             InspectionStatus.UNDER_REVIEW,
             InspectionStatus.APPROVED,
             InspectionStatus.REJECTED,
+            InspectionStatus.CANCELED,
           ]}
           selected={status}
           onSelect={(value) => setStatus(value as typeof status)}
@@ -85,6 +86,7 @@ export default function InspectionsScreen() {
             UNDER_REVIEW: 'Em revisão',
             APPROVED: 'Aprovada',
             REJECTED: 'Reprovada',
+            CANCELED: 'Cancelada',
           }}
         />
         <Text style={[styles.filterLabel, { color: c.textSecondary }]}>Prioridade</Text>

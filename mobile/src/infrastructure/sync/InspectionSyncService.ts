@@ -54,6 +54,12 @@ interface ApiInspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Reason given when the inspection was cancelled (issue #342). */
+  canceledReason?: string;
+  /** Who cancelled the inspection (issue #342). */
+  canceledBy?: string;
+  /** When the inspection was cancelled, ISO date/time (issue #342). */
+  canceledAt?: string;
   version: number;
   template: ApiTemplate;
   reviewComments?: ApiReviewComment[];
@@ -366,6 +372,11 @@ export class InspectionSyncService {
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
+      // issue #342: bring the cancellation metadata down from the server so the
+      // CancellationBanner shows reason, who and when offline.
+      canceledReason: apiInsp.canceledReason,
+      canceledBy: apiInsp.canceledBy,
+      canceledAt: apiInsp.canceledAt,
       serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,

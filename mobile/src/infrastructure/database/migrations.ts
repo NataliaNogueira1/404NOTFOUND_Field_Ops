@@ -288,6 +288,18 @@ const migrations: Migration[] = [
       await addColumnIfMissing(db, 'inspections', 'signature_height', 'REAL');
     },
   },
+  {
+    version: 12,
+    description: 'issue #342: store cancellation metadata (reason, who, when) on inspections',
+    // Mirrors the rejection fields (v2) for the CANCELED status. Added
+    // defensively with addColumnIfMissing to stay idempotent on devices that
+    // may already carry these columns from an earlier build.
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'canceled_reason', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'canceled_by', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'canceled_at', 'TEXT');
+    },
+  },
 ];
 
 /**
