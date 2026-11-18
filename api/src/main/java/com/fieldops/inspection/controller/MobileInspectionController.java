@@ -39,7 +39,9 @@ public class MobileInspectionController {
         this.service = service;
     }
 
-    @Operation(summary = "List inspections assigned to the authenticated technician")
+    @Operation(summary = "List inspections assigned to the authenticated technician, including canceled ones",
+            description = "Returns ASSIGNED, IN_PROGRESS, REJECTED, and CANCELED inspections ordered by due date and time. "
+                    + "Cancellation audit fields are included when present.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Inspections with template snapshot"),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),

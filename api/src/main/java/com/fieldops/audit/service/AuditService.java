@@ -17,6 +17,7 @@ import java.util.List;
 public class AuditService {
 
     public static final String ENTITY_INSPECTION = "INSPECTION";
+    public static final String ENTITY_NON_CONFORMITY = "NON_CONFORMITY";
 
     private final AuditEventRepository repository;
 

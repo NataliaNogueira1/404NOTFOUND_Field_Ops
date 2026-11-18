@@ -22,7 +22,7 @@ de infraestrutura. A visão completa, personas, casos de uso e fluxos estão no
 |---|---|---|---|
 | API REST | [`api/`](../../api/README.md) | Java 21 + Spring Boot 3.5 + PostgreSQL + JWT | Regras de negócio, autenticação, persistência, OpenAPI |
 | Web Admin | [`frontend/`](../../frontend/README.md) | **React 19 + Vite + TypeScript** (React Router, Tailwind CSS) | Gestão, planejamento e revisão de inspeções |
-| Mobile | [`mobile/`](../../mobile/README.md) | Expo SDK 57 + React Native + TypeScript + SQLite | Execução de inspeções em campo, offline-first |
+| Mobile | [`mobile/`](../../mobile/README.md) | Expo SDK 58 + React Native + TypeScript + SQLite | Execução de inspeções em campo, offline-first |
 | Infraestrutura | — | PostgreSQL + SQLite + armazenamento de evidências | Dados centrais + locais + evidências |
 
 > **Atenção à stack do web (divergência do documento do professor).** O documento do

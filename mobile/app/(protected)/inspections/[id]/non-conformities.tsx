@@ -7,29 +7,36 @@ import { SeverityBadge } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { Severity, useFieldOps } from '@/features/fieldops';
+import { criticalEvidenceValidationError } from '@/features/fieldops/nonConformityValidation';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 export default function NonConformitiesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useThemeColors();
-  const { nonConformities, addNonConformity } = useFieldOps();
+  const { nonConformities, evidences, addNonConformity } = useFieldOps();
   const { template } = useInspectionTemplate(id);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity>(Severity.MEDIUM);
   const [itemId, setItemId] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const items = template?.sections.flatMap((section) => section.items) ?? [];
   const list = nonConformities.filter((nc) => nc.inspectionId === id);
 
   function save() {
     if (!itemId || !title) return;
-    addNonConformity({ inspectionId: id, itemId, title, description, severity, evidenceCount: 0 });
+    const evidenceCount = evidences.filter((evidence) => evidence.inspectionId === id && evidence.itemId === itemId).length;
+    const error = criticalEvidenceValidationError(severity, evidenceCount);
+    setValidationError(error);
+    if (error) return;
+    if (!addNonConformity({ inspectionId: id, itemId, title, description, severity, evidenceCount })) return;
     setOpen(false);
     setTitle('');
     setDescription('');
+    setValidationError(null);
   }
 
   return (
@@ -78,7 +85,7 @@ export default function NonConformitiesScreen() {
                 return (
                   <Pressable
                     key={value}
-                    onPress={() => setSeverity(value)}
+                    onPress={() => { setSeverity(value); setValidationError(null); }}
                     style={[styles.chip, { borderColor: active ? Colors.primary : c.border, backgroundColor: active ? Colors.primary : c.surface }]}
                   >
                     <Text style={[styles.chipText, { color: active ? Colors.white : c.textSecondary }]}>
@@ -93,13 +100,14 @@ export default function NonConformitiesScreen() {
               {items.map((item) => (
                 <Pressable
                   key={item.id}
-                  onPress={() => setItemId(item.id)}
+                  onPress={() => { setItemId(item.id); setValidationError(null); }}
                   style={[styles.itemOption, itemId === item.id && { backgroundColor: c.primaryLight }]}
                 >
                   <Text style={{ color: c.textSecondary }}>{item.question}</Text>
                 </Pressable>
               ))}
             </ScrollView>
+            {validationError && <Text accessibilityRole="alert" style={{ color: Colors.danger }}>{validationError}</Text>}
             <Button label="Salvar" onPress={save} fullWidth />
             <Button label="Cancelar" onPress={() => setOpen(false)} variant="ghost" fullWidth />
           </Card>

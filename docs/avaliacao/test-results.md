@@ -153,3 +153,56 @@ Observação Mobile: na primeira execução 1 suíte falhou ao rodar e, na segun
 
 Vulnerabilidades remanescentes sem fix compatível detalhadas na seção 3 de
 [`seguranca-dependencias.md`](seguranca-dependencias.md).
+
+## 11. Mobile — Upgrade Expo SDK 58 (validação, nov/2026)
+
+Registro da validação feita no upgrade do Expo SDK 57 → 58 (issue #335 / PR #345).
+
+| Verificação | Comando | Status | Resultado |
+|---|---|:--:|---|
+| Compatibilidade de deps | `npx expo install --check` | PASS | "Dependencies are up to date" (expo 58.0.23) |
+| Saúde do projeto | `npx expo-doctor` | PASS | 20/20 verificações, sem problemas (expo-doctor 1.21.6) |
+| Projeto nativo Android | `npx expo prebuild --platform android --no-install` | PASS | Gerou o projeto sem erros. RN 0.88 exige compileSdk 37, AGP 9.2.1, Kotlin 2.2.0 e NDK 27.1. **Não compila**: o APK (`build:apk` no EAS) ainda não foi gerado com o SDK 58. |
+| Type-check | `npx tsc --noEmit` | PASS | 0 erros (breaking changes do RN 0.88 ajustados) |
+| Lint | `npm run lint` | PASS | 0 erros/0 warnings |
+| Testes | `npm test` | PASS | 16 suítes, 167 testes (executado com `--runInBand`) |
+
+**Combinação de versões do Jest validada:** `jest@30.5.2` + `jest-expo@~58.0.14`
+(peer `jest ^29 || ^30`) + `ts-jest@^29.4.15` (peer `jest ^29 || ^30`, resolve 29.4.15)
++ `@react-native/jest-preset@0.88.1` + `babel-jest@30`. O `@react-native/jest-preset`
+mantém um `babel-jest@29` aninhado, que coexiste com o `babel-jest@30` de topo sem
+conflito. A suíte roda verde nessa combinação.
+
+> Observação: em execução paralela (sem `--runInBand`), com a máquina carregada, o Jest
+> 30 pode reportar "A worker process has failed to exit gracefully"; a suíte passa
+> integralmente em `--runInBand`. As suítes individuais também passam isoladas.
+
+**npm audit pós-SDK 58 (mobile):** 31 vulnerabilidades (0 critical, 0 high, 30 moderate,
+1 low) — todas toolchain de build/test. Detalhes em
+[`mobile/docs/security-audit-residual-risk.md`](../../mobile/docs/security-audit-residual-risk.md).
+
+**Validação em dispositivo (Android físico, Expo Go 58.0.5, API local em Docker):**
+
+| Item | Resultado | Observação |
+|---|:--:|---|
+| Login e navegação | OK | |
+| Sincronização (download) | OK | 4 inspeções baixadas, 0 erros |
+| Checklist (responder e concluir) | OK | |
+| GPS (início e conclusão) | OK | |
+| Câmera e galeria (evidências) | OK | |
+| Assinatura | OK com aviso | Aviso de desenvolvimento: `notify` chama o `setState` do pai dentro do updater de `setStrokes` (`SignaturePad.tsx`). Código anterior ao upgrade. |
+| SQLite (fechar e reabrir o app) | OK | Dados persistem |
+| Notificações | Parcial | Permissão OK. O agendamento de lembretes falha no Expo Go Android (`getNotificationChannelAsync` com NullPointerException, capturado e registrado como `WARN`). Validar com development build. |
+| Scanner QR | Não testado | O equipamento de demonstração não tem QR cadastrado. |
+| Offline → online | Não testado | Ver observação abaixo. |
+| iOS | Não validado | Sem dispositivo ou simulador disponível. |
+
+Observação sobre sincronização: ao concluir a inspeção 3, o app enfileirou duas
+operações `SUBMITTED` com `operationId` diferentes. O servidor aplicou a primeira e
+rejeitou a segunda (`Illegal transition from SUBMITTED to SUBMITTED`), sem duplicar
+dados. As duas ficaram como falha na tela de sincronização. O fluxo de conclusão e de
+sync não foi alterado por este upgrade, então é um defeito anterior, a tratar em
+issue separada.
+
+Ambiente: o Expo Go precisou de login no CLI (`npx expo login`) para carregar o bundle
+sem estourar o timeout do modo anônimo.
