@@ -3,6 +3,9 @@
 # is checked out on Windows (CRLF would corrupt the shebang inside the container).
 *.sh text eol=lf
 
+# systemd units are read by Linux only (EC2 boot automation, #315).
+*.service text eol=lf
+
 # Maven/Gradle wrapper scripts also need LF.
 mvnw text eol=lf
 gradlew text eol=lf
