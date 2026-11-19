@@ -27,12 +27,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -198,6 +200,41 @@ class MobileInspectionControllerTest {
         mockMvc.perform(get("/api/v1/mobile/inspections/{id}", Long.MAX_VALUE)
                         .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void exposesCancellationAuditOnDetailForCanceledInspection() throws Exception {
+        // #338: a CANCELED inspection must carry reason, canceler name and timestamp so the
+        // technician sees the same audit the supervisor already does (PR #330).
+        User supervisor = userRepository.findByEmail("sup@fieldops.com").orElseThrow();
+        Inspection canceled = saveInspection(template, technician, supervisor,
+                InspectionStatus.CANCELED, Priority.MEDIUM);
+        canceled.setCanceledReason("Cliente cancelou a visita técnica.");
+        canceled.setCanceledBy(supervisor);
+        canceled.setCanceledAt(Instant.parse("2026-11-02T12:00:00Z"));
+        inspectionRepository.saveAndFlush(canceled);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", canceled.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+                .andExpect(jsonPath("$.canceledReason").value("Cliente cancelou a visita técnica."))
+                .andExpect(jsonPath("$.canceledBy").value(supervisor.getName()))
+                .andExpect(jsonPath("$.canceledAt").value("2026-11-02T12:00:00Z"));
+    }
+
+    @Test
+    void omitsCancellationAuditForNonCanceledInspection() throws Exception {
+        // The audit block must stay null in any other state (#338).
+        Inspection assignedInspection = inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technician.getId())
+                .getFirst();
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", assignedInspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canceledReason").value(nullValue()))
+                .andExpect(jsonPath("$.canceledBy").value(nullValue()))
+                .andExpect(jsonPath("$.canceledAt").value(nullValue()));
     }
 
     private User persistUser(String email, Role role) {

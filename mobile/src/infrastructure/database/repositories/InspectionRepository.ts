@@ -240,7 +240,8 @@ export class InspectionRepository {
       inspection.syncStatus,
       inspection.pendingSyncCount,
       inspection.serverVersion ?? 0,
-      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0).
+      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0):
+      // status + 3 rejection columns + 3 cancellation columns.
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,

@@ -4,12 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
+  CancellationBanner,
   InspectionStatusBadge,
   PriorityBadge,
   ProgressBar,
   ReadOnlyBanner,
   RejectionBanner,
-  CancellationBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
