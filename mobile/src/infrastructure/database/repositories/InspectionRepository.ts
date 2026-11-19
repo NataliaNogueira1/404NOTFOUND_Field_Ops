@@ -249,9 +249,6 @@ export class InspectionRepository {
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
-      isServerAuthoritative ? 1 : 0,
-      isServerAuthoritative ? 1 : 0,
-      isServerAuthoritative ? 1 : 0,
     );
   }
 
