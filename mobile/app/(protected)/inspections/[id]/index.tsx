@@ -10,7 +10,6 @@ import {
   ProgressBar,
   ReadOnlyBanner,
   RejectionBanner,
-  CancellationBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
