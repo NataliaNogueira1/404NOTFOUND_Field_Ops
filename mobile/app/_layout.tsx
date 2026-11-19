@@ -51,7 +51,9 @@ function AuthGate() {
   //   2. The user opted in to biometric unlock (stored in SecureStore).
   // The lock is cleared when the user passes the biometric prompt inside
   // BiometricLockScreen, which calls unlockSession().
-  const appState = useRef<AppStateStatus>(AppState.currentState);
+  // RN 0.88 widened the type of `AppState.currentState`; mirror it on the ref so
+  // the initial value always matches, regardless of how RN types the union.
+  const appState = useRef<typeof AppState.currentState>(AppState.currentState);
 
   useEffect(() => {
     const subscription = AppState.addEventListener(

@@ -12,6 +12,7 @@ import {
   SyncQueueRepository,
 } from '@/infrastructure/database/repositories';
 import { InspectionSyncService } from '@/infrastructure/sync';
+import { rescheduleAllReminders, cancelInspectionReminders } from '@/infrastructure/notifications/localNotifications';
 
 import {
   InspectionStatus,
@@ -24,6 +25,7 @@ import {
   type ReviewComment,
   type SyncOperation,
 } from './types';
+import { criticalEvidenceValidationError } from './nonConformityValidation';
 
 // ─── Context Interface ─────────────────────────────────────────────────────────
 
@@ -45,13 +47,20 @@ interface FieldOpsContextValue {
   answerItem: (itemId: string, value: ChecklistValue, observation?: string, inspectionId?: string) => void;
   addEvidence: (inspectionId: string, itemId: string, description: string, uri?: string) => Evidence;
   retryEvidenceUpload: (evidenceId: string) => void;
-  addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => void;
+  addNonConformity: (input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => boolean;
   /**
    * Persist the technician's handwritten signature for the given inspection
    * (PBI-086). Saves the SVG data URI to SQLite so it survives offline restarts
    * and is included in the conclusion payload when synced.
+   * Also persists raw strokes + canvas dimensions for on-device preview (issue #334).
    */
-  saveSignature: (inspectionId: string, signatureUri: string) => void;
+  saveSignature: (
+    inspectionId: string,
+    signatureUri: string,
+    strokes?: string,
+    width?: number,
+    height?: number,
+  ) => void;
   concludeInspection: (
     inspectionId: string,
     options?: {
@@ -80,7 +89,7 @@ async function pullFromApi(db: SQLiteDatabase, token: string): Promise<void> {
   try {
     const syncService = new InspectionSyncService(db);
     console.log('[FieldOps] Pulling inspections from API...');
-    const result = await syncService.pullInspections(token);
+    const result = await syncService.pullInspections(token, rescheduleAllReminders);
     console.log('[FieldOps] Pull complete:', result.downloaded, 'downloaded,', result.errors.length, 'errors');
   } catch (apiError) {
     console.warn('[FieldOps] API pull failed, falling back to local data:', apiError);
@@ -451,32 +460,44 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
   }, [evidences, getSyncService]);
 
   const addNonConformity = useCallback((input: Omit<NonConformity, 'id' | 'evidenceCount'> & { evidenceCount?: number }) => {
+    if (criticalEvidenceValidationError(input.severity, input.evidenceCount ?? 0)) return false;
     const nc: NonConformity = { ...input, id: `nc-manual-${Date.now()}`, evidenceCount: input.evidenceCount ?? 0 };
     setNonConformities((current) => [...current, nc]);
     const repos = getRepos();
     const sync = getSyncService();
     if (repos && sync) {
       repos.nc.add(nc).catch(console.warn);
-      sync.enqueueNonConformity(nc).catch(console.warn);
+      const evidenceDependencies = evidences
+        .filter((evidence) => evidence.inspectionId === nc.inspectionId && evidence.itemId === nc.itemId
+          && evidence.syncStatus !== 'synced')
+        .map((evidence) => evidence.operationId ?? InspectionSyncService.evidenceOperationId(evidence.id));
+      sync.enqueueNonConformity(nc, evidenceDependencies).catch(console.warn);
     }
-  }, [getRepos, getSyncService]);
+    return true;
+  }, [evidences, getRepos, getSyncService]);
 
   /**
    * Persist the technician's handwritten signature (PBI-086).
    * Updates in-memory state and saves the SVG data URI to SQLite. The signature
    * is included in the sync payload when the inspection is concluded.
    */
-  const saveSignature = useCallback((inspectionId: string, signatureUri: string) => {
+  const saveSignature = useCallback((
+    inspectionId: string,
+    signatureUri: string,
+    strokes?: string,
+    width?: number,
+    height?: number,
+  ) => {
     setInspections((current) =>
       current.map((insp) =>
         insp.id === inspectionId
-          ? { ...insp, signatureUri, syncStatus: 'pending' as const }
+          ? { ...insp, signatureUri, signatureStrokes: strokes, signatureWidth: width, signatureHeight: height, syncStatus: 'pending' as const }
           : insp,
       ),
     );
     const repos = getRepos();
     if (repos) {
-      repos.inspection.saveSignature(inspectionId, signatureUri).catch(console.warn);
+      repos.inspection.saveSignature(inspectionId, signatureUri, strokes, width, height).catch(console.warn);
     }
   }, [getRepos]);
 
@@ -515,6 +536,11 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
         // conclusion location (PBI-040 / PBI-045).
         sync.enqueueConclusion(inspectionId, { endedAtDevice, location }).catch(console.warn);
       }
+      // Cancel the local deadline reminders immediately on conclusion, without
+      // waiting for the next sync (PBI-084). Works fully offline — the inspection
+      // is now SUBMITTED so it must no longer alert the technician. Fire-and-forget:
+      // a notification failure must never block the conclusion flow.
+      cancelInspectionReminders(inspectionId).catch(console.warn);
     },
     [getRepos, getSyncService],
   );
@@ -588,7 +614,9 @@ export function FieldOpsProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     setLastSyncError(null);
     try {
-      const result = await sync.fullSync(token);
+      // Pass rescheduleAllReminders as the onAfterPull callback so that every
+      // full sync cycle updates local deadline notifications (PBI-084).
+      const result = await sync.fullSync(token, rescheduleAllReminders);
       if (result.errors.length > 0) {
         setLastSyncError(result.errors[0]);
       }

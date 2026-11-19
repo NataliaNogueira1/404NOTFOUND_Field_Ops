@@ -142,6 +142,34 @@ export function ReadOnlyBanner({ status }: { status: InspectionStatus }) {
   );
 }
 
+/**
+ * Banner shown on the inspection detail screen when status is CANCELED (issue #342).
+ * Aligns the fallback treatment with the web: uses .trim() so an all-whitespace
+ * string is treated the same as an empty one (not shown as a reason).
+ */
+export function CancellationBanner({
+  reason,
+  canceledBy,
+  canceledAt,
+}: {
+  reason?: string;
+  canceledBy?: string;
+  canceledAt?: string;
+}) {
+  return (
+    <View style={styles.cancellation} accessibilityRole="alert">
+      <Text style={styles.cancellationTitle}>🚫 Inspeção cancelada</Text>
+      <Text style={styles.cancellationBody}>
+        {reason?.trim() ? reason.trim() : 'Motivo não informado'}
+      </Text>
+      {canceledBy ? (
+        <Text style={styles.cancellationMeta}>Cancelada por: {canceledBy}</Text>
+      ) : null}
+      {canceledAt ? <Text style={styles.cancellationMeta}>Data: {canceledAt}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 999, backgroundColor: Colors.gray100, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 999, backgroundColor: Colors.primary },
@@ -157,4 +185,8 @@ const styles = StyleSheet.create({
   readOnly: { borderWidth: 1, borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
   readOnlyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
   readOnlyBody: { fontSize: FontSize.sm, lineHeight: 20 },
+  cancellation: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#6B7280', borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
+  cancellationTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#374151' },
+  cancellationBody: { fontSize: FontSize.sm, color: '#374151', lineHeight: 20 },
+  cancellationMeta: { fontSize: FontSize.xs, color: '#6B7280', marginTop: 2 },
 });

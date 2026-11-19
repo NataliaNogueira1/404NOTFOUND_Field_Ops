@@ -10,6 +10,7 @@ import {
   ProgressBar,
   ReadOnlyBanner,
   RejectionBanner,
+  CancellationBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -76,7 +77,7 @@ export default function InspectionDetailsScreen() {
 
   if (!inspection) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <Text style={[styles.empty, { color: c.textSecondary }]}>Inspeção não encontrada.</Text>
           <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
@@ -104,7 +105,7 @@ export default function InspectionDetailsScreen() {
       : `${inspection.progress}% concluído`;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: c.text }]}>{inspection.title}</Text>
         <View style={styles.badges}>

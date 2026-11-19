@@ -15,6 +15,10 @@ interface BackendSection { title: string; order: number; items: BackendItem[] }
 interface BackendItem extends Omit<ReviewItem, 'snapshotId' | 'evidences' | 'nonConformities'> { snapshotId: number; evidences: BackendEvidence[]; nonConformities: BackendNonConformity[] }
 interface BackendEvidence extends Omit<ReviewEvidence, 'id' | 'itemSnapshotId'> { id: number; itemSnapshotId: number }
 interface BackendNonConformity extends Omit<ReviewNonConformity, 'id' | 'snapshotId'> { id: number; snapshotId: number | null }
+// Backend contract (com.fieldops.evidence.dto.EvidenceDownloadUrlResponse, #310).
+interface EvidenceDownloadUrl { url: string; expiresAt: string | null; presigned: boolean }
+/** The review payload only exposes the `/content` path; the temporary link lives beside it. */
+function downloadUrlPath(contentUrl: string) { return contentUrl.replace(/\/content$/, '/download-url') }
 interface Decision { id: number; status: InspectionStatus; reviewedAt: string; reviewedBy: number; comment: string | null; rejectionReason: string | null }
 // Backend contract (com.fieldops.reviewcomment.dto.ReviewCommentResponse): the item snapshot id is
 // `itemId`, and the section/item titles are `section`/`item`. Mapped to the UI names below.
@@ -24,7 +28,16 @@ function nc(value: BackendNonConformity): ReviewNonConformity { return { ...valu
 function item(value: BackendItem): ReviewItem { return { ...value, snapshotId: String(value.snapshotId), evidences: value.evidences.map(evidence => ({ ...evidence, id: String(evidence.id), itemSnapshotId: String(evidence.itemSnapshotId) })), nonConformities: value.nonConformities.map(nc) } }
 export const inspectionReviewApi = {
   async get(id: string): Promise<InspectionReview> { const value = await httpClient.get<BackendReview>(`/api/v1/inspections/${id}/review`); return { ...value, id: String(value.id), sections: value.sections.map(section => ({ ...section, items: section.items.map(item) })), nonConformities: value.nonConformities.map(nc) } },
-  async loadEvidenceImage(contentUrl: string) { return URL.createObjectURL(await apiRequestBlob(contentUrl)) },
+  /**
+   * Resolves an <img>-ready source for an evidence. A presigned link is returned untouched: it already
+   * carries its own signature, so it must be loaded without the Authorization header (S3 rejects both).
+   * Otherwise the image is downloaded through the authenticated content endpoint as a blob URL.
+   */
+  async loadEvidenceImage(contentUrl: string) {
+    const location = await httpClient.get<EvidenceDownloadUrl>(downloadUrlPath(contentUrl))
+    if (location.presigned) return location.url
+    return URL.createObjectURL(await apiRequestBlob(location.url))
+  },
   beginReview: (id: string) => httpClient.post<{ id: number; status: InspectionStatus }>(`/api/v1/inspections/${id}/begin-review`),
   approve: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`),
   reject: (id: string, reason: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/reject`, { reason: reason.trim() }),

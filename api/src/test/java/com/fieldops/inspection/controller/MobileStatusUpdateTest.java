@@ -115,6 +115,29 @@ class MobileStatusUpdateTest {
                 .isEqualTo(InspectionStatus.IN_PROGRESS);
     }
 
+    /**
+     * Regression (#229 field test): the device re-sent IN_PROGRESS with a NEW operationId after
+     * the server was already IN_PROGRESS, and got "Illegal transition from IN_PROGRESS to
+     * IN_PROGRESS", wedging the outbox. Reaching the status the device asked for is the goal of
+     * the operation, so it must be ALREADY_APPLIED and recorded, without a new transition.
+     */
+    @Test
+    void treatsTransitionToCurrentStatusAsAlreadyApplied() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.IN_PROGRESS);
+        String token = obtainToken();
+        String body = "{\"operationId\":\"" + UUID.randomUUID() + "\",\"baseVersion\":0,\"status\":\"IN_PROGRESS\"}";
+
+        mockMvc.perform(post("/api/v1/mobile/inspections/{id}/status", inspection.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").value("ALREADY_APPLIED"))
+                .andExpect(jsonPath("$.applied").value(false))
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+
+        assertThat(processedOperationRepository.count()).isEqualTo(1);
+    }
+
     @Test
     void rejectsIllegalTransitionWith422() throws Exception {
         Inspection inspection = saveInspection(InspectionStatus.ASSIGNED);

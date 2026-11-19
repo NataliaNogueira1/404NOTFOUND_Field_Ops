@@ -277,11 +277,23 @@ const migrations: Migration[] = [
   },
   {
     version: 11,
-    description: '#338: store cancellation audit (reason, canceler name, timestamp) pulled from the server',
-    // Mirrors the rejection metadata (v2) so the technician sees why the inspection
-    // was canceled — reason, who canceled it and when — on the detail screen, the
-    // same audit the supervisor already gets. Added defensively: a device may
-    // already carry these columns from an earlier build (idempotent guard).
+    description: 'issue #334: store signature strokes JSON for on-device preview',
+    // The signature_uri column (v7) only persists the SVG data URI. React Native's
+    // <Image> cannot decode SVG data URIs, so the SignaturePreview component needs
+    // the raw strokes to redraw the signature on-device. This column stores them
+    // as a JSON string (SignatureStroke[][]), populated whenever a signature is saved.
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'signature_strokes', 'TEXT');
+      await addColumnIfMissing(db, 'inspections', 'signature_width', 'REAL');
+      await addColumnIfMissing(db, 'inspections', 'signature_height', 'REAL');
+    },
+  },
+  {
+    version: 12,
+    description: 'issue #342: store cancellation metadata (reason, who, when) on inspections',
+    // Mirrors the rejection fields (v2) for the CANCELED status. Added
+    // defensively with addColumnIfMissing to stay idempotent on devices that
+    // may already carry these columns from an earlier build.
     run: async (db) => {
       await addColumnIfMissing(db, 'inspections', 'canceled_reason', 'TEXT');
       await addColumnIfMissing(db, 'inspections', 'canceled_by', 'TEXT');

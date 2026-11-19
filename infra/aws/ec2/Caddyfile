@@ -1,0 +1,35 @@
+# Caddy reverse proxy that gives the EC2 a public HTTPS endpoint (#312).
+#
+# The Learner Lab blocks CloudFront, so this container plays its role: one HTTPS domain for the
+# Web Admin and the API. Caddy gets and renews the Let's Encrypt certificate by itself (HTTP-01
+# challenge, which needs ports 80 and 443 open in the security group).
+#
+# Started by fieldops-boot.sh with --network host. Both variables are provided by the script:
+#   FIELDOPS_DOMAIN    public host name, e.g. 32-201-122-225.sslip.io
+#   FIELDOPS_WEB_HOST  S3 static website endpoint that holds the Web Admin build (#311)
+{$FIELDOPS_DOMAIN} {
+	encode zstd gzip
+
+	# REST API: same domain as the site, so the Web Admin keeps VITE_API_URL empty and needs no CORS.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Only the health endpoint is exposed; the other actuator endpoints stay on loopback.
+	handle /actuator/health {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Web Admin from the S3 website. The S3 website endpoint matches the bucket by Host header.
+	handle {
+		# Static files have an extension; anything else is a route of the single-page app.
+		@spa {
+			not path_regexp \.[A-Za-z0-9]+$
+		}
+		rewrite @spa /index.html
+
+		reverse_proxy http://{$FIELDOPS_WEB_HOST} {
+			header_up Host {$FIELDOPS_WEB_HOST}
+		}
+	}
+}

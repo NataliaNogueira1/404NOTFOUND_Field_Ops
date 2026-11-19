@@ -10,6 +10,10 @@ import { useConnectivity } from '@/infrastructure/connectivity';
  *
  * All screens keep reading from the local SQLite database while offline, so this
  * banner is purely informative — it does not block any local action.
+ *
+ * The top safe-area inset is NOT applied here — it is applied once in the
+ * parent ProtectedLayout container (issue #332). Adding it here too would
+ * duplicate the offset when OfflineLimitedBanner is also visible.
  */
 export function OfflineBanner() {
   const { isOffline } = useConnectivity();
@@ -17,7 +21,10 @@ export function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <View style={styles.banner} accessibilityRole="alert">
+    <View
+      style={styles.banner}
+      accessibilityRole="alert"
+    >
       <Text style={styles.text}>📡 Modo offline — usando dados salvos no dispositivo</Text>
     </View>
   );
@@ -26,7 +33,8 @@ export function OfflineBanner() {
 const styles = StyleSheet.create({
   banner: {
     backgroundColor: Colors.gray800,
-    paddingVertical: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
   },

@@ -1,4 +1,4 @@
-﻿export enum InspectionStatus { DRAFT = 'DRAFT', ASSIGNED = 'ASSIGNED', IN_PROGRESS = 'IN_PROGRESS', SUBMITTED = 'SUBMITTED', UNDER_REVIEW = 'UNDER_REVIEW', APPROVED = 'APPROVED', REJECTED = 'REJECTED', CANCELED = 'CANCELED' }
+export enum InspectionStatus { DRAFT = 'DRAFT', ASSIGNED = 'ASSIGNED', IN_PROGRESS = 'IN_PROGRESS', SUBMITTED = 'SUBMITTED', UNDER_REVIEW = 'UNDER_REVIEW', APPROVED = 'APPROVED', REJECTED = 'REJECTED', CANCELED = 'CANCELED' }
 export enum Priority { LOW = 'LOW', MEDIUM = 'MEDIUM', HIGH = 'HIGH', CRITICAL = 'CRITICAL' }
 export enum Severity { LOW = 'LOW', MEDIUM = 'MEDIUM', HIGH = 'HIGH', CRITICAL = 'CRITICAL' }
 export enum ResponseType { TEXT_SHORT = 'TEXT_SHORT', TEXT_LONG = 'TEXT_LONG', NUMBER = 'NUMBER', BOOLEAN = 'BOOLEAN', CONFORMITY = 'CONFORMITY', SINGLE_CHOICE = 'SINGLE_CHOICE', DATE = 'DATE' }
@@ -59,17 +59,27 @@ export interface Inspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
-  /** Reason the inspection was CANCELED by the admin/supervisor (#338). */
+  /** Reason given by the administrator/supervisor when the inspection was CANCELED. */
   canceledReason?: string;
-  /** Who canceled the inspection (admin/supervisor name) (#338). */
+  /** Who cancelled the inspection (name). */
   canceledBy?: string;
-  /** When the inspection was canceled (ISO date/time) (#338). */
+  /** When the inspection was cancelled (ISO date/time). */
   canceledAt?: string;
   /**
    * SVG data URI (base64) or local file path of the technician's handwritten
    * signature captured at conclusion (PBI-086).
    */
   signatureUri?: string;
+  /**
+   * Raw strokes serialised as JSON for the on-device SignaturePreview (issue #334).
+   * React Native's <Image> cannot decode SVG data URIs, so the preview component
+   * redraws the strokes directly instead of using signatureUri.
+   */
+  signatureStrokes?: string;
+  /** Canvas width at capture time, needed to scale the preview correctly. */
+  signatureWidth?: number;
+  /** Canvas height at capture time, needed to scale the preview correctly. */
+  signatureHeight?: number;
   /**
    * When true, the conclusion flow requires a non-empty signature before
    * submitting (PBI-086, configurable per inspection template).

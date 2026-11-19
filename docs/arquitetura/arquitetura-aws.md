@@ -108,6 +108,13 @@ flowchart TB
 | 11 — Revisão no Web | Supervisor no Web (CloudFront→S3) → API (CloudFront→EC2) → RDS; fotos via presigned URL. |
 | 12 — Atualização no APK | APK sincroniza estado atualizado do servidor (RDS). |
 
+> **Revisão de 16/11/2026 (decisões #1 e #2):** o Learner Lab bloqueou o CloudFront (`AccessDenied` para o
+> console e para a `LabRole`), então o HTTPS e o domínio estável passam a ser entregues por um proxy **Caddy na
+> própria EC2**, com certificado do Let's Encrypt e um nome `*.sslip.io` apontando para um **Elastic IP**. O
+> restante do desenho (S3, RDS privado, `LabRole`, presigned URL) não muda. Detalhes e validação em
+> `docs/arquitetura/runbook-https-caddy.md`. As referências a CloudFront abaixo e no diagrama descrevem o
+> desenho original.
+
 ## Decisões de arquitetura (congeladas)
 
 Decisões tomadas para o cenário **AWS Academy Learner Lab** (role `LabRole` fixa,
