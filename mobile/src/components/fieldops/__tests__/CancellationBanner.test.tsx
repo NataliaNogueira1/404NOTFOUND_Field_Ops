@@ -7,7 +7,7 @@
  * o tratamento do web, que usa .trim()).
  */
 
-import { render } from '@testing-library/react-native';
+import { render, type RenderResult } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { ThemeProvider } from '@/features/theme';
@@ -21,11 +21,12 @@ jest.mock('@/infrastructure/storage/themeStorage', () => ({
   },
 }));
 
+// RNTL v14 renderiza de forma assíncrona sob React 19: `render` resolve para as queries.
 function renderBanner(props: {
   reason?: string;
   canceledBy?: string;
   canceledAt?: string;
-}): ReturnType<typeof render> {
+}): Promise<RenderResult> {
   const ui: ReactElement = (
     <ThemeProvider>
       <CancellationBanner {...props} />
@@ -35,53 +36,53 @@ function renderBanner(props: {
 }
 
 describe('CancellationBanner', () => {
-  it('exibe o título "Inspeção cancelada"', () => {
-    const { getByText } = renderBanner({ reason: 'Equipamento inativo' });
+  it('exibe o título "Inspeção cancelada"', async () => {
+    const { getByText } = await renderBanner({ reason: 'Equipamento inativo' });
     expect(getByText(/Inspeção cancelada/i)).toBeTruthy();
   });
 
-  it('exibe o motivo quando fornecido', () => {
-    const { getByText } = renderBanner({ reason: 'Equipamento inativo' });
+  it('exibe o motivo quando fornecido', async () => {
+    const { getByText } = await renderBanner({ reason: 'Equipamento inativo' });
     expect(getByText('Equipamento inativo')).toBeTruthy();
   });
 
-  it('exibe "Motivo não informado" quando reason é undefined', () => {
-    const { getByText } = renderBanner({});
+  it('exibe "Motivo não informado" quando reason é undefined', async () => {
+    const { getByText } = await renderBanner({});
     expect(getByText('Motivo não informado')).toBeTruthy();
   });
 
-  it('exibe "Motivo não informado" quando reason é string vazia', () => {
-    const { getByText } = renderBanner({ reason: '' });
+  it('exibe "Motivo não informado" quando reason é string vazia', async () => {
+    const { getByText } = await renderBanner({ reason: '' });
     expect(getByText('Motivo não informado')).toBeTruthy();
   });
 
-  it('exibe "Motivo não informado" quando reason é só whitespace (alinhamento com web)', () => {
-    const { getByText } = renderBanner({ reason: '   ' });
+  it('exibe "Motivo não informado" quando reason é só whitespace (alinhamento com web)', async () => {
+    const { getByText } = await renderBanner({ reason: '   ' });
     expect(getByText('Motivo não informado')).toBeTruthy();
   });
 
-  it('exibe quem cancelou quando canceledBy é fornecido', () => {
-    const { getByText } = renderBanner({ canceledBy: 'Marina Supervisora' });
+  it('exibe quem cancelou quando canceledBy é fornecido', async () => {
+    const { getByText } = await renderBanner({ canceledBy: 'Marina Supervisora' });
     expect(getByText(/Cancelada por: Marina Supervisora/i)).toBeTruthy();
   });
 
-  it('não exibe a linha "Cancelada por" quando canceledBy está ausente', () => {
-    const { queryByText } = renderBanner({ reason: 'Motivo X' });
+  it('não exibe a linha "Cancelada por" quando canceledBy está ausente', async () => {
+    const { queryByText } = await renderBanner({ reason: 'Motivo X' });
     expect(queryByText(/Cancelada por:/i)).toBeNull();
   });
 
-  it('exibe a data quando canceledAt é fornecido', () => {
-    const { getByText } = renderBanner({ canceledAt: '2026-10-10T14:00:00Z' });
+  it('exibe a data quando canceledAt é fornecido', async () => {
+    const { getByText } = await renderBanner({ canceledAt: '2026-10-10T14:00:00Z' });
     expect(getByText(/Data: 2026-10-10T14:00:00Z/i)).toBeTruthy();
   });
 
-  it('não exibe a linha "Data" quando canceledAt está ausente', () => {
-    const { queryByText } = renderBanner({ reason: 'Motivo X' });
+  it('não exibe a linha "Data" quando canceledAt está ausente', async () => {
+    const { queryByText } = await renderBanner({ reason: 'Motivo X' });
     expect(queryByText(/^Data:/i)).toBeNull();
   });
 
-  it('exibe todos os campos quando todos estão presentes', () => {
-    const { getByText } = renderBanner({
+  it('exibe todos os campos quando todos estão presentes', async () => {
+    const { getByText } = await renderBanner({
       reason: 'Projeto encerrado',
       canceledBy: 'Admin Sistema',
       canceledAt: '2026-11-01T09:30:00Z',
