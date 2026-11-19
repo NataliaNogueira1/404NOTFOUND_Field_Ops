@@ -9,6 +9,7 @@ import {
   ProgressBar,
   ReadOnlyBanner,
   RejectionBanner,
+  CancellationBanner,
 } from '@/components/fieldops';
 import { Button, Card } from '@/design-system';
 import { FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -128,6 +129,14 @@ export default function InspectionDetailsScreen() {
             rejectedBy={inspection.rejectedBy}
             rejectedAt={inspection.rejectedAt}
             items={inspectionNCs.map((nc) => nc.title)}
+          />
+        ) : null}
+
+        {inspection.status === InspectionStatus.CANCELED ? (
+          <CancellationBanner
+            reason={inspection.canceledReason}
+            canceledBy={inspection.canceledBy}
+            canceledAt={inspection.canceledAt}
           />
         ) : null}
 
