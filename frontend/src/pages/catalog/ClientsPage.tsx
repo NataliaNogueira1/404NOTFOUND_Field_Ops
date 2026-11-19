@@ -343,6 +343,7 @@ export function ClientDetailsPage() {
   const [loadingSites, setLoadingSites] = useState(true)
   const [clientError, setClientError] = useState('')
   const [notFound, setNotFound] = useState(false)
+  const [sitesError, setSitesError] = useState('')
   const [editingClient, setEditingClient] = useState<ManagedClient | null>(null)
   const [editingSite, setEditingSite] = useState<ManagedInspectionSite | 'new' | null>(null)
   const [changingSiteStatus, setChangingSiteStatus] = useState<ManagedInspectionSite | null>(null)
@@ -368,11 +369,13 @@ export function ClientDetailsPage() {
 
   const loadSites = useCallback(async () => {
     setLoadingSites(true)
+    setSitesError('')
     try {
       const result = await sitesApi.listByClient(clientId)
       setSites(result)
     } catch {
-      /* Mantém lista vazia em caso de erro; o erro do cliente principal já é exibido */
+      // Falha nos locais não pode parecer "lista vazia": exibe erro com retry só nesta seção
+      setSitesError('Não foi possível carregar os locais deste cliente.')
     } finally {
       setLoadingSites(false)
     }
@@ -543,13 +546,17 @@ export function ClientDetailsPage() {
             Adicionar local
           </Button>
         </div>
-        <DataTable
-          columns={siteColumns}
-          rows={sites}
-          loading={loadingSites}
-          loadingLabel="Carregando locais..."
-          empty="Nenhum local cadastrado para este cliente."
-        />
+        {sitesError ? (
+          <ErrorState message={sitesError} onRetry={() => void loadSites()} />
+        ) : (
+          <DataTable
+            columns={siteColumns}
+            rows={sites}
+            loading={loadingSites}
+            loadingLabel="Carregando locais..."
+            empty="Nenhum local cadastrado para este cliente."
+          />
+        )}
       </section>
       <ManagedClientModal
         key={editingClient?.id ?? 'closed'}
