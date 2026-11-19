@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+﻿import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,7 +14,7 @@ const client = {
   email: 'contato@atlas.com',
   phone: '(11) 99999-0000',
   status: 'ACTIVE',
-  activeSitesCount: 2,
+  activeSitesCount: 7,
   version: 0,
 }
 
@@ -107,8 +107,8 @@ describe('ClientDetailsPage', () => {
     expect(screen.getByText('(11) 99999-0000')).not.toBeNull()
     // "Ativo" aparece no status do cliente e no badge do primeiro local
     expect(screen.getAllByText('Ativo').length).toBeGreaterThan(0)
-    // activeSitesCount (2) aparece no resumo; equipmentCount também pode ser 2
-    expect(screen.getAllByText('2').length).toBeGreaterThan(0)
+    // activeSitesCount (7) é único na tela e aparece no resumo da estrutura
+    expect(screen.getByText('7')).not.toBeNull()
 
     // a chamada à API real foi feita
     const clientCalls = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.includes(`/clients/${CLIENT_ID}`))
@@ -162,17 +162,22 @@ describe('ClientDetailsPage', () => {
     // não deve haver botão de retry (404 não é recuperável)
     expect(screen.queryByRole('button', { name: /Tentar novamente/i })).toBeNull()
     // link de voltar para a lista de clientes
-    expect(screen.getByText('Clientes')).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'Clientes' }).getAttribute('href')).toBe('/app/clients')
   })
 
   it('edita o cliente via API real e recarrega os dados', async () => {
     let putBody: Record<string, unknown> | undefined
+    let currentClient = client
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith(`/api/v1/clients/${CLIENT_ID}`) && init?.method === 'PUT') {
+      const url = String(input)
+      if (url.endsWith(`/api/v1/clients/${CLIENT_ID}`) && init?.method === 'PUT') {
         putBody = JSON.parse(String(init.body)) as Record<string, unknown>
-        return json({ ...client, name: 'Industria Atlas Editada' })
+        currentClient = { ...client, name: 'Industria Atlas Editada' }
+        return json(currentClient)
       }
-      return defaultFetch(input)
+      if (url.includes(`/api/v1/clients/${CLIENT_ID}/sites`)) return json(sites)
+      if (url.includes(`/api/v1/clients/${CLIENT_ID}`)) return json(currentClient)
+      return json({}, 404)
     })
     vi.stubGlobal('fetch', fetchMock)
     renderPage()
@@ -192,5 +197,50 @@ describe('ClientDetailsPage', () => {
 
     await waitFor(() => expect(putBody).toBeDefined())
     expect(putBody).toMatchObject({ name: 'Industria Atlas' })
+
+    // após salvar, a página recarrega o cliente e exibe o dado atualizado
+    expect(await screen.findByRole('heading', { name: 'Industria Atlas Editada' })).not.toBeNull()
+  })
+
+  it('exibe erro com retry quando falha o carregamento dos locais, sem mostrar lista vazia', async () => {
+    let sitesCallCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes(`/api/v1/clients/${CLIENT_ID}/sites`)) {
+          sitesCallCount++
+          return sitesCallCount === 1 ? json({ message: 'Internal Server Error' }, 500) : json(sites)
+        }
+        if (url.includes(`/api/v1/clients/${CLIENT_ID}`)) return json(client)
+        return json({}, 404)
+      }),
+    )
+    renderPage()
+
+    // o cliente carrega normalmente; só a seção de locais falha
+    expect(await screen.findByRole('heading', { name: 'Industria Atlas' })).not.toBeNull()
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toMatch(/locais/i)
+    expect(screen.queryByText('Nenhum local cadastrado para este cliente.')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: /Tentar novamente/i }))
+
+    expect(await screen.findByText('Unidade Centro')).not.toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('exibe o estado vazio quando o cliente não tem locais', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).includes(`/api/v1/clients/${CLIENT_ID}/sites`)) return json([])
+        return defaultFetch(input)
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Nenhum local cadastrado para este cliente.')).not.toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
