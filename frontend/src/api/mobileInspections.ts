@@ -18,6 +18,12 @@ export interface TechnicianInspection extends Inspection {
   template: InspectionTemplate
   equipmentQrCode?: string
   rejectionReason?: string
+  /** Reason the inspection was canceled — present only when status is CANCELED (#338). */
+  canceledReason?: string
+  /** Name of the admin/supervisor who canceled the inspection (#338). */
+  canceledBy?: string
+  /** When the inspection was canceled (ISO 8601) (#338). */
+  canceledAt?: string
 }
 
 /** Raw item of the template snapshot as returned by {@code MobileInspectionResponse.ItemDto}. */
@@ -70,6 +76,9 @@ interface BackendMobileInspection {
   progress: number | null
   supervisorInstructions: string | null
   rejectionReason: string | null
+  canceledReason: string | null
+  canceledBy: string | null
+  canceledAt: string | null
   version: number | null
   template: BackendTemplate | null
 }
@@ -156,6 +165,9 @@ function normalize(inspection: BackendMobileInspection): TechnicianInspection {
     overdue: isOverdue(status, inspection.dueDate),
     supervisorInstructions: inspection.supervisorInstructions ?? undefined,
     rejectionReason: inspection.rejectionReason ?? undefined,
+    canceledReason: inspection.canceledReason ?? undefined,
+    canceledBy: inspection.canceledBy ?? undefined,
+    canceledAt: inspection.canceledAt ?? undefined,
     template: normalizeTemplate(inspection.template, inspection.templateId),
   }
 }
@@ -169,5 +181,17 @@ export const mobileInspectionsApi = {
   async list(): Promise<TechnicianInspection[]> {
     const inspections = await httpClient.get<BackendMobileInspection[]>('/api/v1/mobile/inspections')
     return inspections.map(normalize)
+  },
+
+  /**
+   * Fetches one inspection by id for its assigned technician
+   * (GET /api/v1/mobile/inspections/{id}). Unlike {@link list}, this returns the
+   * inspection in any status — including CANCELED — so the detail screen can show
+   * the cancellation reason to the technician (#338). Throws {@link ApiError} on
+   * transport/authorization failures.
+   */
+  async get(id: string): Promise<TechnicianInspection> {
+    const inspection = await httpClient.get<BackendMobileInspection>(`/api/v1/mobile/inspections/${id}`)
+    return normalize(inspection)
   },
 }

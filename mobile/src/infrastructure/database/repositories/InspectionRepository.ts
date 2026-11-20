@@ -64,10 +64,22 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  /** issue #342: reason given when the inspection was cancelled. */
+  canceled_reason: string | null;
+  /** issue #342: name of who cancelled the inspection. */
+  canceled_by: string | null;
+  /** issue #342: ISO date/time when the inspection was cancelled. */
+  canceled_at: string | null;
   equipment_qr_code: string | null;
   server_version: number;
   /** PBI-086: SVG data URI or local file path of the technician's signature. */
   signature_uri: string | null;
+  /** issue #334: raw strokes JSON for on-device SignaturePreview. */
+  signature_strokes: string | null;
+  /** issue #334: canvas width at capture time (for preview scaling). */
+  signature_width: number | null;
+  /** issue #334: canvas height at capture time (for preview scaling). */
+  signature_height: number | null;
   /** PBI-086: 1 when the template requires a signature before conclusion. */
   signature_required: number;
 }
@@ -162,8 +174,9 @@ export class InspectionRepository {
         equipment_id, equipment_name, equipment_qr_code, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
         progress, supervisor_instructions, rejection_reason, rejected_by, rejected_at,
+        canceled_reason, canceled_by, canceled_at,
         sync_status, pending_sync_count, server_version, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -182,11 +195,14 @@ export class InspectionRepository {
         due_time = excluded.due_time,
         supervisor_instructions = excluded.supervisor_instructions,
         -- Only a server-authoritative decision (REJECTED/APPROVED/CANCELED) may
-        -- change the local status and rejection fields; otherwise keep the device's.
+        -- change the local status and rejection/cancellation fields; otherwise keep the device's.
         status = CASE WHEN ? THEN excluded.status ELSE inspections.status END,
         rejection_reason = CASE WHEN ? THEN excluded.rejection_reason ELSE inspections.rejection_reason END,
         rejected_by = CASE WHEN ? THEN excluded.rejected_by ELSE inspections.rejected_by END,
         rejected_at = CASE WHEN ? THEN excluded.rejected_at ELSE inspections.rejected_at END,
+        canceled_reason = CASE WHEN ? THEN excluded.canceled_reason ELSE inspections.canceled_reason END,
+        canceled_by = CASE WHEN ? THEN excluded.canceled_by ELSE inspections.canceled_by END,
+        canceled_at = CASE WHEN ? THEN excluded.canceled_at ELSE inspections.canceled_at END,
         server_version = excluded.server_version,
         updated_at = datetime('now')`,
       inspection.id,
@@ -216,10 +232,19 @@ export class InspectionRepository {
       inspection.rejectionReason ?? null,
       inspection.rejectedBy ?? null,
       inspection.rejectedAt ?? null,
+      // issue #342: persist the cancellation metadata pulled from the server so the
+      // CancellationBanner shows the reason, who and when offline.
+      inspection.canceledReason ?? null,
+      inspection.canceledBy ?? null,
+      inspection.canceledAt ?? null,
       inspection.syncStatus,
       inspection.pendingSyncCount,
       inspection.serverVersion ?? 0,
-      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0).
+      // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0):
+      // status + 3 rejection columns + 3 cancellation columns.
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
+      isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
@@ -325,13 +350,29 @@ export class InspectionRepository {
    * Persist the technician's handwritten signature for the given inspection
    * (PBI-086). The value is an SVG data URI (base64) produced by SignaturePad
    * and is stored alongside the inspection row so it survives offline restarts.
+   * The raw strokes, canvas width and height are also stored so the
+   * SignaturePreview component can redraw the signature on-device (issue #334).
    */
-  async saveSignature(inspectionId: string, signatureUri: string): Promise<void> {
+  async saveSignature(
+    inspectionId: string,
+    signatureUri: string,
+    strokes?: string,
+    width?: number,
+    height?: number,
+  ): Promise<void> {
     await this.db.runAsync(
       `UPDATE inspections
-         SET signature_uri = ?, sync_status = 'pending', updated_at = datetime('now')
+         SET signature_uri = ?,
+             signature_strokes = ?,
+             signature_width = ?,
+             signature_height = ?,
+             sync_status = 'pending',
+             updated_at = datetime('now')
        WHERE id = ?`,
       signatureUri,
+      strokes ?? null,
+      width ?? null,
+      height ?? null,
       inspectionId,
     );
   }
@@ -525,9 +566,16 @@ export class InspectionRepository {
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
+    canceledReason: row.canceled_reason ?? undefined,
+    canceledBy: row.canceled_by ?? undefined,
+    canceledAt: row.canceled_at ?? undefined,
     serverVersion: row.server_version,
     // PBI-086: signature fields (may be absent in rows created before migration v7)
     signatureUri: row.signature_uri ?? undefined,
+    // issue #334: strokes/dimensions for on-device SignaturePreview (migration v11)
+    signatureStrokes: row.signature_strokes ?? undefined,
+    signatureWidth: row.signature_width ?? undefined,
+    signatureHeight: row.signature_height ?? undefined,
     signatureRequired: row.signature_required === 1,
   });
 

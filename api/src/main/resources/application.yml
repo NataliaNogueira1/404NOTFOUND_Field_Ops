@@ -34,7 +34,14 @@ fieldops:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8081,http://localhost:5173}
   storage:
+    # filesystem (default: dev/tests) or s3 (AWS: credentials come from the EC2 instance profile)
+    type: ${EVIDENCE_STORAGE_TYPE:filesystem}
     evidence-dir: ${EVIDENCE_STORAGE_DIR:./evidences}
+    s3:
+      bucket: ${EVIDENCE_S3_BUCKET:}
+      region: ${AWS_REGION:us-east-1}
+      # Validity of the presigned download links handed to the Web Admin (ISO-8601 duration)
+      presign-ttl: ${EVIDENCE_S3_PRESIGN_TTL:PT5M}
   bootstrap:
     admin-email: ${BOOTSTRAP_ADMIN_EMAIL:}
     admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:}

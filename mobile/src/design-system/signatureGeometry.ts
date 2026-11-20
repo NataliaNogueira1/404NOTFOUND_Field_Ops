@@ -63,3 +63,45 @@ export function previewScale(
 export function scaleStrokes(strokes: SignatureStroke[], scale: number): SignatureStroke[] {
   return strokes.map((stroke) => stroke.map((pt) => ({ x: pt.x * scale, y: pt.y * scale })));
 }
+
+/**
+ * Scales and centers strokes inside a `boxWidth × boxHeight` preview box.
+ * First scales uniformly to `scale`, then translates so the drawing is
+ * centered rather than pinned to the top-left corner (issue #334).
+ */
+export function scaleAndCenterStrokes(
+  strokes: SignatureStroke[],
+  scale: number,
+  boxWidth: number,
+  boxHeight: number,
+): SignatureStroke[] {
+  if (strokes.length === 0 || scale <= 0) return strokes;
+
+  // Compute bounding box of the scaled strokes.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const stroke of strokes) {
+    for (const pt of stroke) {
+      const sx = pt.x * scale;
+      const sy = pt.y * scale;
+      if (sx < minX) minX = sx;
+      if (sy < minY) minY = sy;
+      if (sx > maxX) maxX = sx;
+      if (sy > maxY) maxY = sy;
+    }
+  }
+
+  if (!isFinite(minX)) return strokes;
+
+  // Translation to center the bounding box inside the preview box.
+  const drawingW = maxX - minX;
+  const drawingH = maxY - minY;
+  const offsetX = (boxWidth - drawingW) / 2 - minX;
+  const offsetY = (boxHeight - drawingH) / 2 - minY;
+
+  return strokes.map((stroke) =>
+    stroke.map((pt) => ({
+      x: pt.x * scale + offsetX,
+      y: pt.y * scale + offsetY,
+    })),
+  );
+}

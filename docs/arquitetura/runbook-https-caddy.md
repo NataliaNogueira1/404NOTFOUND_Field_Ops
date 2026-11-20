@@ -1,0 +1,166 @@
+# Runbook — HTTPS na EC2 com Caddy (#312)
+
+> Substitui o CloudFront previsto na decisão #1 de `docs/arquitetura/arquitetura-aws.md`.
+> Cenário: **AWS Academy Learner Lab**, `us-east-1`. Nenhum segredo vai para o git.
+
+## Por que não CloudFront
+
+O console do Learner Lab (`voclabs`) negou `cloudfront:CreateDistribution` por falta de política IAM,
+e a `LabRole` da EC2 também recebeu `AccessDenied` em `cloudfront:ListDistributions`. As duas roles
+disponíveis estão bloqueadas, então não há como criar a distribuição. Os pontos de HTTPS e domínio
+estável continuam obrigatórios (`docs/referencias/notion.md`, seção 11.10: "Todo tráfego externo
+deverá utilizar HTTPS em ambientes publicados"; o Android também bloqueia HTTP em builds de release).
+A alternativa foi aprovada pela gestão em 16/11/2026.
+
+## Como funciona
+
+| Peça | Função |
+|---|---|
+| Elastic IP da `fieldops-api` | Endereço fixo (#312 pré-requisito). Não o libere nem o desassocie |
+| Nome `<ip-com-hifens>.sslip.io` | Aponta para o Elastic IP sem cadastro e sem conta. Ex.: o IP `A.B.C.D` vira `A-B-C-D.sslip.io` |
+| Contêiner `fieldops-proxy` (Caddy) | Obtém e renova o certificado do Let's Encrypt sozinho (desafio HTTP-01) e serve tudo em um domínio HTTPS |
+| `infra/aws/ec2/Caddyfile` | `/api/*` e `/actuator/health` vão para a API em `127.0.0.1:8080`; o resto vem do site estático do S3 (#311), com fallback de SPA |
+| `fieldops-boot` (#315) | Sobe e mantém o proxy a cada boot quando `FIELDOPS_DOMAIN` está definido |
+
+O Web Admin e a API ficam no **mesmo domínio**, então o build mantém `VITE_API_URL` vazio. Mesmo assim o
+`CORS_ALLOWED_ORIGINS` da API **precisa listar `https://<nome>.sslip.io`**: o navegador envia o cabeçalho `Origin` nos
+`POST`, o Caddy fala HTTP com a API (que não lê o `X-Forwarded-Proto`) e ela enxerga uma origem diferente da sua, então
+aplica a lista e responde `403 Invalid CORS request`. O front classifica essa resposta como "Servidor indisponível" ao
+entrar. Veja a seção 3.
+
+Com o proxy ativo, a API só escuta em `127.0.0.1`: a porta 8080 deixa de ser acessível pela internet.
+
+Não use DuckDNS: a rede da empresa derruba esse domínio. Se o `sslip.io` também for bloqueado, veja a seção 5.
+
+## 1. Antes de mexer na EC2: testar o nome na rede da empresa
+
+No PowerShell, **na rede onde a demonstração será feita** (troque pelo seu IP, com hifens):
+
+```powershell
+nslookup A-B-C-D.sslip.io
+curl.exe -s -o NUL -w "api: %{http_code}`n" http://A-B-C-D.sslip.io:8080/actuator/health
+```
+
+Esperado: o `nslookup` devolve o Elastic IP e o `curl.exe` retorna `api: 200` (a porta 8080 ainda está aberta
+neste momento). Se o nome não resolver ou a conexão cair, a rede bloqueia o `sslip.io`: use a seção 5.
+
+## 2. Security Group
+
+Console > EC2 > Security Groups > `fieldops-ec2-sg` > **Editar regras de entrada**:
+
+| Tipo | Porta | Origem | Para quê |
+|---|---|---|---|
+| HTTP | 80 | `0.0.0.0/0` | Desafio do Let's Encrypt e redirecionamento para HTTPS |
+| HTTPS | 443 | `0.0.0.0/0` | Tráfego do Web Admin e da API |
+
+Mantenha a regra da 8080 por enquanto; ela é removida na seção 4, depois de validar.
+
+## 3. Instalar e ativar na EC2
+
+Conecte pelo EC2 Instance Connect (`ec2-user`). Digite os comandos à mão se a colagem trouxer `[200~`.
+
+```bash
+cd /opt/fieldops/repo
+sudo git fetch origin
+sudo git checkout feat/312-https-caddy
+sudo bash -n infra/aws/ec2/fieldops-boot.sh && sudo bash -n infra/aws/ec2/user-data.sh && echo SINTAXE-OK
+sudo FIELDOPS_GIT_REF=feat/312-https-caddy FIELDOPS_DOMAIN=A-B-C-D.sslip.io bash infra/aws/ec2/user-data.sh
+sudo tail -f /var/log/fieldops-boot.log
+```
+
+Antes de instalar, ou depois, acrescente o domínio ao CORS da API (a linha não contém segredo):
+
+```bash
+sudo grep -q 'https://A-B-C-D.sslip.io' /opt/fieldops/.env || sudo sed -i 's|^CORS_ALLOWED_ORIGINS=.*|&,https://A-B-C-D.sslip.io|' /opt/fieldops/.env
+sudo grep '^CORS_ALLOWED_ORIGINS=' /opt/fieldops/.env
+sudo systemctl restart fieldops-boot
+```
+
+O `fieldops-boot` percebe que o `.env` mudou e recria o container da API.
+
+Troque `A-B-C-D` pelo Elastic IP. Esperado no log, em ordem: `container is outdated (image or env file changed)`
+(a API passa a publicar só em loopback), `starting the HTTPS proxy for ...`, `API healthy (UP)` e
+`HTTPS proxy healthy: https://...`, depois `boot done`. A primeira emissão do certificado leva de 10 a 60 segundos.
+Se aparecer `WARNING: https://... did not answer`, veja a seção 6.
+
+## 4. Validar os critérios da #312
+
+No PowerShell do seu computador (troque o domínio):
+
+```powershell
+$d = 'https://A-B-C-D.sslip.io'
+curl.exe -sS -o NUL -w "site: %{http_code} %{content_type}`n" "$d/"
+curl.exe -sS -o NUL -w "rota profunda: %{http_code} %{content_type}`n" "$d/app/inspections/1/review"
+curl.exe -sS "$d/actuator/health"
+curl.exe -sS -i "$d/api/v1/inspection-evidences/1/download-url" | Select-String "HTTP/|Cache|WWW"
+# CORS do login (o navegador envia Origin): esperado 400 de validação, nunca 403
+curl.exe -sS -w "`ncom Origin: %{http_code}`n" -X POST "$d/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $d" --data-raw "{}"
+```
+
+| Critério | Como provar | Esperado |
+|---|---|---|
+| Web Admin abre em HTTPS sem aviso de certificado | Abra `$d` no navegador | Cadeado fechado e tela de login. Sem aviso |
+| Fallback de SPA | `curl` na rota profunda | `200 text/html` (diferente do `404` do S3 puro) |
+| `/api/v1/...` chega na API | `curl` sem token em uma rota protegida | Resposta `401` ou `403` em JSON da API, e não HTML |
+| `Authorization` é repassado | Entre pelo Web Admin como supervisor e abra uma inspeção | A tela carrega os dados (sem o header, a API devolveria `401`) |
+| Domínio estável | Interrompa e inicie a EC2, sem abrir terminal | O mesmo `$d` volta a responder em alguns minutos |
+
+Depois de validar, **remova a regra da 8080** do `fieldops-ec2-sg`. A API continua alcançável por
+`$d/api/...` e o health, por `$d/actuator/health`. O `fieldops-boot` verifica a API em `localhost`, então
+não é afetado.
+
+## 5. Se o `sslip.io` for bloqueado pela rede
+
+Troque só o nome; o restante não muda. Alternativas, da menos para a mais trabalhosa:
+
+1. `A-B-C-D.nip.io`: o mesmo serviço, com outro domínio. Troque `FIELDOPS_DOMAIN` e rode a seção 3 de novo.
+2. Um subdomínio do FreeDNS (afraid.org), que exige cadastro. Aponte o registro `A` para o Elastic IP.
+3. Um domínio próprio barato com registro `A` para o Elastic IP.
+
+Nomes `*.amazonaws.com` (como o DNS público da EC2) **não** recebem certificado do Let's Encrypt.
+
+## 6. Problemas comuns
+
+| Sintoma | Causa provável |
+|---|---|
+| `WARNING: https://... did not answer` no log do boot | Portas 80/443 fechadas no Security Group, nome sem resolver, ou limite de emissão do Let's Encrypt. Veja `docker logs fieldops-proxy` |
+| Navegador mostra aviso de certificado | O certificado ainda não foi emitido ou o Caddy usou um certificado temporário. Espere 1 minuto e recarregue |
+| Erro `too many certificates` | Limite do Let's Encrypt para o domínio compartilhado. O Caddy tenta o ZeroSSL; se persistir, use a alternativa 2 ou 3 da seção 5 |
+| `502 Bad Gateway` em `/` | O endpoint do site do S3 não responde. Confira o bucket do #311 |
+| `502` em `/api/...` | A API não está de pé: `docker ps` e `sudo tail /var/log/fieldops-boot.log` |
+| `curl` direto no IP:8080 falha depois da ativação | Esperado: a API agora só escuta em loopback |
+| "Servidor indisponível" ao entrar, e `403 Invalid CORS request` com `Origin` | O domínio não está em `CORS_ALLOWED_ORIGINS` (seção 3) |
+
+## 7. Voltar ao modo sem HTTPS
+
+Remova a linha `FIELDOPS_DOMAIN=` de `/etc/fieldops/boot.conf` e rode `sudo systemctl restart fieldops-boot`.
+O proxy é removido e a API volta a publicar a porta 8080 (reabra a regra no Security Group).
+
+## 8. Critérios de aceite da #312 (adaptados)
+
+- [x] Web Admin abre em `https://<nome>.sslip.io` sem aviso de certificado.
+- [x] Chamadas `https://<nome>.sslip.io/api/v1/...` chegam na API (EC2).
+- [x] O header `Authorization` é repassado para a API.
+- [x] Domínio estável confirmado (não muda ao reiniciar a EC2).
+- [ ] Acesso a partir da rede da empresa (a DuckDNS é bloqueada por ela; o `sslip.io` **não foi testado** lá).
+
+### Evidência da validação (16/11/2026)
+
+| Teste | Resultado |
+|---|---|
+| Instalação | `container is outdated ... recreating`, `starting the HTTPS proxy`, `API healthy (UP)`, `HTTPS proxy healthy`, `boot done`. O certificado foi emitido em cerca de 7 s |
+| Site | `200 text/html` (`curl` sem `-k`, o certificado foi validado) |
+| Rota profunda `/app/inspections/1/review` | `200 text/html` (no S3 puro era `404`) |
+| `/actuator/health` | `{"status":"UP"}` |
+| `/api/v1/...` sem token | `401 application/json`: chegou na API |
+| `http://<elastic-ip>:8080` de fora | `curl: (7) Failed to connect`. Era `200` antes do proxy |
+| `POST /api/v1/auth/login` com `Origin` | `403 Invalid CORS request` antes de listar o domínio; `400` de validação depois |
+| Login no navegador (supervisor) | Entrou e a lista de inspeções carregou da API: o `Authorization` chega |
+| Interromper e iniciar a EC2 | O mesmo endereço voltou a responder `{"status":"UP"}`, sem abrir terminal |
+
+### Pendências
+
+- Testar o acesso pela rede da empresa (seção 1).
+- Remover do `fieldops-ec2-sg` a regra da 8080, que ficou sem uso.
+- Trocar as senhas padrão dos usuários demo (`FIELDOPS_DEV_*_PASSWORD`), porque a API agora é pública.
+- A #313 ainda precisa revisar o `CORS_ALLOWED_ORIGINS` definitivo e o APK (#314) deve usar a URL `https`.

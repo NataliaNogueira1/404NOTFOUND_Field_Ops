@@ -128,6 +128,14 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
             style={[styles.input, styles.textArea, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]}
             multiline
           />
+          {/* Botão de foto disponível para qualquer item respondido — não só em falha (RN-011/UC-11). */}
+          {readOnly ? null : (
+            <Button
+              label="Adicionar foto"
+              onPress={() => router.push(`/(protected)/evidence?inspectionId=${inspectionId}&itemId=${item.id}`)}
+              variant="secondary"
+            />
+          )}
         </View>
       ) : null}
       {evidences.length > 0 ? (
