@@ -215,6 +215,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOn
       onBlur={onTextBlur}
       editable={!readOnly}
       keyboardType="numeric"
+      returnKeyType="done"
       placeholder="Informe o valor"
       placeholderTextColor={c.textSecondary}
       style={[styles.input, inputStyle]}
