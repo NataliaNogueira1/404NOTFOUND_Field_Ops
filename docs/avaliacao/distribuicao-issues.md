@@ -1,213 +1,175 @@
-# Distribuição de issues não atribuídas
+# Distribuição de issues
 
-> Critério: quem tem **menos commits recebe mais issues** (peso inverso ao número de
-> commits). A Natália ficou **de fora** (0 issues) a pedido da equipe.
-> Total distribuído: **28 issues** entre **8 pessoas**.
+> Estado do Kanban em **15/11/2026**
+> (https://github.com/users/NataliaNogueira1/projects/2/views/1).
 >
-> Esta versão aplica as **restrições pedidas pela equipe**: algumas issues foram
-> recusadas por certas pessoas e **redistribuídas** entre as demais (ninguém recebe de
-> volta o que recusou; a Natália continua com 0).
+> Critério original da distribuição: quem tem **menos commits recebe mais issues** (peso
+> inverso ao número de commits), com **28 issues** distribuídas entre **8 pessoas** e
+> restrições pedidas pela equipe (ninguém recebe de volta o que recusou).
 >
-> Os números de commit consideram **todas as branches** (locais e remotas, inclusive as
-> que ainda não entraram na `develop`), sem commits de merge, agrupando identidades
-> duplicadas (mesmo autor com nomes/emails diferentes).
+> Esta versão **atualiza o documento conforme o board atual**: cada pessoa lista apenas as
+> issues **não concluídas** (fora da coluna **Done**) em que está como assignee hoje. As
+> issues que já foram concluídas saíram da lista, e as reatribuições e issues novas estão
+> registradas em [Movimentações desde a versão anterior](#movimentações-desde-a-versão-anterior).
 >
-> A lista de cada pessoa mistura as issues recém-distribuídas com as que ela **já tinha
-> atribuídas** no board (excluindo as que estão na coluna **Done**). As issues já
-> existentes aparecem sem descrição detalhada, apenas com o status atual entre parênteses.
-> Algumas issues (ex.: #92, #197, #302) são épicos/tarefas compartilhadas e aparecem em
-> mais de uma pessoa. O contador "Qtde de issues" do resumo conta **apenas as 28
-> recém-distribuídas**, não as prévias.
+> Os números de commit são os da distribuição original (todas as branches, sem commits de
+> merge, com identidades duplicadas agrupadas) e **não foram recalculados** nesta
+> atualização.
+>
+> Algumas issues (#30, #92, #197, #302) são épicos/tarefas compartilhadas e aparecem em
+> mais de uma pessoa.
 
 ## Resumo
 
-| Pessoa | Commits | Total de issues | Novas | Prévias |
-|--------|--------:|:---------------:|:-----:|:-------:|
-| Caroline Arruda | 21 | 12 | 7 | 5 |
-| Ian Lucas | 29 | 8 | 5 | 3 |
-| Andressa Bartolomeu | 36 | 8 | 4 | 4 |
-| Felipe (Cutiur) | 39 | 7 | 2 (1 compart.) | 5 |
-| Júlia Paes | 47 | 4 | 2 | 2 |
-| Marcela Mulato | 51 | 9 | 4 | 5 |
-| Rodrigo Soares | 60 | 7 | 3 (1 compart.) | 4 |
-| Lucas Miguel | 68 | 9 | 4 | 5 |
-| Natália Nogueira | 245 | 0 | 0 | 0 |
-| **Total distribuído (novas)** | | | **28** | |
+| Pessoa | Commits | Issues abertas | Individuais | Compartilhadas |
+|--------|--------:|:--------------:|:-----------:|:--------------:|
+| Caroline Arruda | 21 | 4 | 3 | 1 |
+| Ian Lucas | 29 | 8 | 7 | 1 |
+| Andressa Bartolomeu | 36 | 8 | 7 | 1 |
+| Felipe (Cutiur) | 39 | 9 | 7 | 2 |
+| Júlia Paes | 47 | 3 | 1 | 2 |
+| Marcela Mulato | 51 | 4 | 0 | 4 |
+| Rodrigo Soares | 60 | 3 | 0 | 3 |
+| Lucas Miguel | 68 | 6 | 2 | 4 |
+| Natália Nogueira | 245 | 3 | 0 | 3 |
 
-> Observação: o total por pessoa inclui issues já existentes. Issues compartilhadas
-> (ex.: #92, #197, #302) são contadas em cada pessoa que as possui, então a soma dos
-> totais individuais é maior que o número de issues distintas.
+> Observação: as issues compartilhadas são contadas em cada pessoa que as possui, então a
+> soma dos totais individuais é maior que o número de issues distintas.
 
 ---
 
-## Caroline Arruda — 21 commits — 11 issues (6 novas + 5 prévias)
+## Caroline Arruda — 21 commits — 4 issues
 
-- **#288 — Adaptar elementos pré-textuais ao template de Relatório Final (capa, resumo, sumário)**
-  Capa e folha de rosto (trocar `<NOME>`/`<TÍTULO>`), Resumo/Abstract do FieldOps,
-  3 palavras-chave, listas (figuras/tabelas/siglas) e sumário final. Remover o texto
-  de sustentabilidade do modelo. Size M, P1.
-- **#289 — Adaptar Capítulo 1 - Introdução**
-  1.1 contexto/restrições, 1.2 justificativa + objetivos, 1.3 metodologia e ferramentas
-  de gestão. Status: parcial.
-- **#290 — Adaptar Capítulo 2 - Gerenciamento da Integração**
-  Derivar do Termo de Abertura (TAP) e da visão geral. Status: parcial.
-- **#291 — Adaptar Capítulo 3 - Escopo e EAP**
-  Gerenciamento do escopo, incluindo a EAP.
-- **#292 — Adaptar Capítulo 4 - Cronograma e Roadmap**
-  Gerenciamento do tempo/cronograma (no template aparece como "Gerenciamento do Tempo").
-- **#299 — Adaptar Capítulo 10 - Gerenciamento das Aquisições**
-  Capítulo de aquisições conforme o template.
+- **#258 — Popular seed com ao menos dois exemplos de cada estado de inspeção** _(In progress)_
+  Estender o `DemoSeedRunner` para gerar ≥2 inspeções em cada estado (ASSIGNED, IN_PROGRESS,
+  SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELED), de forma idempotente e usando os
+  fluxos reais de domínio. P1, Size M.
+- **#263 — Integrar página de detalhes do cliente com a API real** _(In progress)_
+  Trocar os dados mock (`@/mocks/domain`) da página de detalhe do cliente por
+  `GET /api/v1/clients/{id}`, com estados de loading/erro/vazio. P1, Size S.
+- **#338 — Exibir motivo de cancelamento na tela de detalhes para o técnico** _(In review)_
+  Exibir o motivo de cancelamento também na visão do técnico no mobile/portal, não apenas
+  na visão admin.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco: login admin,
   cadastro de cliente/local/equipamento, modelo publicado, agendamento, login do técnico,
   execução offline, sync sem duplicidade, revisão e aprovação. P0.
-- **#258 — Popular seed com ao menos dois exemplos de cada estado de inspeção** _(Ready)_
-  Estender o `DemoSeedRunner` para gerar ≥2 inspeções em cada estado (ASSIGNED, IN_PROGRESS,
-  SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELED), de forma idempotente e usando os
-  fluxos reais de domínio. P1, Size M.
-- ✅ **#262 — Exibir justificativa de cancelamento na tela de detalhes da inspeção** _(Closed)_
-  Mostrar o motivo, quem cancelou e quando (`canceledReason/By/At`) na tela de detalhes
-  quando a inspeção está CANCELADA; o bloco não deve aparecer em outros estados. P1, Size S.
-- **#263 — Integrar página de detalhes do cliente com a API real** _(In review)_
-  Trocar os dados mock (`@/mocks/domain`) da página de detalhe do cliente por
-  `GET /api/v1/clients/{id}`, com estados de loading/erro/vazio. P1, Size S.
-- ✅ **#273 — Mobile: visualizar inspeção após envio (estado ENVIADA/APROVADA)** _(Closed)_
-  Garantir que inspeções SUBMITTED/APPROVED apareçam na listagem e sejam navegáveis em
-  modo somente-leitura (sem botão de ação), funcionando offline via SQLite.
-- **#338 — Exibir motivo de cancelamento na tela de detalhes para o técnico** _(Open)_
-  Exibir o motivo de cancelamento também na visão do técnico no mobile/portal, não apenas
-  na visão admin.
-- **#336 — Adicionar coluna ID na visualização de inspeções no web admin** _(Open)_
-  Exibir a coluna ID (UUID abreviado com tooltip) na tabela de inspeções para os perfis
-  supervisor, admin e técnico no web admin. `frontend`, `ux`, `sprint-3`.
 
-## Ian Lucas — 29 commits — 7 issues (4 novas + 3 prévias)
+## Ian Lucas — 29 commits — 8 issues
 
-- **#307 — Configurar LabRole como instance profile da EC2 (acesso ao S3)**
+Trilha de infra AWS (concentra a maior parte da cadeia de dependências). RDS (#305),
+EC2 (#306), bucket S3 (#308) e `S3EvidenceStorage` (#309) já estão em **Done**:
+
+- **#307 — Configurar LabRole como instance profile da EC2 (acesso ao S3)** _(In progress)_
   Anexar o `LabRole` à EC2 para o SDK S3 obter credencial via metadata, sem chave no
-  `.env`. Depende de: EC2 e bucket S3.
-- **#308 — Criar bucket S3 privado para evidências**
-  Bucket privado com Block Public Access, acesso só via LabRole, acesso anônimo retorna
-  403. Base para o `S3EvidenceStorage`.
-- **#310 — Expor fotos do S3 via presigned URL para o Web Admin**
+  `.env`. Depende de: EC2 e bucket S3 (ambos concluídos).
+- **#310 — Expor fotos do S3 via presigned URL para o Web Admin** _(In progress)_
   Método de presigned URL (GET temporário) no port, implementado no `S3EvidenceStorage`
-  e exposto no endpoint de evidências (revisão/lightbox). Depende de: #309.
-- **#312 — Configurar CloudFront (HTTPS + DNS estável) para web e API**
+  e exposto no endpoint de evidências (revisão/lightbox). Depende de: #309 (concluída).
+- **#312 — Configurar CloudFront (HTTPS + DNS estável) para web e API** _(In progress)_
   Distribuição CloudFront como frente única: origem S3 (default, com cache) + origem EC2
   (`/api/*`, sem cache, repassa `Authorization`). HTTPS em `*.cloudfront.net`, fallback
   SPA. Risco nº1 do Teste 01. Depende de: #306 e #311.
-- ✅ **#89 — PBI-069: Build e publicação do painel web admin** _(Closed)_
+- **#314 — Apontar APK para o CloudFront e habilitar upload de evidências** _(In progress)_
+  Build EAS com `EXPO_PUBLIC_API_URL`, habilitar `EXPO_PUBLIC_EVIDENCE_UPLOAD`, login/sync
+  e upload de foto até o S3 funcionando, sem rebuild a cada sessão. Depende de: #309
+  (concluída) e #312.
+- **#315 — Automatizar boot da EC2 (user-data) e runbook de reset** _(In progress)_
+  Script de `user-data` que no boot sobe o Docker da API e aplica Flyway + seed `demo`
+  idempotente; runbook "subir → demonstrar → desligar". Depende de: #305, #306 (ambas
+  concluídas).
+
+Demais issues:
+
+- **#89 — PBI-069: Build e publicação do painel web admin** _(Issue fechada, mas ainda na coluna Ready do board)_
   Gerar build estático do painel publicável em qualquer servidor estático, com URL da API
   por variável de ambiente e funcionando com a API de demonstração. P0.
-- **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
-  Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
-  execução offline → sync → revisão → aprovação). P0.
-- **#147 — PBI-084: Notificações locais de prazo** _(In progress)_
-  Notificações locais no mobile (offline, via `expo-notifications`) agendadas a partir do
-  `dueDate` das inspeções, com lembrete, reagendamento após sync e tratamento de permissão. P1.
-- **#337 — Adicionar exibição do ID da inspeção no mobile** _(Open)_
+  Pendência: mover o card para **Done** (a issue já está fechada).
+- **#337 — Adicionar exibição do ID da inspeção no mobile** _(In progress)_
   Exibir o ID da inspeção (UUID abreviado) nas telas de listagem e detalhes no app mobile
   para os perfis técnico, supervisor e admin, sem quebrar o layout. `mobile`, `ux`, `sprint-3`.
-
-## Andressa Bartolomeu — 36 commits — 8 issues (4 novas + 4 prévias)
-
-- **#296 — Adaptar Capítulo 7 - Gerenciamento dos Recursos Humanos**
-  Capítulo de recursos (no template, "Recursos Humanos").
-- **#297 — Adaptar Capítulo 8 - Gerenciamento das Comunicações**
-  Capítulo de comunicações conforme o template.
-- **#298 — Adaptar Capítulo 9 - Gerenciamento dos Riscos**
-  Capítulo de riscos conforme o template.
-- **#293 — Adaptar Capítulo 5 - Gerenciamento dos Custos**
-  Capítulo de custos conforme o template.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
-- **#246 — Tornar o botão Versões útil na tela de modelos** _(In progress)_
+
+## Andressa Bartolomeu — 36 commits — 8 issues
+
+- **#293 — Adaptar Capítulo 5 - Gerenciamento dos Custos** _(In review)_
+  Capítulo de custos conforme o template de Relatório Final.
+- **#296 — Adaptar Capítulo 7 - Gerenciamento dos Recursos Humanos** _(In review)_
+  Capítulo de recursos (no template, "Recursos Humanos").
+- **#297 — Adaptar Capítulo 8 - Gerenciamento das Comunicações** _(In review)_
+  Capítulo de comunicações conforme o template.
+- **#298 — Adaptar Capítulo 9 - Gerenciamento dos Riscos** _(In review)_
+  Capítulo de riscos conforme o template.
+- **#246 — Tornar o botão Versões útil na tela de modelos** _(In review)_
   Parte A (só frontend): ligar o botão "Versões" a um modal que lista as versões publicadas
   do modelo via endpoint existente. Parte B (exige backend, decidir antes): alternar a versão
   ativa — pode conflitar com a regra de imutabilidade de versão. P1.
-- **#255 — Exibir fotos das não conformidades para supervisor/admin** _(In progress)_
+- **#255 — Exibir fotos das não conformidades para supervisor/admin** _(In review)_
   No detalhe da NC (`NonConformitiesPage`), carregar e exibir as evidências fotográficas já
   vinculadas, reaproveitando o lightbox da tela de revisão (download autenticado). P1, Size M.
-- **#322 — Corrigir bugs da assinatura no dispositivo (PBI-086)** _(In progress)_
+- **#322 — Corrigir bugs da assinatura no dispositivo (PBI-086)** _(In review)_
   Corrigir o offset de toque no canvas e o preview incorreto da assinatura; decidir entre as
   duas implementações concorrentes e deixar só uma na `develop`, sem código morto.
-
-## Felipe (Cutiur) — 39 commits — 7 issues (2 novas, 1 compart. + 5 prévias)
-
-- **#294 — Adaptar Capítulo 6 - Gerenciamento da Qualidade**
-  Capítulo de qualidade conforme o template.
-- **#320 — Executar demo E2E e preencher evidências de execução** _(compartilhada com Rodrigo Soares)_
-  Rodar os 22 passos do `demo-runbook.md` + validação offline (sync sem duplicar) +
-  recursos nativos (QR, foto, GPS, permissões), registrando prints/vídeos em
-  `evidencias-e2e.md`. Proíbe Swagger/banco manual/mock. Tem blockers (#88, #89, #204,
-  #229, #65).
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
+
+## Felipe (Cutiur) — 39 commits — 9 issues
+
+- **#294 — Adaptar Capítulo 6 - Gerenciamento da Qualidade** _(Ready)_
+  Capítulo de qualidade conforme o template.
+- **#320 — Executar demo E2E e preencher evidências de execução** _(Ready)_
+  Rodar os 22 passos do `demo-runbook.md` + validação offline (sync sem duplicar) +
+  recursos nativos (QR, foto, GPS, permissões), registrando prints/vídeos em
+  `evidencias-e2e.md`. Proíbe Swagger/banco manual/mock. Tem blockers (#88, #89, #204,
+  #229, #65). Agora só no nome do Felipe (antes era compartilhada com Rodrigo).
 - **#197 — Integração ponta a ponta da sincronização do app com o backend** _(Ready, compartilhada)_
   Integrar push/pull da outbox do app com os endpoints reais (respostas, evidências, NCs),
   com pull incremental por cursor e idempotência, refletindo o resultado real na tela de sync. P0, Size L.
-- **#229 — Mobile: enviar upload de evidência (foto) para o backend** _(Blocked)_
-  Ajustar o `EvidenceUploadClient` ao contrato real do endpoint de upload (arquivo +
-  metadados + `operationId`), tirando a foto do estado PENDING, com retry e sem duplicar.
-  Depende do endpoint backend #221.
-- ✅ **#260 — Resolver vulnerabilidades do npm audit no web** _(Closed)_
-  Eliminar as vulnerabilidades do `npm audit` no `frontend/` (bump major do `jspdf`/`jspdf-autotable`
-  + fixes não-major), sem quebrar build, testes nem a geração de PDF. P1, Size M.
-- ✅ **#265 — Adicionar toggle de visibilidade no campo de senha do login web** _(Closed)_
-  Adicionar botão de olho (`Eye`/`EyeOff` do lucide-react já instalado) no componente `Input`
-  para alternar mostrar/ocultar senha, acessível e sem nova dependência. P1, Size XS.
-- **#332 — Exibir mensagem de modo offline abaixo da barra nativa no mobile** _(Open)_
+- **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
+  Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
+  execução offline → sync → revisão → aprovação). P0.
+- **#259 — Resolver vulnerabilidades do npm audit no mobile** _(Ready)_
+  Reduzir/eliminar as vulnerabilidades do `npm audit` em `mobile/` (baseline: 75, sendo
+  2 critical e 56 high), sem quebrar build (Expo SDK 57), testes Jest nem APK. Aplicar
+  primeiro correções seguras e avaliar bumps major caso a caso. P1, Size L.
+- **#260 — Resolver vulnerabilidades do npm audit no web** _(Ready, reaberta)_
+  Eliminar as vulnerabilidades do `npm audit` no `frontend/`, sem quebrar build, testes
+  nem a geração de PDF. As vulnerabilidades de `dompurify` restantes foram separadas na
+  #347. P1.
+- **#347 — Migrar jspdf para 4.x e corrigir vulnerabilidade do dompurify no web** _(Ready)_
+  Atualizar `jspdf`/`jspdf-autotable` para 4.x (versão fixa) e ajustar
+  `generateInspectionPdf.ts`, eliminando 1 vulnerabilidade crítica e 2 altas de `dompurify`.
+  Build e testes devem passar, e o PDF deve ser conferido manualmente. Atualizar
+  `seguranca-dependencias.md` e `test-results.md`. Relacionada: #260, #319.
+- **#332 — Exibir mensagem de modo offline abaixo da barra nativa no mobile** _(In review)_
   Exibir banner/indicador de modo offline posicionado abaixo da status bar nativa, sem
   sobrepor conteúdo.
-- **#333 — Corrigir teclado sobrepondo label e campo de número no mobile** _(Open)_
+- **#333 — Corrigir teclado sobrepondo label e campo de número no mobile** _(In review)_
   Corrigir o layout para que o teclado não cubra o label e o campo de entrada numérica
   durante o preenchimento do checklist.
-- **#334 — Exibir assinatura na visualização do checklist e no review pelo supervisor** _(Open)_
-  Renderizar a assinatura capturada na visualização do checklist concluído e na tela de
-  revisão do supervisor/admin.
-- **#335 — Upgrade do Expo SDK 57 para 58 no mobile** _(Open, compartilhada com Rodrigo Soares)_
-  Atualizar o SDK do Expo de 57 para 58, ajustando dependências nativas e resolvendo
-  breaking changes.
 
-## Júlia Paes — 47 commits — 4 issues (2 novas + 2 prévias)
+## Júlia Paes — 47 commits — 3 issues
 
-- **#301 — Adaptar Capítulos 12 e 13 - Resultados e Considerações Finais**
-  Capítulos 12 e 13 + elementos pós-textuais (síntese final). Status: a produzir.
-- **#316 — Validar os 12 testes ponta a ponta na AWS**
+- **#316 — Validar os 12 testes ponta a ponta na AWS** _(Ready)_
   Checklist E2E no ambiente real (CloudFront + EC2 + RDS + S3), cobrindo os 12 testes do
   professor, com evidências (prints/logs). Depende de toda a infra AWS anterior.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
 - **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
-  Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
+  Épico guarda-chuva das sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor (PMBOK, 13 capítulos + pré/pós-textuais), removendo o texto-exemplo
   de sustentabilidade. P1, Size L.
 
-## Marcela Mulato — 51 commits — 9 issues (4 novas + 5 prévias)
+## Marcela Mulato — 51 commits — 4 issues
 
-- **#314 — Apontar APK para o CloudFront e habilitar upload de evidências**
-  Build EAS com `EXPO_PUBLIC_API_URL`, habilitar `EXPO_PUBLIC_EVIDENCE_UPLOAD`, login/sync
-  e upload de foto até o S3 funcionando, sem rebuild a cada sessão. Depende de: #309 e #312.
-- **#315 — Automatizar boot da EC2 (user-data) e runbook de reset**
-  Script de `user-data` que no boot sobe o Docker da API e aplica Flyway + seed `demo`
-  idempotente; runbook "subir → demonstrar → desligar". Depende de: #305, #306.
-- **#306 — Provisionar EC2 com Docker para a API**
-  Sobe a imagem do `api/Dockerfile` (perfil `demo`), `.env` fora do git, `/actuator/health`
-  UP, conecta no RDS. Depende de: #305.
-- **#309 — Implementar S3EvidenceStorage no port FileStorage**
-  Nova implementação do port `FileStorage` selecionada por `@Profile` (demo/prod = S3,
-  dev = filesystem); upload e leitura via S3. É a pendência do Teste 10. `./mvnw test`
-  deve passar. Depende de: #308 e #307.
-- **#30 — PBI-041→047: Recursos nativos - QR Code, câmera e GPS (Sprint 5)** _(In progress)_
+- **#30 — PBI-041→047: Recursos nativos - QR Code, câmera e GPS (Sprint 5)** _(In progress, compartilhada com Lucas)_
   Épico de recursos nativos no mobile: ler QR Code, capturar foto com prévia, associar
   evidência ao item, registrar NC e localização (início/conclusão). Pendentes: GPS (PBI-045)
   e NC CRITICAL exigindo evidência. P0.
-- **#31 — PBI-048→055: Offline e sincronização idempotente (Sprint 6)** _(In progress)_
-  Épico de offline/sync: outbox persistente no SQLite, push em lote com idempotência e
-  conflito preservando dados locais. Pendente: pull incremental por cursor (PBI-053). P0.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
@@ -215,62 +177,33 @@
   Integrar push/pull da outbox com os endpoints reais (respostas, evidências, NCs), pull por
   cursor e idempotência, refletindo o resultado real na tela de sync. P0, Size L.
 - **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
-  Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
+  Épico guarda-chuva das sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
 
-## Rodrigo Soares — 60 commits — 7 issues (3 novas, 1 compart. + 4 prévias)
+## Rodrigo Soares — 60 commits — 3 issues
 
-- **#319 — Preencher documento de segurança de dependências (npm audit)**
-  Rodar `npm audit` no Web e Mobile, preencher contagens por severidade datadas em
-  `docs/avaliacao/seguranca-dependencias.md`, salvar os JSONs em `evidencias/` (sem
-  segredos). Execução local e rápida.
-- **#300 — Adaptar Capítulo 11 - Gerenciamento das Partes Interessadas**
-  Capítulo de partes interessadas conforme o template.
-- **#320 — Executar demo E2E e preencher evidências de execução** _(compartilhada com Felipe)_
-  Rodar os 22 passos do `demo-runbook.md` + validação offline (sync sem duplicar) +
-  recursos nativos (QR, foto, GPS, permissões), registrando prints/vídeos em
-  `evidencias-e2e.md`. Proíbe Swagger/banco manual/mock. Tem blockers (#88, #89, #204,
-  #229, #65).
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
 - **#197 — Integração ponta a ponta da sincronização do app com o backend** _(Ready, compartilhada)_
   Integrar push/pull da outbox com os endpoints reais (respostas, evidências, NCs), pull por
   cursor e idempotência, refletindo o resultado real na tela de sync. P0, Size L.
-- **#227 — Integrar portal web do técnico com a API (substituir mocks)** _(In review)_
-  Substituir os mocks (`@/mocks/technician`) das telas do portal do técnico por chamadas reais
-  aos endpoints existentes, com loading/vazio/erro e permissão por perfil TECHNICIAN.
 - **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
-  Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
+  Épico guarda-chuva das sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
-- **#335 — Upgrade do Expo SDK 57 para 58 no mobile** _(Open, compartilhada com Felipe)_
-  Atualizar o SDK do Expo de 57 para 58, ajustando dependências nativas e resolvendo
-  breaking changes.
 
-## Lucas Miguel — 68 commits — 9 issues (4 novas + 5 prévias)
+## Lucas Miguel — 68 commits — 6 issues
 
-- ✅ **#278 — Unificar filtro de data da listagem de inspeções para intervalo from/to** _(Closed)_
-  Trocar o parâmetro `dueDate` (data exata) por `from`/`to` (intervalo inclusivo,
-  opcional) no backend (`AdminInspectionController`/`AdminCatalogListService`) e no front
-  (`adminCatalog.ts`/`InspectionsPage.tsx`), alinhando listagem e CSV. Atualizar testes
-  unitários. (bug, sprint-3, P1)
-- **#305 — Provisionar RDS PostgreSQL privado na AWS**
-  Instância RDS PostgreSQL 16, `db.t3.micro`, Single-AZ, `Publicly accessible = No`,
-  porta 5432 só para a SG da EC2, criar DB subnet group. Fundação da infra (sem
-  dependências).
-- **#311 — Publicar Web Admin no S3 (static website)**
+- **#311 — Publicar Web Admin no S3 (static website)** _(Ready)_
   Build de produção do Vite (`npm run build` → `dist/`), publicar no bucket, fallback
   de SPA (recarregar rota profunda não dá 404). Fecha parte do PBI-069.
-- **#313 — Configurar segredos e CORS da API no ambiente AWS**
+- **#313 — Configurar segredos e CORS da API no ambiente AWS** _(Ready)_
   `JWT_SECRET`, `DB_*`, `CORS_ALLOWED_ORIGINS` (= domínio do CloudFront, nunca `*`) fora
   do git (EC2/SSM). Pré-flight CORS funcionando. Depende de: #305, #306, #312.
-- **#30 — PBI-041→047: Recursos nativos - QR Code, câmera e GPS (Sprint 5)** _(In progress)_
+- **#30 — PBI-041→047: Recursos nativos - QR Code, câmera e GPS (Sprint 5)** _(In progress, compartilhada com Marcela)_
   Épico de recursos nativos no mobile: ler QR Code, capturar foto com prévia, associar
   evidência ao item, registrar NC e localização. Pendentes: GPS (PBI-045) e NC CRITICAL
   exigindo evidência. P0.
-- **#31 — PBI-048→055: Offline e sincronização idempotente (Sprint 6)** _(In progress)_
-  Épico de offline/sync: outbox persistente no SQLite, push em lote com idempotência e
-  conflito preservando dados locais. Pendente: pull incremental por cursor (PBI-053). P0.
 - **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
   Demonstrar o fluxo completo com dados reais, sem edição manual do banco (login admin →
   execução offline → sync → revisão → aprovação). P0.
@@ -278,23 +211,59 @@
   Integrar push/pull da outbox com os endpoints reais (respostas, evidências, NCs), pull por
   cursor e idempotência, refletindo o resultado real na tela de sync. P0, Size L.
 - **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
-  Épico guarda-chuva das 13 sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
+  Épico guarda-chuva das sub-issues (#288–#301): adaptar os documentos de `docs/gestao/`
   ao template do professor, removendo o texto-exemplo de sustentabilidade. P1, Size L.
+
+## Natália Nogueira — 245 commits — 3 issues (todas compartilhadas)
+
+Antes a Natália ficou **de fora** da distribuição (0 issues) a pedido da equipe. Hoje ela
+consta como assignee apenas em issues compartilhadas:
+
+- **#92 — PBI-072: Demonstração ponta a ponta** _(Ready, compartilhada com a equipe)_
+- **#197 — Integração ponta a ponta da sincronização do app com o backend** _(Ready, compartilhada)_
+- **#302 — Adaptar documentação de gestão ao template de Relatório Final (épico)** _(Ready, compartilhada)_
+
+---
+
+## Movimentações desde a versão anterior
+
+Comparação com a versão de **14/11/2026**. As movimentações das versões mais antigas estão
+no histórico do git deste arquivo.
+
+**Issues novas no board**
+
+- **#346 — Listar inspeções canceladas na lista do técnico (backend)** → Lucas. Criada e
+  já concluída (issue fechada em 14/11/2026, card em **Done**, PR #352). Por isso não
+  aparece na lista de issues abertas do Lucas.
+
+**Mudanças de coluna**
+
+- **#310** (presigned URL) e **#312** (CloudFront): Ready → **In progress** (Ian).
+
+**Concluídas (Done) e removidas das listas**
+
+- Ian: #305 (RDS), #306 (EC2), #308 (bucket S3), #309 (`S3EvidenceStorage`, PR #359).
+- Felipe e Natália: #229 (upload de evidência no mobile, PR #356).
+- Lucas: #346 (nova, ver acima).
+
+**Sem reatribuições.** Nenhuma issue aberta mudou de assignee desde a versão anterior.
 
 ---
 
 ## Observações
 
-- **Total real: 28 issues** (não 29 — havia um erro de contagem nas versões anteriores
-  deste documento; a lista de issues abertas sem assignee sempre teve 28 itens).
-- **Issue compartilhada:** #320 é responsabilidade conjunta de **Felipe + Rodrigo**
-  (contabilizada uma vez no total de 28, mas aparece nas duas seções).
-- **Issue compartilhada:** #335 é responsabilidade conjunta de **Felipe + Rodrigo**
-  (adicionada após a distribuição inicial; não contabilizada no total de 28).
-- **Dependências de infra AWS:** a trilha é acoplada
-  (#305 → #306 → #307/#309/#315; #312 depende de #306 + #311; #313/#314/#316 dependem de
-  várias). Com a redistribuição, ela ficou espalhada entre Ian, Marcela e Lucas
-  — precisa de coordenação entre eles para não travar.
+- **Distribuição original: 28 issues.** O histórico das atribuições originais está no
+  controle de versão deste arquivo.
+- **Marcela e Rodrigo** ficaram só com issues compartilhadas (#92, #197, #302 e, no caso da
+  Marcela, #30). Vale combinar quem faz o quê dentro de cada uma, ou redistribuir carga.
+- **Ian caiu de 12 para 8 issues** (7 individuais), das quais 5 ainda são da trilha AWS
+  (#307, #310, #312, #314, #315). A base da infra (RDS, EC2, bucket S3 e
+  `S3EvidenceStorage`) já está concluída.
+- **Dependências de infra AWS:** com #305, #306, #308 e #309 concluídas, o caminho crítico
+  passa a ser o CloudFront (#312), que depende de #311 (Lucas, ainda em Ready). Depois
+  dele vêm #313 (Lucas), #314 (Ian) e #316 (Júlia). Vale priorizar a #311 para não travar
+  o Ian.
 - **Issues de fechamento (#316 e #320):** dependem de quase tudo pronto; deixar para o final.
-- **Issues extras (pós-distribuição):** #332, #333, #334 (Felipe), #338 (Caroline) e #336 (Caroline), #337 (Ian) foram
-  atribuídas depois da distribuição inicial e não entram na contagem das 28.
+- **Inconsistência no board:** #89 está fechada, mas o card continua em Ready.
+- **Cards de PR no board:** #331, #342, #349 e #350 são Pull Requests (não issues) ainda
+  fora de Done e não entram na contagem.

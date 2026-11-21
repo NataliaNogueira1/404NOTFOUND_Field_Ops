@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
 import { randomUuidV4, stableUuidFromSeed } from './uuid';
+import { Severity } from '@/features/fieldops/types';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -53,6 +54,12 @@ interface ApiInspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Reason given when the inspection was cancelled (issue #342). */
+  canceledReason?: string;
+  /** Who cancelled the inspection (issue #342). */
+  canceledBy?: string;
+  /** When the inspection was cancelled, ISO date/time (issue #342). */
+  canceledAt?: string;
   version: number;
   template: ApiTemplate;
   reviewComments?: ApiReviewComment[];
@@ -365,6 +372,11 @@ export class InspectionSyncService {
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
+      // issue #342: bring the cancellation metadata down from the server so the
+      // CancellationBanner shows reason, who and when offline.
+      canceledReason: apiInsp.canceledReason,
+      canceledBy: apiInsp.canceledBy,
+      canceledAt: apiInsp.canceledAt,
       serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,
@@ -940,11 +952,18 @@ export class InspectionSyncService {
   /**
    * Enqueue a non-conformity to be synced later.
    */
-  async enqueueNonConformity(nc: NonConformity): Promise<void> {
+  async enqueueNonConformity(nc: NonConformity, knownEvidenceDependencies: string[] = []): Promise<void> {
     const id = `nc-${nc.id}`;
     // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
     // conflict detection (PBI-055), mirroring enqueueAnswer.
     const inspection = await this.inspectionRepo.getById(nc.inspectionId);
+    const evidence = nc.severity === Severity.CRITICAL ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId) : [];
+    const knownDependencies = nc.severity === Severity.CRITICAL ? knownEvidenceDependencies : [];
+    const dependencyIds = [...new Set([
+      ...evidence.filter((entry) => entry.syncStatus !== 'synced')
+        .map((entry) => entry.operationId ?? InspectionSyncService.evidenceOperationId(entry.id)),
+      ...knownDependencies,
+    ])];
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
@@ -954,7 +973,7 @@ export class InspectionSyncService {
       description: nc.description,
       severity: nc.severity,
       baseVersion: inspection?.serverVersion ?? 0,
-    });
+    }, dependencyIds);
   }
 
   /**

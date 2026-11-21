@@ -342,6 +342,8 @@ export function ClientDetailsPage() {
   const [loadingClient, setLoadingClient] = useState(true)
   const [loadingSites, setLoadingSites] = useState(true)
   const [clientError, setClientError] = useState('')
+  const [notFound, setNotFound] = useState(false)
+  const [sitesError, setSitesError] = useState('')
   const [editingClient, setEditingClient] = useState<ManagedClient | null>(null)
   const [editingSite, setEditingSite] = useState<ManagedInspectionSite | 'new' | null>(null)
   const [changingSiteStatus, setChangingSiteStatus] = useState<ManagedInspectionSite | null>(null)
@@ -350,11 +352,16 @@ export function ClientDetailsPage() {
   const loadClient = useCallback(async () => {
     setLoadingClient(true)
     setClientError('')
+    setNotFound(false)
     try {
       const result = await clientsApi.get(clientId)
       setManagedClient(result)
-    } catch {
-      setClientError('Não foi possível carregar os dados do cliente.')
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) {
+        setNotFound(true)
+      } else {
+        setClientError('Não foi possível carregar os dados do cliente.')
+      }
     } finally {
       setLoadingClient(false)
     }
@@ -362,11 +369,13 @@ export function ClientDetailsPage() {
 
   const loadSites = useCallback(async () => {
     setLoadingSites(true)
+    setSitesError('')
     try {
       const result = await sitesApi.listByClient(clientId)
       setSites(result)
     } catch {
-      /* Mantém lista vazia em caso de erro; o erro do cliente principal já é exibido */
+      // Falha nos locais não pode parecer "lista vazia": exibe erro com retry só nesta seção
+      setSitesError('Não foi possível carregar os locais deste cliente.')
     } finally {
       setLoadingSites(false)
     }
@@ -467,6 +476,19 @@ export function ClientDetailsPage() {
   ]
 
   if (loadingClient) return <LoadingState label="Carregando dados do cliente..." />
+  if (notFound) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-primary" to="/app/clients">
+            <ArrowLeft size={16} />
+            Clientes
+          </Link>
+        </div>
+        <ErrorState message="Cliente não encontrado. Ele pode ter sido removido ou o endereço está incorreto." />
+      </div>
+    )
+  }
   if (clientError) return <ErrorState message={clientError} onRetry={() => void loadClient()} />
   if (!managedClient) return <ErrorState message="Cliente não encontrado." />
 
@@ -524,13 +546,17 @@ export function ClientDetailsPage() {
             Adicionar local
           </Button>
         </div>
-        <DataTable
-          columns={siteColumns}
-          rows={sites}
-          loading={loadingSites}
-          loadingLabel="Carregando locais..."
-          empty="Nenhum local cadastrado para este cliente."
-        />
+        {sitesError ? (
+          <ErrorState message={sitesError} onRetry={() => void loadSites()} />
+        ) : (
+          <DataTable
+            columns={siteColumns}
+            rows={sites}
+            loading={loadingSites}
+            loadingLabel="Carregando locais..."
+            empty="Nenhum local cadastrado para este cliente."
+          />
+        )}
       </section>
       <ManagedClientModal
         key={editingClient?.id ?? 'closed'}

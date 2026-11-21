@@ -1,12 +1,23 @@
 package com.fieldops.nonconformity.controller;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
+import com.fieldops.audit.model.AuditEvent;
+import com.fieldops.audit.repository.AuditEventRepository;
+import com.fieldops.evidence.model.InspectionEvidence;
+import com.fieldops.evidence.repository.InspectionEvidenceRepository;
 import com.fieldops.inspection.model.Inspection;
+import com.fieldops.inspection.model.InspectionItemSnapshot;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionTemplate;
 import com.fieldops.inspection.model.Priority;
+import com.fieldops.inspection.model.ResponseType;
+import com.fieldops.inspection.model.TemplateItem;
+import com.fieldops.inspection.model.TemplateSection;
 import com.fieldops.inspection.repository.InspectionRepository;
+import com.fieldops.inspection.repository.InspectionItemSnapshotRepository;
 import com.fieldops.inspection.repository.InspectionTemplateRepository;
+import com.fieldops.inspection.repository.TemplateItemRepository;
+import com.fieldops.inspection.repository.TemplateSectionRepository;
 import com.fieldops.nonconformity.model.NonConformity;
 import com.fieldops.nonconformity.model.NonConformitySeverity;
 import com.fieldops.nonconformity.model.NonConformityStatus;
@@ -27,12 +38,16 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -56,10 +71,28 @@ class NonConformityListControllerTest {
     private NonConformityRepository nonConformityRepository;
 
     @Autowired
+    private AuditEventRepository auditEventRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private InspectionEvidenceRepository evidenceRepository;
+
+    @Autowired
     private InspectionRepository inspectionRepository;
 
     @Autowired
     private InspectionTemplateRepository templateRepository;
+
+    @Autowired
+    private InspectionItemSnapshotRepository snapshotRepository;
+
+    @Autowired
+    private TemplateSectionRepository sectionRepository;
+
+    @Autowired
+    private TemplateItemRepository itemRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -101,7 +134,12 @@ class NonConformityListControllerTest {
 
     private void cleanState() {
         nonConformityRepository.deleteAll();
+        auditEventRepository.deleteAll();
+        evidenceRepository.deleteAll();
         inspectionRepository.deleteAll();
+        snapshotRepository.deleteAll();
+        itemRepository.deleteAll();
+        sectionRepository.deleteAll();
         templateRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -229,6 +267,112 @@ class NonConformityListControllerTest {
                 .andExpect(jsonPath("$.content[0].updatedAt").doesNotExist());
     }
 
+    @Test
+    void rejectsCriticalCreationWithoutEvidenceAndDoesNotPersist() throws Exception {
+        long before = nonConformityRepository.count();
+        InspectionItemSnapshot item = itemFor(acmeInspection);
+
+        mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + obtainToken("sup@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nonConformityBody(acmeInspection, item, "CRITICAL")))
+                .andExpect(status().isBadRequest());
+
+        assertThat(nonConformityRepository.count()).isEqualTo(before);
+    }
+
+    @Test
+    void createsCriticalNonConformityWhenItemEvidenceExists() throws Exception {
+        InspectionItemSnapshot item = itemFor(acmeInspection);
+        evidenceRepository.save(InspectionEvidence.create(acmeInspection, item, "acme/photo.jpg", "checksum",
+                "Photo", Instant.now(), technician));
+
+        mockMvc.perform(post("/api/v1/non-conformities").header("Authorization", "Bearer " + obtainToken("sup@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nonConformityBody(acmeInspection, item, "CRITICAL")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.severity").value("CRITICAL"));
+    }
+
+    @Test
+    void rejectsCriticalUpdateWithoutEvidenceAndKeepsPreviousSeverity() throws Exception {
+        InspectionItemSnapshot item = itemFor(acmeInspection);
+        NonConformity existing = nonConformityRepository.save(NonConformity.create(acmeInspection, item,
+                "Existing issue", "Details", NonConformitySeverity.HIGH));
+
+        mockMvc.perform(put("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + obtainToken("sup@fieldops.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nonConformityBody(acmeInspection, item, "CRITICAL")))
+                .andExpect(status().isBadRequest());
+
+        assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getSeverity())
+                .isEqualTo(NonConformitySeverity.HIGH);
+    }
+
+    @Test
+    void softDeletesNonConformityAndKeepsItOutOfReadQueries() throws Exception {
+        InspectionItemSnapshot item = itemFor(acmeInspection);
+        NonConformity existing = nonConformityRepository.save(NonConformity.create(acmeInspection, item,
+                "Existing issue", "Details", NonConformitySeverity.HIGH));
+        String token = obtainToken("sup@fieldops.com");
+
+        mockMvc.perform(get("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(existing.getId()));
+
+        mockMvc.perform(put("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nonConformityBody(acmeInspection, item, "HIGH")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Critical issue"));
+
+        mockMvc.perform(delete("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/non-conformities/{id}", existing.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/non-conformities").param("inspectionId", acmeInspection.getId().toString())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].id").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(existing.getId().intValue()))));
+        mockMvc.perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openNonConformities").value(2));
+        mockMvc.perform(get("/api/v1/inspections/{id}/review", acmeInspection.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nonConformities[*].id").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(existing.getId().intValue()))));
+
+        java.util.Map<String, Object> stored = jdbcTemplate.queryForMap(
+                "SELECT deleted_at, deleted_by FROM non_conformities WHERE id = ?", existing.getId());
+        assertThat(stored.get("deleted_at")).isNotNull();
+        assertThat(((Number) stored.get("deleted_by")).longValue()).isEqualTo(supervisor.getId());
+        assertThat(auditEventRepository.findByEntityTypeAndEntityIdOrderByOccurredAtAscIdAsc(
+                "NON_CONFORMITY", existing.getId()))
+                .anySatisfy((AuditEvent event) -> {
+                    assertThat(event.getAction().name()).isEqualTo("NON_CONFORMITY_DELETED");
+                    assertThat(event.getActorId()).isEqualTo(supervisor.getId());
+                });
+    }
+
+    private InspectionItemSnapshot itemFor(Inspection inspection) {
+        return snapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId())
+                .getFirst();
+    }
+
+    private String nonConformityBody(Inspection inspection, InspectionItemSnapshot item, String severity) {
+        return "{\"inspectionId\":" + inspection.getId() + ",\"itemId\":" + item.getSourceTemplateItemId()
+                + ",\"title\":\"Critical issue\",\"description\":\"Details\",\"severity\":\""
+                + severity + "\",\"status\":\"OPEN\"}";
+    }
+
     // --- fixtures ---
 
     private User persistUser(String email, Role role) {
@@ -262,6 +406,19 @@ class NonConformityListControllerTest {
         inspection.setStatus(InspectionStatus.UNDER_REVIEW);
         inspection.setPriority(Priority.MEDIUM);
         inspection.setDueDate(LocalDate.now().plusDays(1));
+        TemplateSection section = new TemplateSection();
+        section.setTemplate(template);
+        section.setTitle("Safety");
+        section.setDisplayOrder(1);
+        section = sectionRepository.save(section);
+        TemplateItem item = new TemplateItem();
+        item.setSection(section);
+        item.setQuestion("Is the equipment safe?");
+        item.setResponseType(ResponseType.BOOLEAN);
+        item.setRequired(true);
+        item.setDisplayOrder(1);
+        item = itemRepository.save(item);
+        inspection.addItemSnapshot(InspectionItemSnapshot.from(inspection, section, item));
         return inspectionRepository.save(inspection);
     }
 

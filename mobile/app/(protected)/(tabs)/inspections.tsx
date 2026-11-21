@@ -36,7 +36,7 @@ export default function InspectionsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>Carregando inspeções...</Text>
@@ -46,7 +46,7 @@ export default function InspectionsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -75,6 +75,7 @@ export default function InspectionsScreen() {
             InspectionStatus.UNDER_REVIEW,
             InspectionStatus.APPROVED,
             InspectionStatus.REJECTED,
+            InspectionStatus.CANCELED,
           ]}
           selected={status}
           onSelect={(value) => setStatus(value as typeof status)}
@@ -85,6 +86,7 @@ export default function InspectionsScreen() {
             UNDER_REVIEW: 'Em revisão',
             APPROVED: 'Aprovada',
             REJECTED: 'Reprovada',
+            CANCELED: 'Cancelada',
           }}
         />
         <Text style={[styles.filterLabel, { color: c.textSecondary }]}>Prioridade</Text>

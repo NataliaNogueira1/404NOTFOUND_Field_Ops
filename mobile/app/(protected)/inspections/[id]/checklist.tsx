@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ChecklistItemCard, ProgressBar, ReadOnlyBanner, SectionHeader } from '@/components/fieldops';
-import { Button, Card } from '@/design-system';
+import { Button, Card, SignaturePreview, type SignatureStroke } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { InspectionStatus, useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
@@ -42,6 +42,17 @@ export default function ChecklistScreen() {
   const answered = allItems.filter((item) => answers[item.id] !== undefined).length;
   const pending = total - answered;
 
+  // Parse stored strokes for read-only signature preview (issue #334).
+  // Must be declared before any early return to satisfy the Rules of Hooks.
+  const signatureStrokes = useMemo((): SignatureStroke[] | null => {
+    if (!readOnly || !inspection?.signatureStrokes) return null;
+    try {
+      return JSON.parse(inspection.signatureStrokes) as SignatureStroke[];
+    } catch {
+      return null;
+    }
+  }, [readOnly, inspection?.signatureStrokes]);
+
   // Scroll to first unanswered item — must be defined before any early return
   const handleScrollToPending = useCallback(() => {
     if (!template || !scrollRef.current) return;
@@ -60,14 +71,14 @@ export default function ChecklistScreen() {
     scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
   }, [allItems, answers, template]);
 
-  // Scroll the focused card's Y position into view above the keyboard.
+  // Scroll the focused card's Y position into view above the keyboard (issue #333).
   const handleItemFocus = useCallback((itemY: number) => {
     scrollRef.current?.scrollTo({ y: itemY, animated: true });
   }, []);
 
   if (templateLoading) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={{ color: c.textSecondary }}>Carregando checklist...</Text>
@@ -81,7 +92,7 @@ export default function ChecklistScreen() {
   // freezing forever on the spinner.
   if (!template || !hasChecklist) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <Text style={[styles.title, { color: c.text }]}>Checklist indisponível</Text>
           <Text style={{ color: c.textSecondary, textAlign: 'center' }}>
@@ -95,7 +106,7 @@ export default function ChecklistScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       {/*
        * KeyboardAvoidingView pushes the ScrollView up when the software keyboard
        * opens so the focused input (number, text) stays visible above the keyboard
@@ -108,6 +119,9 @@ export default function ChecklistScreen() {
        * view is not over-shifted. ScrollView also scrolls to the focused card via
        * onFocus callbacks, ensuring the field stays above the keyboard even when
        * it is in the middle or end of a long list.
+       *
+       * Note: the protected layout (_layout.tsx) owns the top safe area inset;
+       * this SafeAreaView only handles the remaining edges (#332).
        */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
@@ -162,6 +176,27 @@ export default function ChecklistScreen() {
             </View>
           ))}
 
+          {/* ── Assinatura do técnico (issue #334) ───────────────────────
+              Exibe a assinatura salva quando o checklist está em modo
+              read-only (SUBMITTED / UNDER_REVIEW / APPROVED). Os strokes
+              persistidos são redesenhados com SignaturePreview, evitando
+              a limitação do <Image> com SVG data URI no React Native.
+          ────────────────────────────────────────────────────────────── */}
+          {readOnly && signatureStrokes ? (
+            <Card style={styles.signatureCard}>
+              <Text style={[styles.signatureTitle, { color: c.text }]}>
+                Assinatura do técnico
+              </Text>
+              <SignaturePreview
+                strokes={signatureStrokes}
+                sourceWidth={inspection?.signatureWidth ?? 300}
+                sourceHeight={inspection?.signatureHeight ?? 180}
+                height={100}
+                accessibilityLabel="Assinatura do técnico"
+              />
+            </Card>
+          ) : null}
+
           <Button
             label="Ver resumo"
             onPress={() => router.push(`/(protected)/inspections/${inspection?.id ?? id}/summary`)}
@@ -198,4 +233,6 @@ const styles = StyleSheet.create({
   card: { gap: Spacing.sm },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pendingLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
+  signatureCard: { gap: Spacing.sm },
+  signatureTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
 });

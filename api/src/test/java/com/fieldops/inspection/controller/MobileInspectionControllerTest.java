@@ -27,11 +27,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -89,6 +92,11 @@ class MobileInspectionControllerTest {
 
         saveInspection(template, technician, supervisor, InspectionStatus.ASSIGNED, Priority.HIGH);
         saveInspection(template, technician, supervisor, InspectionStatus.IN_PROGRESS, Priority.LOW);
+        Inspection canceled = saveInspection(template, technician, supervisor, InspectionStatus.CANCELED, Priority.MEDIUM);
+        canceled.setCanceledReason("Equipment replaced before inspection");
+        canceled.setCanceledBy(supervisor);
+        canceled.setCanceledAt(Instant.parse("2026-11-10T10:15:30Z"));
+        inspectionRepository.save(canceled);
         saveInspection(template, otherTechnician, supervisor, InspectionStatus.ASSIGNED, Priority.MEDIUM);
     }
 
@@ -99,16 +107,22 @@ class MobileInspectionControllerTest {
         mockMvc.perform(get("/api/v1/mobile/inspections")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$..status",
-                        containsInAnyOrder("ASSIGNED", "IN_PROGRESS")))
+                        containsInAnyOrder("ASSIGNED", "IN_PROGRESS", "CANCELED")))
+                .andExpect(jsonPath("$[?(@.status == 'CANCELED')].canceledReason")
+                        .value(org.hamcrest.Matchers.contains("Equipment replaced before inspection")))
+                .andExpect(jsonPath("$[?(@.status == 'CANCELED')].canceledBy")
+                        .value(org.hamcrest.Matchers.contains("User sup@fieldops.com")))
+                .andExpect(jsonPath("$[?(@.status == 'CANCELED')].canceledAt")
+                        .value(org.hamcrest.Matchers.contains("2026-11-10T10:15:30Z")))
                 .andExpect(jsonPath("$[0].template.sections", hasSize(1)));
     }
 
     @Test
     void preservesTemplateItemRulesWhenInspectionIsCreated() {
         assertThat(snapshotRepository.findAll())
-                .hasSize(3)
+                .hasSize(4)
                 .allSatisfy(snapshot -> assertThat(snapshot.getRulesJson()).isEqualTo(
                         "{\"required\":true,\"observationRequiredOnFailure\":true,"
                                 + "\"evidenceRequiredOnFailure\":true}"));
@@ -129,15 +143,15 @@ class MobileInspectionControllerTest {
 
     @Test
     void doesNotListInspectionsAssignedToAnotherTechnician() throws Exception {
-        // Three inspections exist, but one belongs to the other technician: each
+        // Four inspections exist, but one belongs to the other technician: each
         // technician must see only their own assignments.
         mockMvc.perform(get("/api/v1/mobile/inspections")
                         .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$..technicianId",
                         containsInAnyOrder(String.valueOf(technician.getId()),
-                                String.valueOf(technician.getId()))));
+                                String.valueOf(technician.getId()), String.valueOf(technician.getId()))));
 
         mockMvc.perform(get("/api/v1/mobile/inspections")
                         .header("Authorization", "Bearer " + obtainToken("other-tech@fieldops.com", "pass123")))
@@ -145,6 +159,16 @@ class MobileInspectionControllerTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].technicianId")
                         .value(String.valueOf(otherTechnician.getId())));
+    }
+
+    @Test
+    void listsEmptyResultWhenTechnicianHasNoAssignedInspections() throws Exception {
+        persistUser("empty-tech@fieldops.com", Role.TECHNICIAN);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections")
+                        .header("Authorization", "Bearer " + obtainToken("empty-tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
@@ -176,6 +200,41 @@ class MobileInspectionControllerTest {
         mockMvc.perform(get("/api/v1/mobile/inspections/{id}", Long.MAX_VALUE)
                         .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void exposesCancellationAuditOnDetailForCanceledInspection() throws Exception {
+        // #338: a CANCELED inspection must carry reason, canceler name and timestamp so the
+        // technician sees the same audit the supervisor already does (PR #330).
+        User supervisor = userRepository.findByEmail("sup@fieldops.com").orElseThrow();
+        Inspection canceled = saveInspection(template, technician, supervisor,
+                InspectionStatus.CANCELED, Priority.MEDIUM);
+        canceled.setCanceledReason("Cliente cancelou a visita técnica.");
+        canceled.setCanceledBy(supervisor);
+        canceled.setCanceledAt(Instant.parse("2026-11-02T12:00:00Z"));
+        inspectionRepository.saveAndFlush(canceled);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", canceled.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+                .andExpect(jsonPath("$.canceledReason").value("Cliente cancelou a visita técnica."))
+                .andExpect(jsonPath("$.canceledBy").value(supervisor.getName()))
+                .andExpect(jsonPath("$.canceledAt").value("2026-11-02T12:00:00Z"));
+    }
+
+    @Test
+    void omitsCancellationAuditForNonCanceledInspection() throws Exception {
+        // The audit block must stay null in any other state (#338).
+        Inspection assignedInspection = inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technician.getId())
+                .getFirst();
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", assignedInspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canceledReason").value(nullValue()))
+                .andExpect(jsonPath("$.canceledBy").value(nullValue()))
+                .andExpect(jsonPath("$.canceledAt").value(nullValue()));
     }
 
     private User persistUser(String email, Role role) {
@@ -215,7 +274,7 @@ class MobileInspectionControllerTest {
         return templateRepository.save(template);
     }
 
-    private void saveInspection(InspectionTemplate template, User technician, User supervisor,
+    private Inspection saveInspection(InspectionTemplate template, User technician, User supervisor,
                                 InspectionStatus status, Priority priority) {
         Inspection inspection = new Inspection();
         inspection.setTitle("Inspection " + status);
@@ -230,7 +289,7 @@ class MobileInspectionControllerTest {
         inspection.setDueDate(LocalDate.now().plusDays(1));
         template.getSections().forEach(section -> section.getItems().forEach(item ->
                 inspection.addItemSnapshot(InspectionItemSnapshot.from(inspection, section, item))));
-        inspectionRepository.save(inspection);
+        return inspectionRepository.save(inspection);
     }
 
     private String obtainToken(String email, String password) throws Exception {

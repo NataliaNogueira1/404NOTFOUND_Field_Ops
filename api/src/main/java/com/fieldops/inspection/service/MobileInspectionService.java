@@ -64,6 +64,17 @@ public class MobileInspectionService {
             return MobileStatusUpdateResponse.alreadyApplied(inspection.getId(), inspection.getStatus());
         }
 
+        // Already in the requested status: the operation's goal is met (e.g. the device re-sent
+        // IN_PROGRESS with a new operationId after the first one was applied). Record it and
+        // answer ALREADY_APPLIED instead of an illegal X -> X transition that would wedge the
+        // device outbox (#229 field test). Checked before the version so a stale baseVersion
+        // does not turn a satisfied operation into a conflict.
+        if (inspection.getStatus() == targetStatus) {
+            idempotencyService.markProcessed(operationId, OP_TYPE_STATUS, inspection.getId(),
+                    targetStatus.name());
+            return MobileStatusUpdateResponse.alreadyApplied(inspection.getId(), inspection.getStatus());
+        }
+
         if (!inspection.getVersion().equals(baseVersion)) {
             throw new ResourceConflictException("Inspection version conflict: local=" + baseVersion
                     + ", server=" + inspection.getVersion());
@@ -117,7 +128,8 @@ public class MobileInspectionService {
         List<InspectionStatus> mobileStatuses = List.of(
                 InspectionStatus.ASSIGNED,
                 InspectionStatus.IN_PROGRESS,
-                InspectionStatus.REJECTED
+                InspectionStatus.REJECTED,
+                InspectionStatus.CANCELED
         );
 
         List<Inspection> inspections = inspectionRepository.findByTechnicianAndStatuses(
