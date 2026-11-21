@@ -76,9 +76,8 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
    */
   const handleInputFocus = useCallback(() => {
     if (!onInputFocus) return;
-    // 80px offset clears the card header (question + status label + optional description)
-    // so the TextInput is visible above the keyboard, not hidden behind the card title.
-    onInputFocus(Math.max(0, cardLayoutY.current - 80));
+    // Pass the card's top Y directly — checklist.tsx adds the keyboard height offset.
+    onInputFocus(cardLayoutY.current);
   }, [onInputFocus]);
 
   const handleCardLayout = useCallback((event: { nativeEvent: { layout: { y: number } } }) => {
