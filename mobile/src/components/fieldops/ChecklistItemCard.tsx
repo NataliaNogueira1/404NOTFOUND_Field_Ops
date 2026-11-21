@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, findNodeHandle } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -70,27 +70,35 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
 
   /**
    * Notify the parent so it can scroll the focused TextInput above the keyboard (#333).
-   * Uses measureLayout on the TextInput directly (Opção A) so the Y offset points to
-   * the input row, not the card header.  Falls back to the card Y when the input ref
-   * is not yet mounted (e.g. CONFORMITY / BOOLEAN / DATE cards).
+   * Uses `measure` (absolute screen coordinates) on both the input and the ScrollView
+   * to compute the input's Y offset relative to the scroll container — avoids the
+   * "ref must be a native component" error that measureLayout throws when the ScrollView
+   * ref is not yet a resolved host node.
    */
   const handleInputFocus = useCallback(() => {
     if (!onInputFocus) return;
-    const scrollNode = scrollRef?.current;
-    if (!scrollNode) return;
-
-    const scrollHandle = findNodeHandle(scrollNode);
-    if (!scrollHandle) return;
-
-    // Prefer the TextInput position; fall back to the card View.
-    const target: View | TextInput | null = inputRef.current ?? cardRef.current;
+    // Prefer the TextInput; fall back to the card View for non-text types.
+    const target = inputRef.current ?? cardRef.current;
     if (!target) return;
 
-    target.measureLayout(
-      scrollHandle as unknown as React.ElementRef<typeof View>,
-      (_x, y) => { onInputFocus(y); },
-      () => { /* fallback: no-op */ },
-    );
+    target.measure((_x, _y, _w, _h, pageX: number, pageY: number) => {
+      const scrollNode = scrollRef?.current;
+      if (!scrollNode) {
+        // No scroll ref: best-effort using absolute Y minus a rough status bar offset.
+        onInputFocus(Math.max(0, pageY - 80));
+        return;
+      }
+      // Measure the ScrollView to get its absolute top on screen, then compute
+      // the input's position relative to the ScrollView's content origin.
+      (scrollNode as unknown as { measure: typeof target.measure }).measure(
+        (_sx, _sy, _sw, _sh, _spx, spPageY: number) => {
+          // pageY is the input's top in screen coords; spPageY is the ScrollView's
+          // top in screen coords. The difference gives the input's offset inside the
+          // scroll content, which is what scrollTo({ y }) expects.
+          onInputFocus(Math.max(0, pageY - spPageY));
+        },
+      );
+    });
   }, [onInputFocus, scrollRef]);
 
   // Text fields: debounced save on each keystroke
