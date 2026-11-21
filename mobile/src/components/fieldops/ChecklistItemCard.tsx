@@ -1,5 +1,5 @@
-﻿import { useCallback, useMemo, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import { useCallback, useMemo, useRef, useState } from 'react';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -10,6 +10,9 @@ import { useThemeColors } from '@/features/theme';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { SaveStatusIndicator } from './SaveStatusIndicator';
 import type { ReviewComment } from '@/features/fieldops';
+
+/** Unique ID for the numeric keyboard's InputAccessoryView (iOS only). */
+export const NUMERIC_ACCESSORY_ID = 'checklist-numeric-accessory';
 
 interface ChecklistItemProps {
   item: TemplateItem;
@@ -28,9 +31,20 @@ interface ChecklistItemProps {
    * a SUBMITTED/UNDER_REVIEW/APPROVED inspection without editing or triggering any save.
    */
   readOnly?: boolean;
+  /**
+   * Called when any text input inside this card receives focus. Receives the card's Y offset
+   * relative to the ScrollView, obtained via measureLayout, so the parent can scroll the
+   * focused field above the keyboard (#333).
+   */
+  onInputFocus?: (y: number) => void;
+  /**
+   * Ref to the root ScrollView. Required for measureLayout to compute the card's Y position
+   * relative to the scroll container across multiple sections (#333).
+   */
+  scrollRef?: React.RefObject<ScrollView | null>;
 }
 
-export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence, reviewComments = [], readOnly = false }: ChecklistItemProps) {
+export function ChecklistItemCard({ item, index, inspectionId, answer, evidences, onAnswer, onRetryEvidence, reviewComments = [], readOnly = false, onInputFocus, scrollRef }: ChecklistItemProps) {
   const router = useRouter();
   const c = useThemeColors();
   const [text, setText] = useState(answer?.value?.toString() ?? '');
@@ -42,6 +56,27 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
     responseType: item.responseType,
     onSave: onAnswer,
   });
+
+  // Ref to the root <View> wrapper of this card — used by measureLayout.
+  const cardRef = useRef<View>(null);
+
+  /**
+   * Notify the parent so it can scroll this card above the keyboard (#333).
+   * measureLayout returns the card's position relative to the ScrollView node,
+   * which is correct even when the card sits inside a later section whose own
+   * <View> offset is not yet accumulated (unlike onLayout, which reports y
+   * relative only to the immediate parent <View key={section.id}>).
+   */
+  const handleInputFocus = useCallback(() => {
+    if (!onInputFocus) return;
+    if (scrollRef?.current && cardRef.current) {
+      cardRef.current.measureLayout(
+        scrollRef.current as unknown as React.ElementRef<typeof View>,
+        (_x, y) => { onInputFocus(y); },
+        () => { /* fallback: no-op */ },
+      );
+    }
+  }, [onInputFocus, scrollRef]);
 
   // Text fields: debounced save on each keystroke
   const handleTextChange = useCallback((value: string) => {
@@ -78,6 +113,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
   }, [answer?.value, flush, observation]);
 
   return (
+    <View ref={cardRef}>
     <Card style={styles.card}>
       <View style={styles.header}>
         <Text style={[styles.question, { color: c.text }]}>{index}. {item.question}{item.required ? ' *' : ''}</Text>
@@ -92,6 +128,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
         onText={handleTextChange}
         onTextBlur={handleTextBlur}
         onAnswer={handleSelect}
+        onFocus={handleInputFocus}
         readOnly={readOnly}
       />
       {isFailure ? (
@@ -147,6 +184,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
       ) : null}
       {readOnly ? null : <SaveStatusIndicator status={saveStatus} />}
     </Card>
+    </View>
   );
 }
 
@@ -193,13 +231,14 @@ function EvidenceThumb({ evidence, onRetry }: { evidence: Evidence; onRetry?: (e
   );
 }
 
-function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOnly = false }: {
+function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocus, readOnly = false }: {
   item: TemplateItem;
   value?: ChecklistValue;
   text: string;
   onText: (value: string) => void;
   onTextBlur: () => void;
   onAnswer: (value: ChecklistValue) => void;
+  onFocus?: () => void;
   readOnly?: boolean;
 }) {
   const c = useThemeColors();
@@ -209,13 +248,22 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOn
   if (item.responseType === ResponseType.SINGLE_CHOICE) return <Segmented options={(item.options ?? []).map((option) => [option, option])} value={value} onSelect={onAnswer} readOnly={readOnly} />;
   if (item.responseType === ResponseType.DATE) return <DateInput value={value as string | undefined} onSelect={onAnswer} readOnly={readOnly} />;
   if (item.responseType === ResponseType.NUMBER) return (
+    /*
+     * InputAccessoryView (iOS only) is rendered once at the screen level (checklist.tsx)
+     * to avoid duplicating the same nativeID across every card, which causes undefined
+     * behaviour. Only the inputAccessoryViewID link is kept here.
+     * returnKeyType="done" is set for completeness; on iOS numeric keyboards it has no
+     * visible Return key — the InputAccessoryView "OK" button is the primary dismiss path.
+     */
     <TextInput
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      onFocus={onFocus}
       editable={!readOnly}
       keyboardType="numeric"
       returnKeyType="done"
+      inputAccessoryViewID={Platform.OS === 'ios' ? NUMERIC_ACCESSORY_ID : undefined}
       placeholder="Informe o valor"
       placeholderTextColor={c.textSecondary}
       style={[styles.input, inputStyle]}
@@ -226,6 +274,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOn
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      onFocus={onFocus}
       editable={!readOnly}
       placeholder="Digite a resposta"
       placeholderTextColor={c.textSecondary}
@@ -238,6 +287,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, readOn
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
+      onFocus={onFocus}
       editable={!readOnly}
       placeholder="Digite a resposta"
       placeholderTextColor={c.textSecondary}
