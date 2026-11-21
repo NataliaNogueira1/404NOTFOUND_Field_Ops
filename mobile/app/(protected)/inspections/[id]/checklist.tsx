@@ -1,4 +1,4 @@
-import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentRef, useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, InputAccessoryView, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -75,28 +75,11 @@ export default function ChecklistScreen() {
   }, [allItems, answers, template]);
 
   // Scroll the focused card's Y position into view above the keyboard (issue #333).
-  // keyboardHeight is updated by Keyboard listeners so the scroll always compensates
-  // the actual keyboard height, not a hardcoded estimate.
-  const keyboardHeightRef = useRef(0);
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      keyboardHeightRef.current = e.endCoordinates.height;
-    });
-    const hide = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardHeightRef.current = 0;
-    });
-    return () => { show.remove(); hide.remove(); };
-  }, []);
-
+  // behavior="padding" on KeyboardAvoidingView already pushes the ScrollView content
+  // up by the keyboard height. The manual scroll here handles items in the middle of
+  // multi-section checklists that are not yet visible when focus fires.
   const handleItemFocus = useCallback((cardY: number) => {
-    // Scroll so the card sits 16px below the top of the visible area (above the keyboard).
-    // Adding keyboardHeight ensures the target position accounts for the keyboard reducing
-    // the visible area — without it the card scrolls into view but the input at the bottom
-    // of the card is still behind the keyboard.
-    scrollRef.current?.scrollTo({
-      y: Math.max(0, cardY + keyboardHeightRef.current - 16),
-      animated: true,
-    });
+    scrollRef.current?.scrollTo({ y: Math.max(0, cardY - 16), animated: true });
   }, []);
 
   if (templateLoading) {
@@ -150,7 +133,7 @@ export default function ChecklistScreen() {
        */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         keyboardVerticalOffset={KEYBOARD_VERTICAL_OFFSET}
       >
         {/*
