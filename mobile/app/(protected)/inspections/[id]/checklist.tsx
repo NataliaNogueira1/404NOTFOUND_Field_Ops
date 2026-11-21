@@ -1,17 +1,20 @@
 import { type ComponentRef, useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, InputAccessoryView, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ChecklistItemCard, ProgressBar, ReadOnlyBanner, SectionHeader } from '@/components/fieldops';
+import { NUMERIC_ACCESSORY_ID } from '@/components/fieldops/ChecklistItemCard';
 import { Button, Card, SignaturePreview, type SignatureStroke } from '@/design-system';
 import { Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
 import { InspectionStatus, useFieldOps } from '@/features/fieldops';
 import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
-// Approximate header + safe area height per platform used as KeyboardAvoidingView offset.
-const KEYBOARD_VERTICAL_OFFSET = Platform.OS === 'ios' ? 90 : 56;
+// _layout.tsx owns the top safe-area inset (paddingTop via useSafeAreaInsets).
+// There is no header in the protected Stack (headerShown: false), so there is
+// nothing extra to compensate for — keyboardVerticalOffset must be 0.
+const KEYBOARD_VERTICAL_OFFSET = 0;
 
 // Inspection states whose checklist is viewable but never editable (#273/#277).
 const READ_ONLY_STATUSES: InspectionStatus[] = [
@@ -112,22 +115,39 @@ export default function ChecklistScreen() {
        * opens so the focused input (number, text) stays visible above the keyboard
        * on both iOS and Android (issue #333).
        *
-       * iOS:    behavior="padding" adds bottom padding equal to the keyboard height.
-       * Android: behavior="height" shrinks the view to the available height.
+       * iOS:     behavior="padding" adds bottom padding equal to the keyboard height.
+       * Android: behavior={undefined} — Expo sets windowSoftInputMode=adjustResize by
+       *          default, which already shrinks the layout. Using behavior="height" on
+       *          top of adjustResize would adjust twice and push content too far up.
        *
-       * keyboardVerticalOffset accounts for the header + safe area height so the
-       * view is not over-shifted. ScrollView also scrolls to the focused card via
-       * onFocus callbacks, ensuring the field stays above the keyboard even when
-       * it is in the middle or end of a long list.
+       * keyboardVerticalOffset=0 because _layout.tsx already owns the top safe-area
+       * inset (paddingTop via useSafeAreaInsets) and the Stack has headerShown: false,
+       * so there is no header to compensate for (#332).
        *
-       * Note: the protected layout (_layout.tsx) owns the top safe area inset;
-       * this SafeAreaView only handles the remaining edges (#332).
+       * ScrollView also scrolls to the focused card via onInputFocus + measureLayout,
+       * ensuring the field stays above the keyboard even at the middle or end of a
+       * long multi-section checklist (#333).
        */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={KEYBOARD_VERTICAL_OFFSET}
       >
+        {/*
+         * InputAccessoryView (iOS only): a single "OK" toolbar above the numeric keyboard.
+         * Rendered once at screen level to avoid duplicate nativeIDs across multiple
+         * NUMBER cards (which would cause undefined behaviour). Each NUMBER TextInput
+         * in ChecklistItemCard links to it via inputAccessoryViewID.
+         */}
+        {Platform.OS === 'ios' ? (
+          <InputAccessoryView nativeID={NUMERIC_ACCESSORY_ID}>
+            <View style={[styles.accessoryBar, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+              <TouchableOpacity onPress={() => Keyboard.dismiss()} accessibilityRole="button" accessibilityLabel="Fechar teclado">
+                <Text style={[styles.accessoryDone, { color: c.primary }]}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </InputAccessoryView>
+        ) : null}
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.container}
@@ -171,6 +191,7 @@ export default function ChecklistScreen() {
                   reviewComments={reviewComments.filter((comment) => comment.itemId === item.id)}
                   readOnly={readOnly}
                   onInputFocus={handleItemFocus}
+                  scrollRef={scrollRef}
                 />
               ))}
             </View>
@@ -235,4 +256,6 @@ const styles = StyleSheet.create({
   pendingLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
   signatureCard: { gap: Spacing.sm },
   signatureTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  accessoryBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderTopWidth: 1 },
+  accessoryDone: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
 });
