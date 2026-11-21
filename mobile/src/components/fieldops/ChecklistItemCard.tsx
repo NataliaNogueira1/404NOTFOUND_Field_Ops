@@ -57,49 +57,33 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
     onSave: onAnswer,
   });
 
-  // Ref to the root <View> wrapper of this card — kept for potential fallback use.
+  // Ref to the root <View> wrapper of this card — used to capture layout Y via onLayout.
   const cardRef = useRef<View>(null);
+  // Y position of this card's top inside the ScrollView content, captured by onLayout.
+  // onLayout fires with coordinates relative to the parent View, which is already inside
+  // the ScrollView content — so this value is stable and does not change when the keyboard opens.
+  const cardLayoutY = useRef<number>(0);
 
-  /**
-   * Ref forwarded to the focused TextInput (NUMBER / TEXT_SHORT / TEXT_LONG).
-   * measureLayout on the TextInput itself returns its exact Y position relative
-   * to the ScrollView, so the scroll lands with the input above the keyboard —
-   * not just at the top of the card, which may be 100-200 px above the input (#333).
-   */
+  // Unused inputRef kept so AnswerControl prop signature stays compatible.
   const inputRef = useRef<TextInput>(null);
 
   /**
    * Notify the parent so it can scroll the focused TextInput above the keyboard (#333).
-   * Uses `measure` (absolute screen coordinates) on both the input and the ScrollView
-   * to compute the input's Y offset relative to the scroll container — avoids the
-   * "ref must be a native component" error that measureLayout throws when the ScrollView
-   * ref is not yet a resolved host node.
+   * Uses the card's layout Y (captured by onLayout, stable relative to ScrollView content)
+   * plus a fixed offset to skip the card header and reach the TextInput row.
+   * This avoids the race condition in measure/measureLayout where the keyboard has already
+   * shifted the layout before the callback fires.
    */
   const handleInputFocus = useCallback(() => {
     if (!onInputFocus) return;
-    // Prefer the TextInput; fall back to the card View for non-text types.
-    const target = inputRef.current ?? cardRef.current;
-    if (!target) return;
+    // 80px offset clears the card header (question + status label + optional description)
+    // so the TextInput is visible above the keyboard, not hidden behind the card title.
+    onInputFocus(Math.max(0, cardLayoutY.current - 80));
+  }, [onInputFocus]);
 
-    target.measure((_x, _y, _w, _h, pageX: number, pageY: number) => {
-      const scrollNode = scrollRef?.current;
-      if (!scrollNode) {
-        // No scroll ref: best-effort using absolute Y minus a rough status bar offset.
-        onInputFocus(Math.max(0, pageY - 80));
-        return;
-      }
-      // Measure the ScrollView to get its absolute top on screen, then compute
-      // the input's position relative to the ScrollView's content origin.
-      (scrollNode as unknown as { measure: typeof target.measure }).measure(
-        (_sx, _sy, _sw, _sh, _spx, spPageY: number) => {
-          // pageY is the input's top in screen coords; spPageY is the ScrollView's
-          // top in screen coords. The difference gives the input's offset inside the
-          // scroll content, which is what scrollTo({ y }) expects.
-          onInputFocus(Math.max(0, pageY - spPageY));
-        },
-      );
-    });
-  }, [onInputFocus, scrollRef]);
+  const handleCardLayout = useCallback((event: { nativeEvent: { layout: { y: number } } }) => {
+    cardLayoutY.current = event.nativeEvent.layout.y;
+  }, []);
 
   // Text fields: debounced save on each keystroke
   const handleTextChange = useCallback((value: string) => {
@@ -136,7 +120,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
   }, [answer?.value, flush, observation]);
 
   return (
-    <View ref={cardRef}>
+    <View ref={cardRef} onLayout={handleCardLayout}>
     <Card style={styles.card}>
       <View style={styles.header}>
         <Text style={[styles.question, { color: c.text }]}>{index}. {item.question}{item.required ? ' *' : ''}</Text>
