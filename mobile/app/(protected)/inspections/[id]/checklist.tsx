@@ -12,9 +12,10 @@ import { useThemeColors } from '@/features/theme';
 import { useInspectionTemplate } from '@/hooks/useInspectionTemplate';
 
 // _layout.tsx owns the top safe-area inset (paddingTop via useSafeAreaInsets).
-// There is no header in the protected Stack (headerShown: false), so there is
-// nothing extra to compensate for — keyboardVerticalOffset must be 0.
-const KEYBOARD_VERTICAL_OFFSET = 0;
+// There is no header in the protected Stack (headerShown: false).
+// A small offset is needed so KeyboardAvoidingView over-compensates slightly,
+// ensuring the input clears the keyboard fully on Android (#333).
+const KEYBOARD_VERTICAL_OFFSET = Platform.OS === 'ios' ? 0 : 64;
 
 // Inspection states whose checklist is viewable but never editable (#273/#277).
 const READ_ONLY_STATUSES: InspectionStatus[] = [
