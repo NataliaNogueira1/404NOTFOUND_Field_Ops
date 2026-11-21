@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, findNodeHandle } from 'react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -57,25 +57,40 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
     onSave: onAnswer,
   });
 
-  // Ref to the root <View> wrapper of this card — used by measureLayout.
+  // Ref to the root <View> wrapper of this card — kept for potential fallback use.
   const cardRef = useRef<View>(null);
 
   /**
-   * Notify the parent so it can scroll this card above the keyboard (#333).
-   * measureLayout returns the card's position relative to the ScrollView node,
-   * which is correct even when the card sits inside a later section whose own
-   * <View> offset is not yet accumulated (unlike onLayout, which reports y
-   * relative only to the immediate parent <View key={section.id}>).
+   * Ref forwarded to the focused TextInput (NUMBER / TEXT_SHORT / TEXT_LONG).
+   * measureLayout on the TextInput itself returns its exact Y position relative
+   * to the ScrollView, so the scroll lands with the input above the keyboard —
+   * not just at the top of the card, which may be 100-200 px above the input (#333).
+   */
+  const inputRef = useRef<TextInput>(null);
+
+  /**
+   * Notify the parent so it can scroll the focused TextInput above the keyboard (#333).
+   * Uses measureLayout on the TextInput directly (Opção A) so the Y offset points to
+   * the input row, not the card header.  Falls back to the card Y when the input ref
+   * is not yet mounted (e.g. CONFORMITY / BOOLEAN / DATE cards).
    */
   const handleInputFocus = useCallback(() => {
     if (!onInputFocus) return;
-    if (scrollRef?.current && cardRef.current) {
-      cardRef.current.measureLayout(
-        scrollRef.current as unknown as React.ElementRef<typeof View>,
-        (_x, y) => { onInputFocus(y); },
-        () => { /* fallback: no-op */ },
-      );
-    }
+    const scrollNode = scrollRef?.current;
+    if (!scrollNode) return;
+
+    const scrollHandle = findNodeHandle(scrollNode);
+    if (!scrollHandle) return;
+
+    // Prefer the TextInput position; fall back to the card View.
+    const target: View | TextInput | null = inputRef.current ?? cardRef.current;
+    if (!target) return;
+
+    target.measureLayout(
+      scrollHandle as unknown as React.ElementRef<typeof View>,
+      (_x, y) => { onInputFocus(y); },
+      () => { /* fallback: no-op */ },
+    );
   }, [onInputFocus, scrollRef]);
 
   // Text fields: debounced save on each keystroke
@@ -129,6 +144,7 @@ export function ChecklistItemCard({ item, index, inspectionId, answer, evidences
         onTextBlur={handleTextBlur}
         onAnswer={handleSelect}
         onFocus={handleInputFocus}
+        inputRef={inputRef}
         readOnly={readOnly}
       />
       {isFailure ? (
@@ -231,7 +247,7 @@ function EvidenceThumb({ evidence, onRetry }: { evidence: Evidence; onRetry?: (e
   );
 }
 
-function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocus, readOnly = false }: {
+function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocus, inputRef, readOnly = false }: {
   item: TemplateItem;
   value?: ChecklistValue;
   text: string;
@@ -239,6 +255,12 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocu
   onTextBlur: () => void;
   onAnswer: (value: ChecklistValue) => void;
   onFocus?: () => void;
+  /**
+   * Ref forwarded to the TextInput for NUMBER / TEXT_SHORT / TEXT_LONG so the
+   * parent can measureLayout on the input itself and scroll it precisely above
+   * the keyboard (#333).
+   */
+  inputRef?: React.RefObject<TextInput | null>;
   readOnly?: boolean;
 }) {
   const c = useThemeColors();
@@ -256,6 +278,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocu
      * visible Return key — the InputAccessoryView "OK" button is the primary dismiss path.
      */
     <TextInput
+      ref={inputRef}
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
@@ -271,6 +294,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocu
   );
   if (item.responseType === ResponseType.TEXT_SHORT) return (
     <TextInput
+      ref={inputRef}
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
@@ -284,6 +308,7 @@ function AnswerControl({ item, value, text, onText, onTextBlur, onAnswer, onFocu
   );
   if (item.responseType === ResponseType.TEXT_LONG) return (
     <TextInput
+      ref={inputRef}
       value={text}
       onChangeText={onText}
       onBlur={onTextBlur}
