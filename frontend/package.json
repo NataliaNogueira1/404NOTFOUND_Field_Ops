@@ -15,8 +15,8 @@
   "dependencies": {
     "@hookform/resolvers": "latest",
     "@tanstack/react-table": "latest",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.9",
     "lucide-react": "latest",
     "qrcode.react": "^4.2.0",
     "react": "latest",

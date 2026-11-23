@@ -154,6 +154,20 @@ Observação Mobile: na primeira execução 1 suíte falhou ao rodar e, na segun
 Vulnerabilidades remanescentes sem fix compatível detalhadas na seção 3 de
 [`seguranca-dependencias.md`](seguranca-dependencias.md).
 
+### Web — migração `jspdf@4.2.1` / `jspdf-autotable@5.0.9` (issue #347)
+
+| Verificação | Comando | Status | Resultado |
+|---|---|:--:|---|
+| Auditoria | `cd frontend; npm audit` | PASS | 9 vulns (0 crítica, 0 alta, 9 moderadas de `minimatch` via toolchain de lint). `dompurify` 3.5.0. |
+| Testes | `cd frontend; npm run test` | PASS | 48 arquivos, 244 testes |
+| Teste do PDF | `cd frontend; npx vitest run src/utils/generateInspectionPdf.test.ts` | PASS | 5 testes: arquivo PDF válido, cabeçalho e dados da inspeção, tabelas do checklist por seção, não conformidades e instruções do supervisor |
+| Lint | `cd frontend; npm run lint` | PASS | Sem erros |
+| Build | `cd frontend; npm run build` | PASS | 2553 módulos transformados |
+
+O teste do PDF usa o `jspdf` real e só substitui o `save` para capturar o documento em
+vez de baixar o arquivo. Nenhuma tela usa `generateInspectionPdf` hoje; o relatório
+oficial vem do servidor (`GET /api/v1/inspections/{id}/report.pdf`).
+
 ## 11. Mobile — Upgrade Expo SDK 58 (validação, nov/2026)
 
 Registro da validação feita no upgrade do Expo SDK 57 → 58 (issue #335 / PR #345).
