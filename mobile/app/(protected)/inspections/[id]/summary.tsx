@@ -54,14 +54,17 @@ export default function SummaryScreen() {
   // (e.g. the technician drew a signature, navigated away, and returned).
   // Uses the persisted strokes + dimensions so the SignaturePreview can redraw
   // without SVG decoding (issue #334).
+  // Read into a local so the memo depends on the exact value; the React
+  // Compiler cannot preserve a memo keyed on `inspection?.signatureStrokes`.
+  const storedSignatureStrokes = inspection?.signatureStrokes;
   const persistedStrokes = useMemo(() => {
-    if (!inspection?.signatureStrokes) return null;
+    if (!storedSignatureStrokes) return null;
     try {
-      return JSON.parse(inspection.signatureStrokes) as import('@/design-system').SignatureStroke[];
+      return JSON.parse(storedSignatureStrokes) as import('@/design-system').SignatureStroke[];
     } catch {
       return null;
     }
-  }, [inspection?.signatureStrokes]);
+  }, [storedSignatureStrokes]);
   const signatureRequired = inspection?.signatureRequired ?? false;
 
   // Persist the signature to SQLite whenever it changes (auto-save pattern —

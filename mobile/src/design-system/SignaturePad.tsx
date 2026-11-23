@@ -2,24 +2,24 @@
  * SignaturePad — PBI-086 (bugfix PBI-322, issue #334)
  *
  * Canvas de assinatura manuscrita sem dependências externas.
- * Usa PanResponder para capturar traços e os renderiza como segmentos de linha
- * com Views de posicionamento absoluto.
+ * Usa as props de responder do View (mesmos eventos do PanResponder) para
+ * capturar traços e os renderiza como segmentos de linha com Views de
+ * posicionamento absoluto.
  *
- * Performance: o stroke in-flight é mantido em um ref e renderizado via um
- * componente filho isolado (LiveStroke) que só re-renderiza a si mesmo,
- * evitando re-render do componente pai a cada ponto de movimento.
+ * Performance: os traços concluídos ficam memoizados (CompletedStrokes); a cada
+ * ponto de movimento só o traço em andamento (LiveStroke) é redesenhado.
  *
  * Boundary: quando o dedo sai dos limites do canvas (x<0, y<0, x>width,
  * y>height) o stroke é imediatamente commitado — sem clamp, sem linhas tortas.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  PanResponder,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  type GestureResponderEvent,
   type LayoutChangeEvent,
 } from 'react-native';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '@/config/theme';
@@ -56,6 +56,16 @@ export interface SignaturePadProps {
   height?: number;
   disabled?: boolean;
 }
+
+// ─── Gesture tuning ───────────────────────────────────────────────────────────
+
+// Minimum squared distance between consecutive points. Skipping points that
+// are too close reduces the number of segments rendered without visible loss
+// of quality, which is the main source of lag on slow devices.
+const MIN_DIST_SQ = 4; // 2dp minimum distance
+
+// ~60fps cap on accepted points; natively fires faster on some devices.
+const THROTTLE_MS = 16;
 
 // ─── Stroke segment rendering ─────────────────────────────────────────────────
 
@@ -129,26 +139,27 @@ function SignatureStrokes({
 }
 
 /**
- * Isolated component for the in-flight stroke. Receives a ref to a mutable
- * array and a tick counter — re-renders only when tick changes, keeping the
- * parent SignaturePad from re-rendering on every touch-move event.
+ * Completed strokes, memoized so a new in-flight point does not redraw every
+ * finished segment — only the live stroke below changes per touch-move.
+ */
+const CompletedStrokes = React.memo(SignatureStrokes);
+
+/**
+ * In-flight stroke. Receives the stroke as a value (not a ref): reading
+ * `ref.current` during render breaks the React Compiler rules after SDK 58.
  */
 const LiveStroke = React.memo(function LiveStroke({
-  strokeRef,
-  tick,
+  stroke,
   strokeColor,
   strokeWidth,
 }: {
-  strokeRef: React.MutableRefObject<SignatureStroke>;
-  tick: number;
+  stroke: SignatureStroke;
   strokeColor: string;
   strokeWidth: number;
 }) {
-  // tick is the render trigger; reading strokeRef.current here is intentional.
-  void tick;
   return (
     <SignatureStrokes
-      strokes={strokeRef.current.length > 0 ? [strokeRef.current] : []}
+      strokes={stroke.length > 0 ? [stroke] : []}
       strokeColor={strokeColor}
       strokeWidth={strokeWidth}
     />
@@ -170,10 +181,12 @@ export function SignaturePad({
   // the whole component, but that only happens ~once per stroke, not per point.
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
 
-  // In-flight stroke lives in a ref to avoid triggering a full re-render on
-  // every touch-move. LiveStroke subscribes to `liveTick` to repaint itself.
+  // In-flight stroke: the ref is the source of truth read by the gesture
+  // handlers (always the latest points, no stale closure); `liveStroke` is the
+  // render copy handed to LiveStroke. Completed strokes are memoized
+  // (CompletedStrokes), so a new point only repaints the live stroke.
   const liveStrokeRef = useRef<SignatureStroke>([]);
-  const [liveTick, setLiveTick] = useState(0);
+  const [liveStroke, setLiveStroke] = useState<SignatureStroke>([]);
 
   // Canvas dimensions — read in gesture handlers only, never during render.
   const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 0, height });
@@ -209,7 +222,7 @@ export function SignaturePad({
     const finished = liveStrokeRef.current;
     liveStrokeRef.current = [];
     // Repaint LiveStroke as empty.
-    setLiveTick((n) => n + 1);
+    setLiveStroke([]);
     if (finished.length === 0) return;
     setStrokes((prev) => {
       const next = [...prev, finished];
@@ -228,67 +241,60 @@ export function SignaturePad({
 
   // ─── Gesture handlers ──────────────────────────────────────────────────────
 
-  // Minimum squared distance between consecutive points. Skipping points that
-  // are too close reduces the number of segments rendered without visible loss
-  // of quality, which is the main source of lag on slow devices.
-  const MIN_DIST_SQ = 4; // 2dp minimum distance
-
   // Timestamp of the last accepted point, used to throttle high-frequency events.
   const lastPointTimeRef = useRef(0);
-  const THROTTLE_MS = 16; // ~60fps cap; natively fires faster on some devices
 
   const isInsideCanvas = useCallback((x: number, y: number): boolean => {
     const { width: w, height: h } = canvasSizeRef.current;
     return x >= 0 && y >= 0 && (w <= 0 || x <= w) && (h <= 0 || y <= h);
   }, []);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => !disabled,
-        onMoveShouldSetPanResponder: () => !disabled,
+  // The canvas uses the View responder props directly — the same events that
+  // PanResponder.panHandlers forwards. Building a PanResponder inside useMemo
+  // made the React Compiler treat these handlers as render-time code, flagging
+  // the ref access and Date.now() in them (react-hooks/refs, react-hooks/purity).
+  // As plain event handlers they only run on touch, never during render.
+  const shouldBecomeResponder = useCallback(() => !disabled, [disabled]);
 
-        onPanResponderGrant: (evt) => {
-          const { locationX: x, locationY: y } = evt.nativeEvent;
-          if (!isInsideCanvas(x, y)) return;
-          liveStrokeRef.current = [{ x, y }];
-          lastPointTimeRef.current = Date.now();
-          setLiveTick((n) => n + 1);
-        },
+  const onResponderGrant = useCallback(
+    (evt: GestureResponderEvent) => {
+      const { locationX: x, locationY: y } = evt.nativeEvent;
+      if (!isInsideCanvas(x, y)) return;
+      liveStrokeRef.current = [{ x, y }];
+      lastPointTimeRef.current = Date.now();
+      setLiveStroke(liveStrokeRef.current);
+    },
+    [isInsideCanvas],
+  );
 
-        onPanResponderMove: (evt) => {
-          const { locationX: x, locationY: y } = evt.nativeEvent;
+  const onResponderMove = useCallback(
+    (evt: GestureResponderEvent) => {
+      const { locationX: x, locationY: y } = evt.nativeEvent;
 
-          // Stop drawing immediately when the finger exits the canvas boundary.
-          if (!isInsideCanvas(x, y)) {
-            commitCurrentStroke();
-            return;
-          }
+      // Stop drawing immediately when the finger exits the canvas boundary.
+      if (!isInsideCanvas(x, y)) {
+        commitCurrentStroke();
+        return;
+      }
 
-          // Throttle: skip points that arrive faster than THROTTLE_MS.
-          const now = Date.now();
-          if (now - lastPointTimeRef.current < THROTTLE_MS) return;
-          lastPointTimeRef.current = now;
+      // Throttle: skip points that arrive faster than THROTTLE_MS.
+      const now = Date.now();
+      if (now - lastPointTimeRef.current < THROTTLE_MS) return;
+      lastPointTimeRef.current = now;
 
-          // Skip points too close to the last one (reduces segment count).
-          const live = liveStrokeRef.current;
-          if (live.length > 0) {
-            const last = live[live.length - 1];
-            const dx = x - last.x;
-            const dy = y - last.y;
-            if (dx * dx + dy * dy < MIN_DIST_SQ) return;
-          }
+      // Skip points too close to the last one (reduces segment count).
+      const live = liveStrokeRef.current;
+      if (live.length > 0) {
+        const last = live[live.length - 1];
+        const dx = x - last.x;
+        const dy = y - last.y;
+        if (dx * dx + dy * dy < MIN_DIST_SQ) return;
+      }
 
-          liveStrokeRef.current = [...live, { x, y }];
-          setLiveTick((n) => n + 1);
-        },
-
-        onPanResponderRelease: commitCurrentStroke,
-        // Terminate fires when the gesture is stolen — commit what was drawn.
-        onPanResponderTerminate: commitCurrentStroke,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [disabled, isInsideCanvas, commitCurrentStroke],
+      liveStrokeRef.current = [...live, { x, y }];
+      setLiveStroke(liveStrokeRef.current);
+    },
+    [isInsideCanvas, commitCurrentStroke],
   );
 
   // ─── Layout ───────────────────────────────────────────────────────────────
@@ -304,14 +310,14 @@ export function SignaturePad({
 
   const clear = useCallback(() => {
     liveStrokeRef.current = [];
-    setLiveTick((n) => n + 1);
+    setLiveStroke([]);
     setStrokes([]);
     onSignatureChange(null);
   }, [onSignatureChange]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const isEmpty = strokes.length === 0 && liveStrokeRef.current.length === 0;
+  const isEmpty = strokes.length === 0 && liveStroke.length === 0;
 
   return (
     <View style={styles.wrapper}>
@@ -326,7 +332,13 @@ export function SignaturePad({
           },
         ]}
         onLayout={onLayout}
-        {...panResponder.panHandlers}
+        onStartShouldSetResponder={shouldBecomeResponder}
+        onMoveShouldSetResponder={shouldBecomeResponder}
+        onResponderGrant={onResponderGrant}
+        onResponderMove={onResponderMove}
+        onResponderRelease={commitCurrentStroke}
+        // Terminate fires when the gesture is stolen — commit what was drawn.
+        onResponderTerminate={commitCurrentStroke}
       >
         {/* Placeholder */}
         {isEmpty && (
@@ -338,17 +350,16 @@ export function SignaturePad({
           </Text>
         )}
 
-        {/* Completed strokes — re-rendered only on finger-up */}
-        <SignatureStrokes
+        {/* Completed strokes — memoized, redrawn only on finger-up */}
+        <CompletedStrokes
           strokes={strokes}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
         />
 
-        {/* In-flight stroke — isolated re-render on every point */}
+        {/* In-flight stroke — the only part repainted on every point */}
         <LiveStroke
-          strokeRef={liveStrokeRef}
-          tick={liveTick}
+          stroke={liveStroke}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
         />
