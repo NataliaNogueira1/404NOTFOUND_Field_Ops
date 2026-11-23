@@ -13,6 +13,10 @@
 
 Data da última execução: **2026-11-08 13:35 (BRT)** · Executor: Rodrigo (Dev Mobile).
 
+> **Atualização 2026-11-25 (Web):** vulnerabilidades crítica/altas do `dompurify`
+> (via `jspdf`) eliminadas após migração para `jspdf@4.2.1` e
+> `jspdf-autotable@5.0.9` — ver seção 2.1.
+
 ---
 
 ## 1. Como gerar os números
@@ -47,8 +51,8 @@ npm audit fix --force    # CUIDADO: pode subir major e quebrar build — só com
 
 ### 2.1. Web (`frontend/`) — issue [#260](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/260) (OPEN)
 
-Foram realizadas **duas rodadas**: a contagem inicial (antes de qualquer ação) e após
-`npm audit fix` sem `--force`.
+Foram realizadas **três rodadas**: a contagem inicial (antes de qualquer ação), após
+`npm audit fix` sem `--force`, e após a migração do `jspdf` para 4.x (issue #347).
 
 #### Antes do `npm audit fix`
 
@@ -89,6 +93,32 @@ Foram realizadas **duas rodadas**: a contagem inicial (antes de qualquer ação)
 > `dompurify` aparece com severidade `high`; a contagem `critical` reflete o advisory
 > mais grave dentro da cadeia de dependência. A correção requer `--force` com bump
 > major de `jspdf` para 4.x — ver seção 3.
+
+#### Após migração `jspdf@4.x` / `jspdf-autotable@5.x` — issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347) (CLOSED)
+
+| Severidade | Qtd | Pacotes remanescentes |
+|---|:---:|---|
+| Crítica    | 0   | — |
+| Alta       | 0   | — |
+| Moderada   | 9   | `minimatch` (via `@typescript-eslint/*`, `eslint`) |
+| Baixa      | 0   | — |
+| **Total**  | **9** | |
+
+- Pacotes atualizados: `jspdf` 2.5.x → **4.2.1** · `jspdf-autotable` 3.8.x → **5.0.9**
+- `generateInspectionPdf.ts` atualizado para o import nomeado `{ autoTable }` do autotable 5.x
+- Comandos executados:
+  ```powershell
+  cd frontend
+  npm install jspdf@4 jspdf-autotable@latest
+  npm run build   # ✅ passou (built in 3.52s, 2553 modules)
+  npm run test -- --run   # ✅ 47 arquivos, 189 testes passando
+  npm audit       # ✅ 0 críticas, 0 altas, 9 moderadas (apenas toolchain de lint)
+  ```
+- Data/hora: **2026-11-25 (BRT)**
+- Build após migração: ✅ `npm run build` · ✅ `npm run test -- --run`
+- As 9 moderadas remanescentes são todas em `minimatch`/`typescript-eslint`/`eslint`
+  (dev dependencies de toolchain — aceitas conforme seção 3).
+- Vulnerabilidades crítica e altas do `dompurify` **eliminadas** ✅
 
 ---
 
@@ -141,7 +171,7 @@ quebra de build documentada.
 
 | Pacote | Sev. | Fix disponível | Decisão | Justificativa |
 |---|:---:|---|---|---|
-| `dompurify` ≤ 3.4.16 (Web) | Alta / Crítica | Sim — `--force` (bump `jspdf` 4.x) | **Aceitar temporariamente** | O `jspdf@4.x` é um major com mudanças de API; a geração de PDF (`frontend/src/utils/generateInspectionPdf.ts`) precisa ser migrada e testada antes de atualizar. Atenção: `jspdf` roda **no navegador** (portal web), portanto a cadeia `jspdf` → `dompurify` faz parte do bundle do frontend. O risco é reduzido porque o PDF é gerado a partir de dados da própria inspeção, sem renderizar HTML arbitrário de terceiros, mas a aceitação é **temporária**. Acompanhamento: issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347) (migrar `jspdf` para 4.x). |
+| `dompurify` ≤ 3.4.16 (Web) | Alta / Crítica | Sim — `--force` (bump `jspdf` 4.x) | **✅ Corrigido** | Migração para `jspdf@4.2.1` + `jspdf-autotable@5.0.9` concluída (issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347), 2026-11-25). `generateInspectionPdf.ts` atualizado para a API 5.x do autotable. `npm audit` confirma 0 críticas/altas no frontend. |
 | `minimatch` 7–11 (Web e Mobile) | Moderada | Sim — `--force` (bump `eslint` 9.x) | **Aceitar temporariamente** | Pacote de toolchain de lint (dev dependency). Não integra o bundle de produção nem o runtime da aplicação. O `eslint@9.x` exige migração de configuração (flat config) — fora do escopo imediato. Sem impacto em produção. |
 | `decode-uri-component` (Mobile) | Alta | Sim — `--force` | **Aceitar temporariamente** | Dependência transitiva de `expo-router`; o upgrade forçado pode quebrar a navegação do app. Sem fix compatível disponível — requer upgrade do `expo-router` pelo mantenedor Expo. Sem superfície de ataque direta: o valor não é controlado por entrada do usuário final. |
 | `deepmerge` (Mobile) | Alta | Sim — `--force` | **Aceitar temporariamente** | Dependência transitiva de `jest` / `jest-expo` (dev dependency). Não compõe o bundle da aplicação; afeta apenas o ambiente de testes. Risco de exploração em produção: nulo. |
