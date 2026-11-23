@@ -129,26 +129,27 @@ function SignatureStrokes({
 }
 
 /**
- * Isolated component for the in-flight stroke. Receives a ref to a mutable
- * array and a tick counter — re-renders only when tick changes, keeping the
- * parent SignaturePad from re-rendering on every touch-move event.
+ * Completed strokes, memoized so a new in-flight point does not redraw every
+ * finished segment — only the live stroke below changes per touch-move.
+ */
+const CompletedStrokes = React.memo(SignatureStrokes);
+
+/**
+ * In-flight stroke. Receives the stroke as a value (not a ref): reading
+ * `ref.current` during render breaks the React Compiler rules after SDK 58.
  */
 const LiveStroke = React.memo(function LiveStroke({
-  strokeRef,
-  tick,
+  stroke,
   strokeColor,
   strokeWidth,
 }: {
-  strokeRef: React.MutableRefObject<SignatureStroke>;
-  tick: number;
+  stroke: SignatureStroke;
   strokeColor: string;
   strokeWidth: number;
 }) {
-  // tick is the render trigger; reading strokeRef.current here is intentional.
-  void tick;
   return (
     <SignatureStrokes
-      strokes={strokeRef.current.length > 0 ? [strokeRef.current] : []}
+      strokes={stroke.length > 0 ? [stroke] : []}
       strokeColor={strokeColor}
       strokeWidth={strokeWidth}
     />
@@ -170,10 +171,12 @@ export function SignaturePad({
   // the whole component, but that only happens ~once per stroke, not per point.
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
 
-  // In-flight stroke lives in a ref to avoid triggering a full re-render on
-  // every touch-move. LiveStroke subscribes to `liveTick` to repaint itself.
+  // In-flight stroke: the ref is the source of truth read by the gesture
+  // handlers (always the latest points, no stale closure); `liveStroke` is the
+  // render copy handed to LiveStroke. Completed strokes are memoized
+  // (CompletedStrokes), so a new point only repaints the live stroke.
   const liveStrokeRef = useRef<SignatureStroke>([]);
-  const [liveTick, setLiveTick] = useState(0);
+  const [liveStroke, setLiveStroke] = useState<SignatureStroke>([]);
 
   // Canvas dimensions — read in gesture handlers only, never during render.
   const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 0, height });
@@ -209,7 +212,7 @@ export function SignaturePad({
     const finished = liveStrokeRef.current;
     liveStrokeRef.current = [];
     // Repaint LiveStroke as empty.
-    setLiveTick((n) => n + 1);
+    setLiveStroke([]);
     if (finished.length === 0) return;
     setStrokes((prev) => {
       const next = [...prev, finished];
@@ -253,7 +256,7 @@ export function SignaturePad({
           if (!isInsideCanvas(x, y)) return;
           liveStrokeRef.current = [{ x, y }];
           lastPointTimeRef.current = Date.now();
-          setLiveTick((n) => n + 1);
+          setLiveStroke(liveStrokeRef.current);
         },
 
         onPanResponderMove: (evt) => {
@@ -280,7 +283,7 @@ export function SignaturePad({
           }
 
           liveStrokeRef.current = [...live, { x, y }];
-          setLiveTick((n) => n + 1);
+          setLiveStroke(liveStrokeRef.current);
         },
 
         onPanResponderRelease: commitCurrentStroke,
@@ -304,14 +307,14 @@ export function SignaturePad({
 
   const clear = useCallback(() => {
     liveStrokeRef.current = [];
-    setLiveTick((n) => n + 1);
+    setLiveStroke([]);
     setStrokes([]);
     onSignatureChange(null);
   }, [onSignatureChange]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const isEmpty = strokes.length === 0 && liveStrokeRef.current.length === 0;
+  const isEmpty = strokes.length === 0 && liveStroke.length === 0;
 
   return (
     <View style={styles.wrapper}>
@@ -338,17 +341,16 @@ export function SignaturePad({
           </Text>
         )}
 
-        {/* Completed strokes — re-rendered only on finger-up */}
-        <SignatureStrokes
+        {/* Completed strokes — memoized, redrawn only on finger-up */}
+        <CompletedStrokes
           strokes={strokes}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
         />
 
-        {/* In-flight stroke — isolated re-render on every point */}
+        {/* In-flight stroke — the only part repainted on every point */}
         <LiveStroke
-          strokeRef={liveStrokeRef}
-          tick={liveTick}
+          stroke={liveStroke}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
         />
