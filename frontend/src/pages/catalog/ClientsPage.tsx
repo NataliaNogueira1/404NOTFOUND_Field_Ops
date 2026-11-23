@@ -6,6 +6,7 @@ import { ClientStatus, type ClientInput, type ManagedClient, clientsApi } from '
 import { EquipmentStatus, type ManagedEquipment, equipmentApi } from '@/api/equipment'
 import { InspectionSiteStatus, type InspectionSiteInput, type ManagedInspectionSite, sitesApi } from '@/api/sites'
 import { ActiveBadge } from '@/components/badges/Badge'
+import { EquipmentQrCode } from '@/components/equipment/EquipmentQrCode'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
@@ -1075,19 +1076,7 @@ function InspectionSiteModal({
 function ManagedEquipmentQrModal({ item, onClose }: { item: ManagedEquipment | null; onClose: () => void }) {
   return (
     <Modal open={Boolean(item)} title="QR Code do equipamento" onClose={onClose}>
-      {item && (
-        <div className="grid place-items-center gap-4">
-          <div className="grid h-44 w-44 grid-cols-5 gap-1 rounded-card border border-border bg-surface p-4">
-            {Array.from({ length: 25 }, (_, index) => (
-              <span key={index} className={(index + item.qrCode.length) % 3 === 0 ? 'bg-text' : 'bg-primary-light'} />
-            ))}
-          </div>
-          <div className="text-center">
-            <p className="font-semibold">{item.name}</p>
-            <p className="text-sm text-muted">{item.qrCode}</p>
-          </div>
-        </div>
-      )}
+      {item && <EquipmentQrCode name={item.name} qrCode={item.qrCode} />}
     </Modal>
   )
 }

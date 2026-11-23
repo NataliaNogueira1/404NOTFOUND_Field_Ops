@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client'
 import { EquipmentStatus, type EquipmentInput, type ManagedEquipment, equipmentApi } from '@/api/equipment'
 import { InspectionSiteStatus, type ManagedInspectionSite, sitesApi } from '@/api/sites'
 import { Badge } from '@/components/badges/Badge'
+import { EquipmentQrCode } from '@/components/equipment/EquipmentQrCode'
 import { ConfirmDialog, Modal } from '@/components/feedback/Modal'
 import { Toast } from '@/components/feedback/Toast'
 import { Select, Textarea } from '@/components/forms/Fields'
@@ -438,22 +439,7 @@ function EquipmentStatusBadge({ status }: { status: EquipmentStatus }) {
 function QrModal({ item, onClose }: { item: ManagedEquipment | null; onClose: () => void }) {
   return (
     <Modal open={Boolean(item)} title="QR Code do equipamento" onClose={onClose}>
-      {item && (
-        <div className="grid place-items-center gap-4">
-          <div
-            aria-label={`Representação visual do QR Code ${item.qrCode}`}
-            className="grid h-44 w-44 grid-cols-7 gap-1 rounded-card border border-border bg-surface p-4"
-          >
-            {Array.from({ length: 49 }, (_, index) => (
-              <span key={index} className={(index + item.qrCode.length) % 3 === 0 ? 'bg-text' : 'bg-primary-light'} />
-            ))}
-          </div>
-          <div className="text-center">
-            <p className="font-semibold">{item.name}</p>
-            <p className="font-mono text-sm text-muted">{item.qrCode}</p>
-          </div>
-        </div>
-      )}
+      {item && <EquipmentQrCode name={item.name} qrCode={item.qrCode} />}
     </Modal>
   )
 }

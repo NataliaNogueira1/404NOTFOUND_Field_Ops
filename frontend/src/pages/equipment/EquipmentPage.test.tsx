@@ -136,6 +136,23 @@ describe('EquipmentPage', () => {
     expect(String(postBody?.qrCode)).toMatch(/^FO-[0-9a-f-]{36}$/)
   })
 
+  it('shows a scannable QR Code for the equipment', async () => {
+    vi.stubGlobal('fetch', vi.fn(defaultFetch))
+    render(
+      <MemoryRouter>
+        <EquipmentPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('Compressor XPTO')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver QR Code de Compressor XPTO' }))
+
+    const dialog = screen.getByRole('dialog')
+    const image = within(dialog).getByRole('img', { name: 'QR Code FO-QR-001' })
+    expect(image.tagName.toLowerCase()).toBe('svg')
+    expect(within(dialog).getByText('FO-QR-001')).not.toBeNull()
+  })
+
   it('requires confirmation before logical inactivation', async () => {
     let patchBody: Record<string, unknown> | undefined
     vi.stubGlobal(

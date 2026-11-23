@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -178,7 +178,9 @@ describe('ClientSiteDetailsPage', () => {
     await screen.findByText('Compressor A')
     await userEvent.click(screen.getByRole('button', { name: /Ver/i }))
 
-    expect(screen.getByRole('dialog')).not.toBeNull()
-    expect(screen.getByText('FO-CMP-001')).not.toBeNull()
+    const dialog = screen.getByRole('dialog')
+    const image = within(dialog).getByRole('img', { name: 'QR Code FO-CMP-001' })
+    expect(image.tagName.toLowerCase()).toBe('svg')
+    expect(within(dialog).getByText('FO-CMP-001')).not.toBeNull()
   })
 })
