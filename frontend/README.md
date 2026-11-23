@@ -40,6 +40,14 @@ Painel administrativo da plataforma FieldOps, usado por administradores e superv
 
    > Variáveis com prefixo `VITE_` são embutidas no bundle e ficam públicas. Use apenas para configuração não sensível.
 
+### Publicação do painel
+
+O diretório `frontend/` está configurado para publicação estática. Em Vercel, selecione esse diretório como raiz do projeto; o `vercel.json` aplica o fallback de SPA para `index.html`. No Netlify, use `frontend/` como diretório base; o `netlify.toml` executa `npm run build`, publica `dist/` e aplica o mesmo fallback.
+
+Configure `VITE_API_URL` nas variáveis de ambiente de build da plataforma com a URL HTTPS pública da API FieldOps, sem barra final (por exemplo, `https://<serviço-api>.onrender.com`). A variável é incorporada no bundle durante o build; alterar a configuração depois exige um novo deploy. O arquivo `.env.production` não define uma URL porque cada ambiente precisa informar o endereço real da sua API.
+
+Para a API de demonstração, publique a API seguindo [as instruções de deploy no Render](../api/README.md#public-demonstration-deployment-render) e use a URL do serviço criada pelo Render. Em seguida, inclua a origem pública exata do painel em `CORS_ALLOWED_ORIGINS` na API, sem caminho e sem curingas, por exemplo `https://meu-painel.vercel.app`. Faça novo deploy da API após alterar o CORS. Sem essa origem, o navegador bloqueia as chamadas entre o painel e a API.
+
 ---
 
 ## Executando

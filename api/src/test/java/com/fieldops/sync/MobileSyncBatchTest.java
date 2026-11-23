@@ -2,6 +2,7 @@ package com.fieldops.sync;
 
 import com.fieldops.auth.repository.RefreshTokenRepository;
 import com.fieldops.audit.repository.InspectionResponseHistoryRepository;
+import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.inspection.model.Inspection;
 import com.fieldops.inspection.model.InspectionStatus;
 import com.fieldops.inspection.model.InspectionItemSnapshot;
@@ -378,7 +379,7 @@ class MobileSyncBatchTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results[0].status").value("APPLIED"));
 
-        assertThat(nonConformityRepository.findByInspectionIdOrderByCreatedAtAsc(inspection.getId()))
+        assertThat(nonConformityRepository.findByInspectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(inspection.getId()))
                 .singleElement()
                 .satisfies(nonConformity -> {
                     assertThat(nonConformity.getInspectionItemSnapshot().getId()).isEqualTo(item.getId());
@@ -386,6 +387,33 @@ class MobileSyncBatchTest {
                     assertThat(nonConformity.getSeverity().name()).isEqualTo("HIGH");
                     assertThat(nonConformity.getStatus().name()).isEqualTo("OPEN");
                 });
+    }
+
+    @Test
+    void requiresEvidenceForCriticalNonConformityInMobileSync() throws Exception {
+        Inspection inspection = saveInspection(InspectionStatus.IN_PROGRESS);
+        InspectionItemSnapshot item = snapshotRepository
+                .findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()).getFirst();
+        UUID rejectedOperation = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + obtainToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operations\":[" + nonConformityOperation(rejectedOperation,
+                                inspection.getId(), item.getSourceTemplateItemId(), null, "CRITICAL") + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.results[0].detail").value(org.hamcrest.Matchers.containsString("require evidence")));
+        assertThat(nonConformityRepository.count()).isZero();
+
+        evidenceRepository.save(InspectionEvidence.create(inspection, item, "sync/critical.jpg", "checksum",
+                "Critical evidence", java.time.Instant.now(), technician));
+        mockMvc.perform(post("/api/v1/mobile/sync/push").header("Authorization", "Bearer " + obtainToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operations\":[" + nonConformityOperation(UUID.randomUUID(),
+                                inspection.getId(), item.getSourceTemplateItemId(), null, "CRITICAL") + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results[0].status").value("APPLIED"));
+        assertThat(nonConformityRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -455,11 +483,16 @@ class MobileSyncBatchTest {
     }
 
     private String nonConformityOperation(UUID operationId, Long inspectionId, Long itemId, UUID dependencyId) {
+        return nonConformityOperation(operationId, inspectionId, itemId, dependencyId, "HIGH");
+    }
+
+    private String nonConformityOperation(UUID operationId, Long inspectionId, Long itemId, UUID dependencyId,
+            String severity) {
         String dependencies = dependencyId == null ? "[]" : "[\"" + dependencyId + "\"]";
         return "{\"operationId\":\"" + operationId + "\",\"type\":\"NON_CONFORMITY_CREATE\",\"dependencyIds\":"
                 + dependencies + ",\"baseVersion\":0,\"payload\":{\"inspectionId\":" + inspectionId
                 + ",\"itemId\":" + itemId + ",\"title\":\"Damaged panel\",\"description\":"
-                + "\"Panel cover is corroded\",\"severity\":\"HIGH\"}}";
+                + "\"Panel cover is corroded\",\"severity\":\"" + severity + "\"}}";
     }
 
     private User persistUser(String email, Role role) {

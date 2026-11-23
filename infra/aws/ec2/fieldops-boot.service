@@ -1,0 +1,17 @@
+[Unit]
+Description=FieldOps API boot (swap, Docker container and health check)
+Documentation=https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/blob/develop/docs/arquitetura/runbook-reset-ec2.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/fieldops-boot
+# The first run builds the image on a t3.micro, which takes several minutes.
+TimeoutStartSec=1800
+StandardOutput=append:/var/log/fieldops-boot.log
+StandardError=append:/var/log/fieldops-boot.log
+
+[Install]
+WantedBy=multi-user.target

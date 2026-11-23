@@ -1,7 +1,10 @@
 package com.fieldops.evidence.controller;
 
+import com.fieldops.evidence.dto.EvidenceDownloadUrlResponse;
 import com.fieldops.evidence.model.InspectionEvidence;
 import com.fieldops.evidence.repository.InspectionEvidenceRepository;
+import com.fieldops.evidence.service.EvidenceDownloadUrlService;
+import com.fieldops.evidence.storage.EvidenceContent;
 import com.fieldops.evidence.storage.EvidenceStorage;
 import com.fieldops.shared.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,10 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,10 +33,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class InspectionEvidenceController {
     private final InspectionEvidenceRepository repository;
     private final EvidenceStorage storage;
+    private final EvidenceDownloadUrlService downloadUrlService;
 
-    public InspectionEvidenceController(InspectionEvidenceRepository repository, EvidenceStorage storage) {
+    public InspectionEvidenceController(InspectionEvidenceRepository repository, EvidenceStorage storage,
+            EvidenceDownloadUrlService downloadUrlService) {
         this.repository = repository;
         this.storage = storage;
+        this.downloadUrlService = downloadUrlService;
+    }
+
+    @Operation(summary = "Get a temporary URL to load the evidence image",
+            description = "Returns a short-lived presigned S3 link (presigned=true, fetch it WITHOUT the Authorization header) "
+                    + "or, when the storage cannot presign, the authenticated content endpoint path (presigned=false).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Download location"),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated"),
+            @ApiResponse(responseCode = "403", description = "Forbidden — only ADMINISTRATOR or SUPERVISOR"),
+            @ApiResponse(responseCode = "404", description = "Evidence not found")
+    })
+    @GetMapping("/{id}/download-url")
+    public ResponseEntity<EvidenceDownloadUrlResponse> downloadUrl(
+            @Parameter(description = "Evidence ID") @PathVariable Long id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(downloadUrlService.resolve(id));
     }
 
     @Operation(summary = "Download the protected binary content of an inspection evidence")
@@ -46,13 +65,14 @@ public class InspectionEvidenceController {
             @ApiResponse(responseCode = "404", description = "Evidence or stored file not found")
     })
     @GetMapping("/{id}/content")
-    public ResponseEntity<FileSystemResource> content(@Parameter(description = "Evidence ID") @PathVariable Long id) throws IOException {
+    public ResponseEntity<InputStreamResource> content(@Parameter(description = "Evidence ID") @PathVariable Long id) {
         InspectionEvidence evidence = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Inspection evidence not found: " + id));
-        Path file = storage.find(evidence.getReference())
+        EvidenceContent content = storage.open(evidence.getReference())
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence content not found: " + id));
-        String contentType = Files.probeContentType(file);
-        MediaType mediaType = contentType == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(contentType);
-        return ResponseEntity.ok().contentType(mediaType).contentLength(Files.size(file)).body(new FileSystemResource(file));
+        MediaType mediaType = content.contentType() == null
+                ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(content.contentType());
+        return ResponseEntity.ok().contentType(mediaType).contentLength(content.contentLength())
+                .body(new InputStreamResource(content.stream()));
     }
 }

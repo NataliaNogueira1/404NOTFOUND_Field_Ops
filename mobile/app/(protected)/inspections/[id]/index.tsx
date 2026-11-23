@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
+  CancellationBanner,
   InspectionStatusBadge,
   PriorityBadge,
   ProgressBar,
@@ -75,7 +76,7 @@ export default function InspectionDetailsScreen() {
 
   if (!inspection) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
           <Text style={[styles.empty, { color: c.textSecondary }]}>Inspeção não encontrada.</Text>
           <Button label="Voltar" onPress={() => router.back()} variant="secondary" />
@@ -103,7 +104,7 @@ export default function InspectionDetailsScreen() {
       : `${inspection.progress}% concluído`;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: c.text }]}>{inspection.title}</Text>
         <View style={styles.badges}>
@@ -128,6 +129,14 @@ export default function InspectionDetailsScreen() {
             rejectedBy={inspection.rejectedBy}
             rejectedAt={inspection.rejectedAt}
             items={inspectionNCs.map((nc) => nc.title)}
+          />
+        ) : null}
+
+        {inspection.status === InspectionStatus.CANCELED ? (
+          <CancellationBanner
+            reason={inspection.canceledReason}
+            canceledBy={inspection.canceledBy}
+            canceledAt={inspection.canceledAt}
           />
         ) : null}
 

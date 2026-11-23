@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { apiClient } from '@/infrastructure/api/client';
 import { randomUuidV4, stableUuidFromSeed } from './uuid';
+import { Severity } from '@/features/fieldops/types';
 import { evidenceUploadClient } from './EvidenceUploadClient';
 import {
   InspectionRepository,
@@ -53,6 +54,12 @@ interface ApiInspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Reason given when the inspection was cancelled (issue #342). */
+  canceledReason?: string;
+  /** Who cancelled the inspection (issue #342). */
+  canceledBy?: string;
+  /** When the inspection was cancelled, ISO date/time (issue #342). */
+  canceledAt?: string;
   version: number;
   template: ApiTemplate;
   reviewComments?: ApiReviewComment[];
@@ -193,10 +200,21 @@ export class InspectionSyncService {
   /**
    * Fetch inspections assigned to the current technician and store locally.
    * This is the main "download" operation.
+   *
+   * @param token        - Bearer access token.
+   * @param onAfterPull  - Optional async callback called with the downloaded
+   *                       inspections after they are persisted. Used to
+   *                       reschedule local deadline reminders (PBI-084) without
+   *                       coupling this service to the notifications module
+   *                       (keeps existing tests unaffected).
    */
-  async pullInspections(token: string): Promise<{ downloaded: number; errors: string[] }> {
+  async pullInspections(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{ downloaded: number; errors: string[] }> {
     const errors: string[] = [];
     let downloaded = 0;
+    const downloaded_inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }> = [];
 
     try {
       const apiInspections = await apiClient.get<ApiInspection[]>(
@@ -207,6 +225,13 @@ export class InspectionSyncService {
         try {
           await this.saveInspectionLocally(apiInsp);
           downloaded++;
+          downloaded_inspections.push({
+            id: apiInsp.id,
+            title: apiInsp.title,
+            dueDate: apiInsp.dueDate,
+            dueTime: apiInsp.dueTime,
+            status: apiInsp.status,
+          });
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           errors.push(`[${apiInsp.id}] ${msg}`);
@@ -215,6 +240,16 @@ export class InspectionSyncService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch inspections';
       errors.push(msg);
+    }
+
+    // Reschedule local deadline reminders after pull. Errors here must never
+    // break the sync result or surface to the user as sync failures (RN-041).
+    if (onAfterPull && downloaded_inspections.length > 0) {
+      try {
+        await onAfterPull(downloaded_inspections);
+      } catch {
+        // Notification scheduling failure is silently swallowed.
+      }
     }
 
     return { downloaded, errors };
@@ -337,6 +372,11 @@ export class InspectionSyncService {
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
+      // issue #342: bring the cancellation metadata down from the server so the
+      // CancellationBanner shows reason, who and when offline.
+      canceledReason: apiInsp.canceledReason,
+      canceledBy: apiInsp.canceledBy,
+      canceledAt: apiInsp.canceledAt,
       serverVersion: apiInsp.version,
       syncStatus: 'synced',
       pendingSyncCount: 0,
@@ -745,8 +785,14 @@ export class InspectionSyncService {
 
   /**
    * Perform a full sync cycle: push pending operations, then pull latest data.
+   *
+   * @param onAfterPull  - Optional callback forwarded to {@link pullInspections}
+   *                       for rescheduling local deadline reminders (PBI-084).
    */
-  async fullSync(token: string): Promise<{
+  async fullSync(
+    token: string,
+    onAfterPull?: (inspections: Array<{ id: string; title: string; dueDate: string; dueTime?: string; status: string }>) => Promise<void>,
+  ): Promise<{
     pulled: number;
     pushed: number;
     errors: string[];
@@ -771,6 +817,28 @@ export class InspectionSyncService {
       const fallback = await this.pullInspections(token);
       errors.push(...fallback.errors);
       pulled += fallback.downloaded;
+    }
+
+    // Reschedule local deadline reminders (PBI-084) after the incremental pull.
+    // `pullChanges` only returns a change count, so we read the current state
+    // from SQLite (the source of truth, already reflecting this pull's updates
+    // — new inspections, due-date changes, cancellations) and hand it to the
+    // callback. Failures here must never break the sync result (RN-041).
+    if (onAfterPull) {
+      try {
+        const all = await this.inspectionRepo.getAll();
+        await onAfterPull(
+          all.map((i) => ({
+            id: i.id,
+            title: i.title,
+            dueDate: i.dueDate,
+            dueTime: i.dueTime,
+            status: i.status,
+          })),
+        );
+      } catch {
+        // Notification scheduling failure is silently swallowed.
+      }
     }
 
     // Record the timestamp of the last *successful* sync only when the whole
@@ -884,11 +952,18 @@ export class InspectionSyncService {
   /**
    * Enqueue a non-conformity to be synced later.
    */
-  async enqueueNonConformity(nc: NonConformity): Promise<void> {
+  async enqueueNonConformity(nc: NonConformity, knownEvidenceDependencies: string[] = []): Promise<void> {
     const id = `nc-${nc.id}`;
     // Stable UUID operationId for idempotent resend (RN-068) and baseVersion for
     // conflict detection (PBI-055), mirroring enqueueAnswer.
     const inspection = await this.inspectionRepo.getById(nc.inspectionId);
+    const evidence = nc.severity === Severity.CRITICAL ? await this.evidenceRepo.getByItem(nc.inspectionId, nc.itemId) : [];
+    const knownDependencies = nc.severity === Severity.CRITICAL ? knownEvidenceDependencies : [];
+    const dependencyIds = [...new Set([
+      ...evidence.filter((entry) => entry.syncStatus !== 'synced')
+        .map((entry) => entry.operationId ?? InspectionSyncService.evidenceOperationId(entry.id)),
+      ...knownDependencies,
+    ])];
     await this.syncQueueRepo.enqueue(id, 'CREATE', 'non_conformity', nc.id, {
       operationId: randomUuidV4(),
       inspectionId: nc.inspectionId,
@@ -898,7 +973,7 @@ export class InspectionSyncService {
       description: nc.description,
       severity: nc.severity,
       baseVersion: inspection?.serverVersion ?? 0,
-    });
+    }, dependencyIds);
   }
 
   /**
