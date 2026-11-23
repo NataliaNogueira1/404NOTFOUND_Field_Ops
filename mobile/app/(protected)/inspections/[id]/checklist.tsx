@@ -41,14 +41,18 @@ export default function ChecklistScreen() {
 
   // Parse stored strokes for read-only signature preview (issue #334).
   // Must be declared before any early return to satisfy the Rules of Hooks.
+  // The raw JSON is read into a local first so the memo depends on that exact
+  // value — the React Compiler cannot preserve a memo keyed on an optional
+  // property path (`inspection?.signatureStrokes`).
+  const storedSignatureStrokes = inspection?.signatureStrokes;
   const signatureStrokes = useMemo((): SignatureStroke[] | null => {
-    if (!readOnly || !inspection?.signatureStrokes) return null;
+    if (!readOnly || !storedSignatureStrokes) return null;
     try {
-      return JSON.parse(inspection.signatureStrokes) as SignatureStroke[];
+      return JSON.parse(storedSignatureStrokes) as SignatureStroke[];
     } catch {
       return null;
     }
-  }, [readOnly, inspection?.signatureStrokes]);
+  }, [readOnly, storedSignatureStrokes]);
 
   // Scroll to first unanswered item — must be defined before any early return
   const handleScrollToPending = useCallback(() => {
