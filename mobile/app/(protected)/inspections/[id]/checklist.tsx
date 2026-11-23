@@ -1,5 +1,9 @@
 import { type ComponentRef, useCallback, useMemo, useRef } from 'react';
+<<<<<<< HEAD
 import { ActivityIndicator, InputAccessoryView, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+=======
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+>>>>>>> e17f84321ff3f5709abde1fbdc714ca490b75526
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -31,8 +35,13 @@ export default function ChecklistScreen() {
   const { inspections, answers, evidences, reviewComments, answerItem, retryEvidenceUpload } = useFieldOps();
   const { template, isLoading: templateLoading } = useInspectionTemplate(id);
   // RN 0.88 types ScrollView as a function component; derive the imperative
-  // instance type (with scrollTo) from the component ref instead of the class.
+  // instance type (with scrollTo / measureLayout) from the component ref.
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+
+  // Accumulates the measured Y-offset of each section relative to the ScrollView
+  // so the scroll-to-pending handler can target the correct item position even
+  // when the checklist has multiple sections (issue #333 — scroll correction).
+  const sectionOffsetsRef = useRef<Record<string, number>>({});
 
   const inspection = inspections.find((item) => item.id === id) ?? inspections[0];
   // Lock the whole checklist when the inspection is in a reviewed state. Derived from the
@@ -57,22 +66,30 @@ export default function ChecklistScreen() {
     }
   }, [readOnly, inspection?.signatureStrokes]);
 
-  // Scroll to first unanswered item — must be defined before any early return
+  // Scroll to first unanswered item — must be defined before any early return.
+  //
+  // Uses the sectionOffsetsRef collected via onLayout on each section <View> to
+  // compute the correct Y position inside the ScrollView. This avoids the
+  // previous approximation (120 + items * 180) which was wrong for checklists
+  // with multiple sections of varying height (issue #333).
   const handleScrollToPending = useCallback(() => {
     if (!template || !scrollRef.current) return;
-    const firstPendingItem = allItems.find((item) => answers[item.id] === undefined);
-    if (!firstPendingItem) return;
 
-    let itemsBefore = 0;
+    // Find the first unanswered item and which section it belongs to.
     for (const section of template.sections) {
-      for (const item of section.items) {
-        if (item.id === firstPendingItem.id) break;
-        itemsBefore++;
+      for (let i = 0; i < section.items.length; i++) {
+        const item = section.items[i];
+        if (answers[item.id] === undefined) {
+          // sectionOffset is the Y of the section header relative to the ScrollView.
+          // We add a per-item estimate (88px per card) only within the section so
+          // the error is bounded to one section's height instead of the whole list.
+          const sectionOffset = sectionOffsetsRef.current[section.id] ?? 0;
+          const itemOffset = i * 88; // approximate card height within the section
+          scrollRef.current.scrollTo({ y: sectionOffset + itemOffset, animated: true });
+          return;
+        }
       }
-      if (section.items.some((i) => i.id === firstPendingItem.id)) break;
     }
-    // Approximate scroll: header (~120px) + cards (~180px each)
-    scrollRef.current.scrollTo({ y: 120 + itemsBefore * 180, animated: true });
   }, [allItems, answers, template]);
 
   // Scroll the focused card's Y position into view above the keyboard (issue #333).
@@ -116,6 +133,7 @@ export default function ChecklistScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['bottom', 'left', 'right']}>
       {/*
        * KeyboardAvoidingView pushes the ScrollView up when the software keyboard
+<<<<<<< HEAD
        * opens so the focused input (number, text) stays visible above the keyboard
        * on both iOS and Android (issue #333).
        *
@@ -131,6 +149,17 @@ export default function ChecklistScreen() {
        * ScrollView also scrolls to the focused card via onInputFocus + measureLayout,
        * ensuring the field stays above the keyboard even at the middle or end of a
        * long multi-section checklist (#333).
+=======
+       * opens so text/number fields stay visible (issue #333).
+       *
+       * iOS:    behavior="padding" adds bottom padding equal to the keyboard height.
+       * Android: behavior is omitted — the OS handles it via windowSoftInputMode
+       *          (adjustResize); adding behavior="height" here would double-offset.
+       *
+       * keyboardVerticalOffset=0: the Stack uses headerShown:false and the
+       * SafeAreaView with edges=['bottom','left','right'] sits outside the KAV,
+       * so there is no header or top inset to compensate for.
+>>>>>>> e17f84321ff3f5709abde1fbdc714ca490b75526
        */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
@@ -180,7 +209,15 @@ export default function ChecklistScreen() {
           </Card>
 
           {template.sections.map((section) => (
-            <View key={section.id}>
+            <View
+              key={section.id}
+              onLayout={(e) => {
+                // Record each section's Y-offset relative to the ScrollView content
+                // so handleScrollToPending can compute the correct scroll target
+                // even in checklists with multiple sections (issue #333).
+                sectionOffsetsRef.current[section.id] = e.nativeEvent.layout.y;
+              }}
+            >
               <SectionHeader title={section.title} meta={`${section.items.length} itens`} />
               {section.items.map((item) => (
                 <ChecklistItemCard
