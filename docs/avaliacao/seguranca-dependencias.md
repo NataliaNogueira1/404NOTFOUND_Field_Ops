@@ -94,7 +94,7 @@ Foram realizadas **três rodadas**: a contagem inicial (antes de qualquer ação
 > mais grave dentro da cadeia de dependência. A correção requer `--force` com bump
 > major de `jspdf` para 4.x — ver seção 3.
 
-#### Após migração `jspdf@4.x` / `jspdf-autotable@5.x` — issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347) (CLOSED)
+#### Após migração `jspdf@4.x` / `jspdf-autotable@5.x` — issue [#347](https://github.com/NataliaNogueira1/404NOTFOUND_Field_Ops/issues/347)
 
 | Severidade | Qtd | Pacotes remanescentes |
 |---|:---:|---|
@@ -105,16 +105,26 @@ Foram realizadas **três rodadas**: a contagem inicial (antes de qualquer ação
 | **Total**  | **9** | |
 
 - Pacotes atualizados: `jspdf` 2.5.x → **4.2.1** · `jspdf-autotable` 3.8.x → **5.0.9**
+  (versões fixas no `package.json`, sem `^`) · `dompurify` resolvido: **3.5.0**
 - `generateInspectionPdf.ts` atualizado para o import nomeado `{ autoTable }` do autotable 5.x
+- Teste automatizado `generateInspectionPdf.test.ts` gera o PDF com o jspdf real e
+  confere cabeçalho, dados da inspeção, tabelas do checklist por seção, tabela de não
+  conformidades e instruções do supervisor.
+- Observação: hoje nenhuma tela importa `generateInspectionPdf` (o relatório oficial é
+  gerado no servidor via `GET /api/v1/inspections/{id}/report.pdf`). Por isso o build
+  de produção não inclui o `jspdf`, e a conferência do PDF é feita pelo teste e por um
+  arquivo gerado localmente, não pela interface.
 - Comandos executados:
   ```powershell
   cd frontend
   npm install jspdf@4 jspdf-autotable@latest
   npm run build   # ✅ passou (built in 3.52s, 2553 modules)
-  npm run test -- --run   # ✅ 47 arquivos, 189 testes passando
+  npm run test -- --run   # ✅ 48 arquivos, 244 testes passando (inclui o teste do PDF)
+  npm run lint    # ✅ sem erros
   npm audit       # ✅ 0 críticas, 0 altas, 9 moderadas (apenas toolchain de lint)
   ```
-- Data/hora: **2026-11-25 (BRT)**
+- Data/hora: **2026-11-25 (BRT)** · números de testes revalidados após fixar as versões e
+  adicionar o teste do PDF
 - Build após migração: ✅ `npm run build` · ✅ `npm run test -- --run`
 - As 9 moderadas remanescentes são todas em `minimatch`/`typescript-eslint`/`eslint`
   (dev dependencies de toolchain — aceitas conforme seção 3).
