@@ -89,6 +89,20 @@ describe('TechnicianInspectionDetailsPage — cancelamento (#338)', () => {
     expect(screen.queryByRole('alert', { name: /justificativa de cancelamento/i })).toBeNull()
   })
 
+  it('exibe o comentário da aprovação quando a inspeção está APPROVED', async () => {
+    renderDetail(inspectionDetail({ status: 'APPROVED', approvalComment: 'Tudo conforme, bom trabalho.' }))
+
+    expect(await screen.findByText('Comentário da aprovação')).toBeInTheDocument()
+    expect(screen.getByText('Tudo conforme, bom trabalho.')).toBeInTheDocument()
+  })
+
+  it('não exibe o comentário da aprovação quando ele está vazio', async () => {
+    renderDetail(inspectionDetail({ status: 'APPROVED', approvalComment: '   ' }))
+
+    expect(await screen.findByRole('heading', { name: 'Inspeção de painel' })).toBeInTheDocument()
+    expect(screen.queryByText('Comentário da aprovação')).toBeNull()
+  })
+
   it('degrada graciosamente quando falta o motivo do cancelamento', async () => {
     renderDetail(
       inspectionDetail({
