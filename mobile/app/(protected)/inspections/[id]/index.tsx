@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
+  ApprovalCommentBanner,
   CancellationBanner,
   InspectionStatusBadge,
   PriorityBadge,
@@ -144,6 +145,15 @@ export default function InspectionDetailsScreen() {
           inspection.status === InspectionStatus.UNDER_REVIEW ||
           inspection.status === InspectionStatus.APPROVED) ? (
           <ReadOnlyBanner status={inspection.status} />
+        ) : null}
+
+        {inspection.status === InspectionStatus.APPROVED ? (
+          // The API reports the reviewer of either decision in rejectedBy/rejectedAt.
+          <ApprovalCommentBanner
+            comment={inspection.approvalComment}
+            approvedBy={inspection.rejectedBy}
+            approvedAt={inspection.rejectedAt}
+          />
         ) : null}
 
         <Card style={styles.card}>
