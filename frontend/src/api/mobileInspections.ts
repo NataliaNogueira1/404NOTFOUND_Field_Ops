@@ -18,6 +18,8 @@ export interface TechnicianInspection extends Inspection {
   template: InspectionTemplate
   equipmentQrCode?: string
   rejectionReason?: string
+  /** Optional comment the reviewer left when approving — present only when status is APPROVED. */
+  approvalComment?: string
   /** Reason the inspection was canceled — present only when status is CANCELED (#338). */
   canceledReason?: string
   /** Name of the admin/supervisor who canceled the inspection (#338). */
@@ -76,6 +78,7 @@ interface BackendMobileInspection {
   progress: number | null
   supervisorInstructions: string | null
   rejectionReason: string | null
+  approvalComment: string | null
   canceledReason: string | null
   canceledBy: string | null
   canceledAt: string | null
@@ -165,6 +168,7 @@ function normalize(inspection: BackendMobileInspection): TechnicianInspection {
     overdue: isOverdue(status, inspection.dueDate),
     supervisorInstructions: inspection.supervisorInstructions ?? undefined,
     rejectionReason: inspection.rejectionReason ?? undefined,
+    approvalComment: inspection.approvalComment?.trim() || undefined,
     canceledReason: inspection.canceledReason ?? undefined,
     canceledBy: inspection.canceledBy ?? undefined,
     canceledAt: inspection.canceledAt ?? undefined,

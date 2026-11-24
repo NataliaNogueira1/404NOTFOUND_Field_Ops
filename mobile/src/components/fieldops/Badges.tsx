@@ -61,6 +61,31 @@ export function RejectionBanner({
   );
 }
 
+/**
+ * Supervisor feedback shown to the technician when the inspection was APPROVED with a
+ * comment. Mirrors RejectionBanner; renders nothing when the comment is blank.
+ */
+export function ApprovalCommentBanner({
+  comment,
+  approvedBy,
+  approvedAt,
+}: {
+  comment?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+}) {
+  const text = comment?.trim();
+  if (!text) return null;
+  return (
+    <View style={styles.approval} accessibilityRole="summary">
+      <Text style={styles.approvalTitle}>💬 Comentário da aprovação</Text>
+      <Text style={styles.approvalBody}>{text}</Text>
+      {approvedBy ? <Text style={styles.approvalMeta}>Aprovada por: {approvedBy}</Text> : null}
+      {approvedAt ? <Text style={styles.approvalMeta}>Data: {approvedAt}</Text> : null}
+    </View>
+  );
+}
+
 const readOnlyConfig: Record<string, { icon: string; title: string; description: string; bg: string; border: string; textColor: string }> = {
   SUBMITTED: {
     icon: '📤',
@@ -144,6 +169,10 @@ const styles = StyleSheet.create({
   rejectionLabel: { fontWeight: FontWeight.semibold, color: Colors.dangerDark },
   rejectionItems: { marginTop: Spacing.xs, gap: 2 },
   rejectionMeta: { fontSize: FontSize.xs, color: Colors.dangerDark, marginTop: 2 },
+  approval: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#86EFAC', borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
+  approvalTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: '#166534' },
+  approvalBody: { fontSize: FontSize.sm, color: '#166534', lineHeight: 20 },
+  approvalMeta: { fontSize: FontSize.xs, color: '#166534', marginTop: 2 },
   readOnly: { borderWidth: 1, borderRadius: 10, padding: Spacing.md, gap: Spacing.xs },
   readOnlyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
   readOnlyBody: { fontSize: FontSize.sm, lineHeight: 20 },

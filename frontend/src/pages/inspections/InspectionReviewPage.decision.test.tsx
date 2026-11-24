@@ -24,6 +24,14 @@ describe('InspectionReviewPage decisions', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/approve'))).toHaveLength(1); await waitFor(() => expect(screen.getByRole('button', { name: 'Aprovando...' })).toBeDisabled())
     resolveApproval?.(body({ id: 1, status: 'APPROVED' })); await waitFor(() => expect(screen.getByText(/não pode receber uma nova decisão/i)).toBeInTheDocument())
   })
+  it('sends the optional approval comment typed by the reviewer', async () => {
+    const fetchMock = vi.fn((url: string) => url.endsWith('/review') ? Promise.resolve(body(fetchMock.mock.calls.length > 1 ? approved : review)) : Promise.resolve(body({ id: 1, status: 'APPROVED' })))
+    renderPage(fetchMock); await screen.findByText('Inspecao'); await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }))
+    await userEvent.type(screen.getByLabelText(/comentário da aprovação/i), '  Tudo conforme, bom trabalho.  '); await userEvent.click(screen.getByRole('button', { name: 'Aprovar inspeção' }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/approve'))).toBe(true))
+    const approveCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/approve')) as unknown as [string, RequestInit]
+    expect(JSON.parse(String(approveCall[1].body))).toEqual({ comment: 'Tudo conforme, bom trabalho.' })
+  })
   it('posts rejection and keeps the current state after request failure', async () => {
     const fetchMock = vi.fn((url: string) => url.endsWith('/review') ? Promise.resolve(body(review)) : Promise.resolve(body({ status: 422, code: 'BUSINESS_RULE', message: 'Estado invalido' }, 422)))
     renderPage(fetchMock); await screen.findByText('Inspecao'); await userEvent.click(screen.getAllByRole('button', { name: 'Reprovar' }).at(-1)!); await userEvent.type(screen.getByLabelText(/motivo/i), 'Motivo suficiente'); await userEvent.click(screen.getByRole('button', { name: /confirmar reprovação/i }))

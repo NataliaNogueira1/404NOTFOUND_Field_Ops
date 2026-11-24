@@ -237,6 +237,35 @@ class MobileInspectionControllerTest {
                 .andExpect(jsonPath("$.canceledAt").value(nullValue()));
     }
 
+    @Test
+    void exposesApprovalCommentOnDetailForApprovedInspection() throws Exception {
+        User supervisor = userRepository.findByEmail("sup@fieldops.com").orElseThrow();
+        Inspection approved = saveInspection(template, technician, supervisor,
+                InspectionStatus.APPROVED, Priority.MEDIUM);
+        approved.setReviewComment("Tudo conforme, parabéns pelas evidências.");
+        approved.setReviewedBy(supervisor);
+        approved.setReviewedAt(Instant.parse("2026-11-03T12:00:00Z"));
+        inspectionRepository.saveAndFlush(approved);
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", approved.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.approvalComment").value("Tudo conforme, parabéns pelas evidências."))
+                .andExpect(jsonPath("$.rejectionReason").value(nullValue()));
+    }
+
+    @Test
+    void omitsApprovalCommentWhenInspectionWasNotApprovedWithComment() throws Exception {
+        Inspection assignedInspection = inspectionRepository.findByTechnicianIdOrderByDueDateAsc(technician.getId())
+                .getFirst();
+
+        mockMvc.perform(get("/api/v1/mobile/inspections/{id}", assignedInspection.getId())
+                        .header("Authorization", "Bearer " + obtainToken("tech@fieldops.com", "pass123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalComment").value(nullValue()));
+    }
+
     private User persistUser(String email, Role role) {
         User user = new User();
         user.setName("User " + email);

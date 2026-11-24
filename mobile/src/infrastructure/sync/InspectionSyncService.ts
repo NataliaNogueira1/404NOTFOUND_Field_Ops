@@ -54,6 +54,8 @@ interface ApiInspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Optional comment the supervisor left when approving (APPROVED only). */
+  approvalComment?: string;
   /** Reason given when the inspection was cancelled (issue #342). */
   canceledReason?: string;
   /** Who cancelled the inspection (issue #342). */
@@ -372,6 +374,9 @@ export class InspectionSyncService {
       rejectionReason: apiInsp.rejectionReason,
       rejectedBy: apiInsp.rejectedBy,
       rejectedAt: apiInsp.rejectedAt,
+      // Approval feedback mirrors the rejection reason so the technician reads it offline.
+      // The server reuses rejectedBy/rejectedAt for the reviewer of either decision.
+      approvalComment: apiInsp.approvalComment,
       // issue #342: bring the cancellation metadata down from the server so the
       // CancellationBanner shows reason, who and when offline.
       canceledReason: apiInsp.canceledReason,

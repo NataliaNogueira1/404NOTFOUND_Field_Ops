@@ -39,7 +39,7 @@ export const inspectionReviewApi = {
     return URL.createObjectURL(await apiRequestBlob(location.url))
   },
   beginReview: (id: string) => httpClient.post<{ id: number; status: InspectionStatus }>(`/api/v1/inspections/${id}/begin-review`),
-  approve: (id: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`),
+  approve: (id: string, comment = '') => httpClient.post<Decision>(`/api/v1/inspections/${id}/approve`, { comment: comment.trim() || null }),
   reject: (id: string, reason: string) => httpClient.post<Decision>(`/api/v1/inspections/${id}/reject`, { reason: reason.trim() }),
   async listComments(id: string): Promise<ReviewComment[]> { const values = await httpClient.get<BackendReviewComment[]>(`/api/v1/inspections/${id}/review-comments`); return values.map(reviewComment) },
   async addComment(id: string, itemSnapshotId: string, comment: string): Promise<ReviewComment> { return reviewComment(await httpClient.post<BackendReviewComment>(`/api/v1/inspections/${id}/items/${itemSnapshotId}/review-comment`, { comment: comment.trim() })) },
