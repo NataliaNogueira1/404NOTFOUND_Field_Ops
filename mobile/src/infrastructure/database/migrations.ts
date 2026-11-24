@@ -300,6 +300,15 @@ const migrations: Migration[] = [
       await addColumnIfMissing(db, 'inspections', 'canceled_at', 'TEXT');
     },
   },
+  {
+    version: 13,
+    description: 'Store the supervisor approval comment on inspections',
+    // Mirrors rejection_reason (v2) for the APPROVED status so the technician
+    // sees the reviewer's feedback offline.
+    run: async (db) => {
+      await addColumnIfMissing(db, 'inspections', 'approval_comment', 'TEXT');
+    },
+  },
 ];
 
 /**

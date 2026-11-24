@@ -59,6 +59,8 @@ export interface Inspection {
   rejectedBy?: string;
   /** When the inspection was rejected (ISO date/time). */
   rejectedAt?: string;
+  /** Optional comment the supervisor left when the inspection was APPROVED. */
+  approvalComment?: string;
   /** Reason given by the administrator/supervisor when the inspection was CANCELED. */
   canceledReason?: string;
   /** Who cancelled the inspection (name). */

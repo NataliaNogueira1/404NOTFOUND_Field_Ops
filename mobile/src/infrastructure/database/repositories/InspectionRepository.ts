@@ -64,6 +64,8 @@ interface InspectionRow {
   rejection_reason: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  /** Supervisor comment left on approval (migration v13). */
+  approval_comment: string | null;
   /** issue #342: reason given when the inspection was cancelled. */
   canceled_reason: string | null;
   /** issue #342: name of who cancelled the inspection. */
@@ -174,9 +176,9 @@ export class InspectionRepository {
         equipment_id, equipment_name, equipment_qr_code, technician_id, supervisor_id, supervisor_name,
         status, priority, due_date, due_time, created_at, started_at, completed_at,
         progress, supervisor_instructions, rejection_reason, rejected_by, rejected_at,
-        canceled_reason, canceled_by, canceled_at,
+        approval_comment, canceled_reason, canceled_by, canceled_at,
         sync_status, pending_sync_count, server_version, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         template_id = excluded.template_id,
@@ -200,6 +202,7 @@ export class InspectionRepository {
         rejection_reason = CASE WHEN ? THEN excluded.rejection_reason ELSE inspections.rejection_reason END,
         rejected_by = CASE WHEN ? THEN excluded.rejected_by ELSE inspections.rejected_by END,
         rejected_at = CASE WHEN ? THEN excluded.rejected_at ELSE inspections.rejected_at END,
+        approval_comment = CASE WHEN ? THEN excluded.approval_comment ELSE inspections.approval_comment END,
         canceled_reason = CASE WHEN ? THEN excluded.canceled_reason ELSE inspections.canceled_reason END,
         canceled_by = CASE WHEN ? THEN excluded.canceled_by ELSE inspections.canceled_by END,
         canceled_at = CASE WHEN ? THEN excluded.canceled_at ELSE inspections.canceled_at END,
@@ -232,6 +235,8 @@ export class InspectionRepository {
       inspection.rejectionReason ?? null,
       inspection.rejectedBy ?? null,
       inspection.rejectedAt ?? null,
+      // Approval feedback for the technician, readable offline (migration v13).
+      inspection.approvalComment ?? null,
       // issue #342: persist the cancellation metadata pulled from the server so the
       // CancellationBanner shows the reason, who and when offline.
       inspection.canceledReason ?? null,
@@ -241,7 +246,8 @@ export class InspectionRepository {
       inspection.pendingSyncCount,
       inspection.serverVersion ?? 0,
       // CASE guards for the UPDATE branch (SQLite has no booleans → 1/0):
-      // status + 3 rejection columns + 3 cancellation columns.
+      // status + 3 rejection columns + approval comment + 3 cancellation columns.
+      isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
       isServerAuthoritative ? 1 : 0,
@@ -566,6 +572,7 @@ export class InspectionRepository {
     rejectionReason: row.rejection_reason ?? undefined,
     rejectedBy: row.rejected_by ?? undefined,
     rejectedAt: row.rejected_at ?? undefined,
+    approvalComment: row.approval_comment ?? undefined,
     canceledReason: row.canceled_reason ?? undefined,
     canceledBy: row.canceled_by ?? undefined,
     canceledAt: row.canceled_at ?? undefined,
