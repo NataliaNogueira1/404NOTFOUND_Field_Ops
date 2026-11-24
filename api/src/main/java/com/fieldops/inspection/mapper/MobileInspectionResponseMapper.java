@@ -80,6 +80,7 @@ public class MobileInspectionResponseMapper {
                 inspection.getRejectionReason(),
                 inspection.getReviewedBy() != null ? inspection.getReviewedBy().getName() : null,
                 inspection.getReviewedAt() != null ? inspection.getReviewedAt().toString() : null,
+                inspection.getReviewComment(),
                 // Cancellation audit for the technician's detail screen — mirrors the review
                 // contract (#262/PR #330). canceledBy is a LAZY User; resolved here inside the
                 // read transaction, same as supervisor/reviewedBy above (#338).

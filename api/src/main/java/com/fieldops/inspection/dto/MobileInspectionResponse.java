@@ -34,6 +34,8 @@ public record MobileInspectionResponse(
         String rejectionReason,
         String rejectedBy,
         String rejectedAt,
+        /** Optional comment the reviewer left when approving — only populated when status is APPROVED. */
+        String approvalComment,
         /** Reason the inspection was canceled — only populated when status is CANCELED (#338). */
         String canceledReason,
         /** Name of the admin/supervisor who canceled the inspection (#338). */
