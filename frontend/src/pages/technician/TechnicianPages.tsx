@@ -301,6 +301,12 @@ function DetailsContent({ inspection }: { inspection: TechnicianInspection }) {
               <p className="mt-1">{inspection.rejectionReason}</p>
             </Card>
           )}
+          {inspection.status === InspectionStatus.APPROVED && inspection.approvalComment && (
+            <Card className="border-success/40 bg-success/10 p-4 text-sm text-success-dark">
+              <p className="font-semibold">Comentário da aprovação</p>
+              <p className="mt-1">{inspection.approvalComment}</p>
+            </Card>
+          )}
           <Card className="p-5">
             <h2 className="text-base font-semibold">Dados da inspeção</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
