@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -32,6 +32,20 @@ describe('InspectionReviewPage evidence lightbox', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Próxima foto' })); expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
     expect(within(dialog).getByText('Localização não informada')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Fechar lightbox' })); expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows the evidence preview in the thumbnails without opening the lightbox', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getAllByAltText('Protecao').length).toBeGreaterThan(0))
+    expect(screen.queryByText('Carregando...')).toBeNull()
+    expect(screen.getAllByAltText('Protecao')[0]).toHaveAttribute('src', 'blob:real-image')
+  })
+
+  it('marks the thumbnail as unavailable when the evidence file cannot be loaded', async () => {
+    renderPage('fail')
+    await screen.findAllByRole('button', { name: /Abrir foto/ })
+    await waitFor(() => expect(screen.getAllByText('Indisponível').length).toBeGreaterThan(0))
+    expect(screen.queryByRole('img')).toBeNull()
   })
 
   it('shows the real loading failure instead of a mock image', async () => {

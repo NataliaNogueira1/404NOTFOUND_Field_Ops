@@ -13,7 +13,13 @@ export interface LightboxPhoto {
   /** Human-readable coordinates or location name */
   location?: string
   description?: string
+  /** True while the image is still being fetched from the API/storage. */
+  loading?: boolean
   loadError?: boolean
+}
+
+function hasImage(photo: LightboxPhoto) {
+  return !photo.loadError && (photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data'))
 }
 
 interface LightboxProps {
@@ -69,7 +75,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
 
   const photo = photos[Math.min(index, photos.length - 1)]
   if (!photo) return null
-  const isUrl = !photo.loadError && (photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data'))
+  const isUrl = hasImage(photo)
 
   return createPortal(
     <div
@@ -138,7 +144,7 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
               <div className="rounded-full bg-primary/20 p-6">
                 <ZoomIn size={48} className="text-primary-light" />
               </div>
-              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.loadError ? 'Não foi possível carregar a evidência.' : 'Evidência indisponível'}</p>
+              <p className="max-w-xs break-all text-center text-sm text-white/60">{photo.loadError ? 'Não foi possível carregar a evidência.' : photo.loading ? 'Carregando evidência...' : 'Evidência indisponível'}</p>
             </div>
           )}
         </div>
@@ -188,10 +194,10 @@ function LightboxContent({ photos, initialIndex = 0, onClose }: LightboxProps) {
                   : 'border-transparent opacity-50 hover:opacity-80'
               }`}
             >
-              {!thumbnail.loadError && (thumbnail.src.startsWith('http') || thumbnail.src.startsWith('blob') || thumbnail.src.startsWith('data')) ? (
+              {hasImage(thumbnail) ? (
                 <img src={thumbnail.src} alt={thumbnail.item} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">Indisponível</div>
+                <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs text-white/50">{thumbnail.loading ? '...' : 'Indisponível'}</div>
               )}
             </button>
           ))}
@@ -220,10 +226,10 @@ export function PhotoThumbnails({
           onClick={() => onOpen(index)}
           className="group relative h-16 w-16 overflow-hidden rounded-md border border-border bg-app-bg transition hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          {!photo.loadError && (photo.src.startsWith('http') || photo.src.startsWith('blob') || photo.src.startsWith('data')) ? (
+          {hasImage(photo) ? (
             <img src={photo.src} alt={photo.item} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-app-bg text-xs text-muted">Carregar</div>
+            <div className="flex h-full w-full items-center justify-center bg-app-bg text-center text-[11px] leading-tight text-muted">{photo.loading ? 'Carregando...' : 'Indisponível'}</div>
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
             <ZoomIn size={16} className="text-white opacity-0 transition group-hover:opacity-100" />
