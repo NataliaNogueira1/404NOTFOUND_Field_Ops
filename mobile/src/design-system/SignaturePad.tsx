@@ -72,6 +72,52 @@ const MIN_DIST_SQ = 4; // 2dp minimum distance
  * canvas and, read-only, in SignaturePreview — so the preview is pixel-faithful
  * to what was drawn without relying on <Image>/SVG decoding (PBI-322).
  */
+/**
+ * One line segment between two points. Memoized: point objects are never
+ * mutated (new points are appended), so while a stroke grows only the newest
+ * segment actually renders; the others bail out on the props comparison.
+ *
+ * The segment extends half a stroke width past each point and has round
+ * caps, so neighbouring segments overlap at the joints. That closes the
+ * gaps/notches that appeared on curves when segments ended exactly at the
+ * points. It is centred on the midpoint and rotated around its own centre.
+ */
+const Segment = React.memo(function Segment({
+  from,
+  to,
+  strokeColor,
+  strokeWidth,
+}: {
+  from: SignaturePoint;
+  to: SignaturePoint;
+  strokeColor: string;
+  strokeWidth: number;
+}) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length < 0.5) return null;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const width = length + strokeWidth;
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.segment,
+        {
+          width,
+          height: strokeWidth,
+          borderRadius: strokeWidth / 2,
+          left: (from.x + to.x) / 2 - width / 2,
+          top: (from.y + to.y) / 2 - strokeWidth / 2,
+          backgroundColor: strokeColor,
+          transform: [{ rotate: `${angle}deg` }],
+        },
+      ]}
+    />
+  );
+});
+
 function SignatureStrokes({
   strokes,
   strokeColor,
@@ -84,32 +130,15 @@ function SignatureStrokes({
   return (
     <>
       {strokes.map((stroke, si) =>
-        stroke.slice(0, -1).map((pt, pi) => {
-          const next = stroke[pi + 1];
-          const dx = next.x - pt.x;
-          const dy = next.y - pt.y;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          if (length < 0.5) return null;
-          const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-          return (
-            <View
-              key={`${si}-${pi}`}
-              pointerEvents="none"
-              style={[
-                styles.segment,
-                {
-                  width: length,
-                  height: strokeWidth,
-                  left: pt.x,
-                  top: pt.y - strokeWidth / 2,
-                  backgroundColor: strokeColor,
-                  transform: [{ rotate: `${angle}deg` }],
-                  transformOrigin: '0% 50%',
-                },
-              ]}
-            />
-          );
-        }),
+        stroke.slice(0, -1).map((pt, pi) => (
+          <Segment
+            key={`${si}-${pi}`}
+            from={pt}
+            to={stroke[pi + 1]}
+            strokeColor={strokeColor}
+            strokeWidth={strokeWidth}
+          />
+        )),
       )}
 
       {/* Single-point taps rendered as dots */}
@@ -460,7 +489,6 @@ const styles = StyleSheet.create({
   },
   segment: {
     position: 'absolute',
-    borderRadius: 999,
   },
   dot: {
     position: 'absolute',
