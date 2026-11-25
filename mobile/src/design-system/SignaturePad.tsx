@@ -55,6 +55,12 @@ export interface SignaturePadProps {
   strokeWidth?: number;
   height?: number;
   disabled?: boolean;
+  /**
+   * Called with true when a stroke starts and false when it ends. Lets a parent
+   * ScrollView disable scrolling while the user signs — on iOS the JS responder
+   * cannot stop the native scroll gesture on its own.
+   */
+  onDrawingChange?: (drawing: boolean) => void;
 }
 
 // ─── Gesture tuning ───────────────────────────────────────────────────────────
@@ -201,6 +207,7 @@ export function SignaturePad({
   strokeWidth = 2,
   height = 180,
   disabled = false,
+  onDrawingChange,
 }: SignaturePadProps) {
   const c = useThemeColors();
 
@@ -259,6 +266,13 @@ export function SignaturePad({
     setCommitCount((n) => n + 1);
   }, []);
 
+  // Release/terminate end the gesture; a boundary exit only ends the stroke
+  // (the finger is still down, so the parent keeps scrolling disabled).
+  const endGesture = useCallback(() => {
+    commitCurrentStroke();
+    onDrawingChange?.(false);
+  }, [commitCurrentStroke, onDrawingChange]);
+
   // Notify parent after render settles (avoids setState-during-render, #334).
   useEffect(() => {
     if (commitCount === 0) return;
@@ -280,15 +294,27 @@ export function SignaturePad({
   // As plain event handlers they only run on touch, never during render.
   const shouldBecomeResponder = useCallback(() => !disabled, [disabled]);
 
+  // Returning true blocks native components (the summary screen's ScrollView)
+  // from stealing the gesture. PanResponder did this by default
+  // (onShouldBlockNativeResponder); without it the ScrollView took over on
+  // vertical moves, terminating the stroke and scrolling the page under the
+  // finger — strokes broke into dots and drifted away from the finger.
   const onResponderGrant = useCallback(
-    (evt: GestureResponderEvent) => {
+    (evt: GestureResponderEvent): boolean => {
       const { locationX: x, locationY: y } = evt.nativeEvent;
-      if (!isInsideCanvas(x, y)) return;
-      liveStrokeRef.current = [{ x, y }];
-      setLiveStroke(liveStrokeRef.current);
+      onDrawingChange?.(true);
+      if (isInsideCanvas(x, y)) {
+        liveStrokeRef.current = [{ x, y }];
+        setLiveStroke(liveStrokeRef.current);
+      }
+      return true;
     },
-    [isInsideCanvas],
+    [isInsideCanvas, onDrawingChange],
   );
+
+  // Refuse to hand the gesture to another responder (e.g. a parent ScrollView)
+  // while the user is signing.
+  const refuseTermination = useCallback(() => false, []);
 
   const onResponderMove = useCallback(
     (evt: GestureResponderEvent) => {
@@ -385,9 +411,10 @@ export function SignaturePad({
           onMoveShouldSetResponder={shouldBecomeResponder}
           onResponderGrant={onResponderGrant}
           onResponderMove={onResponderMove}
-          onResponderRelease={commitCurrentStroke}
+          onResponderTerminationRequest={refuseTermination}
+          onResponderRelease={endGesture}
           // Terminate fires when the gesture is stolen — commit what was drawn.
-          onResponderTerminate={commitCurrentStroke}
+          onResponderTerminate={endGesture}
         />
       </View>
 
