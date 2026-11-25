@@ -61,11 +61,9 @@ export interface SignaturePadProps {
 
 // Minimum squared distance between consecutive points. Skipping points that
 // are too close reduces the number of segments rendered without visible loss
-// of quality, which is the main source of lag on slow devices.
+// of quality. This is the only point filter: a time-based throttle dropped
+// points on fast strokes, turning curves into long straight jumps.
 const MIN_DIST_SQ = 4; // 2dp minimum distance
-
-// ~60fps cap on accepted points; natively fires faster on some devices.
-const THROTTLE_MS = 16;
 
 // ─── Stroke segment rendering ─────────────────────────────────────────────────
 
@@ -241,9 +239,6 @@ export function SignaturePad({
 
   // ─── Gesture handlers ──────────────────────────────────────────────────────
 
-  // Timestamp of the last accepted point, used to throttle high-frequency events.
-  const lastPointTimeRef = useRef(0);
-
   const isInsideCanvas = useCallback((x: number, y: number): boolean => {
     const { width: w, height: h } = canvasSizeRef.current;
     return x >= 0 && y >= 0 && (w <= 0 || x <= w) && (h <= 0 || y <= h);
@@ -261,7 +256,6 @@ export function SignaturePad({
       const { locationX: x, locationY: y } = evt.nativeEvent;
       if (!isInsideCanvas(x, y)) return;
       liveStrokeRef.current = [{ x, y }];
-      lastPointTimeRef.current = Date.now();
       setLiveStroke(liveStrokeRef.current);
     },
     [isInsideCanvas],
@@ -276,11 +270,6 @@ export function SignaturePad({
         commitCurrentStroke();
         return;
       }
-
-      // Throttle: skip points that arrive faster than THROTTLE_MS.
-      const now = Date.now();
-      if (now - lastPointTimeRef.current < THROTTLE_MS) return;
-      lastPointTimeRef.current = now;
 
       // Skip points too close to the last one (reduces segment count).
       const live = liveStrokeRef.current;
