@@ -32,6 +32,9 @@ export default function SummaryScreen() {
   const [confirm, setConfirm] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const [concluding, setConcluding] = useState(false);
+  // True while the finger is down on the signature canvas: the ScrollView stops
+  // scrolling so it cannot steal the stroke or move the page under the finger.
+  const [signing, setSigning] = useState(false);
 
   // ─── Signature state ─────────────────────────────────────────────────────
 
@@ -165,7 +168,7 @@ export default function SummaryScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} scrollEnabled={!signing}>
         <Text style={[styles.title, { color: c.text }]}>Resumo</Text>
 
         <Card style={styles.card}>
@@ -205,6 +208,7 @@ export default function SummaryScreen() {
           {/* Canvas de assinatura */}
           <SignaturePad
             onSignatureChange={handleSignatureChange}
+            onDrawingChange={setSigning}
             height={180}
           />
 

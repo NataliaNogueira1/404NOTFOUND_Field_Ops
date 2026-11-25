@@ -55,17 +55,21 @@ export interface SignaturePadProps {
   strokeWidth?: number;
   height?: number;
   disabled?: boolean;
+  /**
+   * Called with true when a stroke starts and false when it ends. Lets a parent
+   * ScrollView disable scrolling while the user signs — on iOS the JS responder
+   * cannot stop the native scroll gesture on its own.
+   */
+  onDrawingChange?: (drawing: boolean) => void;
 }
 
 // ─── Gesture tuning ───────────────────────────────────────────────────────────
 
 // Minimum squared distance between consecutive points. Skipping points that
 // are too close reduces the number of segments rendered without visible loss
-// of quality, which is the main source of lag on slow devices.
+// of quality. This is the only point filter: a time-based throttle dropped
+// points on fast strokes, turning curves into long straight jumps.
 const MIN_DIST_SQ = 4; // 2dp minimum distance
-
-// ~60fps cap on accepted points; natively fires faster on some devices.
-const THROTTLE_MS = 16;
 
 // ─── Stroke segment rendering ─────────────────────────────────────────────────
 
@@ -74,6 +78,52 @@ const THROTTLE_MS = 16;
  * canvas and, read-only, in SignaturePreview — so the preview is pixel-faithful
  * to what was drawn without relying on <Image>/SVG decoding (PBI-322).
  */
+/**
+ * One line segment between two points. Memoized: point objects are never
+ * mutated (new points are appended), so while a stroke grows only the newest
+ * segment actually renders; the others bail out on the props comparison.
+ *
+ * The segment extends half a stroke width past each point and has round
+ * caps, so neighbouring segments overlap at the joints. That closes the
+ * gaps/notches that appeared on curves when segments ended exactly at the
+ * points. It is centred on the midpoint and rotated around its own centre.
+ */
+const Segment = React.memo(function Segment({
+  from,
+  to,
+  strokeColor,
+  strokeWidth,
+}: {
+  from: SignaturePoint;
+  to: SignaturePoint;
+  strokeColor: string;
+  strokeWidth: number;
+}) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length < 0.5) return null;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const width = length + strokeWidth;
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.segment,
+        {
+          width,
+          height: strokeWidth,
+          borderRadius: strokeWidth / 2,
+          left: (from.x + to.x) / 2 - width / 2,
+          top: (from.y + to.y) / 2 - strokeWidth / 2,
+          backgroundColor: strokeColor,
+          transform: [{ rotate: `${angle}deg` }],
+        },
+      ]}
+    />
+  );
+});
+
 function SignatureStrokes({
   strokes,
   strokeColor,
@@ -86,32 +136,15 @@ function SignatureStrokes({
   return (
     <>
       {strokes.map((stroke, si) =>
-        stroke.slice(0, -1).map((pt, pi) => {
-          const next = stroke[pi + 1];
-          const dx = next.x - pt.x;
-          const dy = next.y - pt.y;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          if (length < 0.5) return null;
-          const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-          return (
-            <View
-              key={`${si}-${pi}`}
-              pointerEvents="none"
-              style={[
-                styles.segment,
-                {
-                  width: length,
-                  height: strokeWidth,
-                  left: pt.x,
-                  top: pt.y - strokeWidth / 2,
-                  backgroundColor: strokeColor,
-                  transform: [{ rotate: `${angle}deg` }],
-                  transformOrigin: '0% 50%',
-                },
-              ]}
-            />
-          );
-        }),
+        stroke.slice(0, -1).map((pt, pi) => (
+          <Segment
+            key={`${si}-${pi}`}
+            from={pt}
+            to={stroke[pi + 1]}
+            strokeColor={strokeColor}
+            strokeWidth={strokeWidth}
+          />
+        )),
       )}
 
       {/* Single-point taps rendered as dots */}
@@ -174,6 +207,7 @@ export function SignaturePad({
   strokeWidth = 2,
   height = 180,
   disabled = false,
+  onDrawingChange,
 }: SignaturePadProps) {
   const c = useThemeColors();
 
@@ -232,6 +266,13 @@ export function SignaturePad({
     setCommitCount((n) => n + 1);
   }, []);
 
+  // Release/terminate end the gesture; a boundary exit only ends the stroke
+  // (the finger is still down, so the parent keeps scrolling disabled).
+  const endGesture = useCallback(() => {
+    commitCurrentStroke();
+    onDrawingChange?.(false);
+  }, [commitCurrentStroke, onDrawingChange]);
+
   // Notify parent after render settles (avoids setState-during-render, #334).
   useEffect(() => {
     if (commitCount === 0) return;
@@ -240,9 +281,6 @@ export function SignaturePad({
   }, [commitCount]);
 
   // ─── Gesture handlers ──────────────────────────────────────────────────────
-
-  // Timestamp of the last accepted point, used to throttle high-frequency events.
-  const lastPointTimeRef = useRef(0);
 
   const isInsideCanvas = useCallback((x: number, y: number): boolean => {
     const { width: w, height: h } = canvasSizeRef.current;
@@ -256,16 +294,27 @@ export function SignaturePad({
   // As plain event handlers they only run on touch, never during render.
   const shouldBecomeResponder = useCallback(() => !disabled, [disabled]);
 
+  // Returning true blocks native components (the summary screen's ScrollView)
+  // from stealing the gesture. PanResponder did this by default
+  // (onShouldBlockNativeResponder); without it the ScrollView took over on
+  // vertical moves, terminating the stroke and scrolling the page under the
+  // finger — strokes broke into dots and drifted away from the finger.
   const onResponderGrant = useCallback(
-    (evt: GestureResponderEvent) => {
+    (evt: GestureResponderEvent): boolean => {
       const { locationX: x, locationY: y } = evt.nativeEvent;
-      if (!isInsideCanvas(x, y)) return;
-      liveStrokeRef.current = [{ x, y }];
-      lastPointTimeRef.current = Date.now();
-      setLiveStroke(liveStrokeRef.current);
+      onDrawingChange?.(true);
+      if (isInsideCanvas(x, y)) {
+        liveStrokeRef.current = [{ x, y }];
+        setLiveStroke(liveStrokeRef.current);
+      }
+      return true;
     },
-    [isInsideCanvas],
+    [isInsideCanvas, onDrawingChange],
   );
+
+  // Refuse to hand the gesture to another responder (e.g. a parent ScrollView)
+  // while the user is signing.
+  const refuseTermination = useCallback(() => false, []);
 
   const onResponderMove = useCallback(
     (evt: GestureResponderEvent) => {
@@ -276,11 +325,6 @@ export function SignaturePad({
         commitCurrentStroke();
         return;
       }
-
-      // Throttle: skip points that arrive faster than THROTTLE_MS.
-      const now = Date.now();
-      if (now - lastPointTimeRef.current < THROTTLE_MS) return;
-      lastPointTimeRef.current = now;
 
       // Skip points too close to the last one (reduces segment count).
       const live = liveStrokeRef.current;
@@ -332,13 +376,6 @@ export function SignaturePad({
           },
         ]}
         onLayout={onLayout}
-        onStartShouldSetResponder={shouldBecomeResponder}
-        onMoveShouldSetResponder={shouldBecomeResponder}
-        onResponderGrant={onResponderGrant}
-        onResponderMove={onResponderMove}
-        onResponderRelease={commitCurrentStroke}
-        // Terminate fires when the gesture is stolen — commit what was drawn.
-        onResponderTerminate={commitCurrentStroke}
       >
         {/* Placeholder */}
         {isEmpty && (
@@ -362,6 +399,22 @@ export function SignaturePad({
           stroke={liveStroke}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
+        />
+
+        {/* Touch layer: transparent and rendered last so it is always the touch
+            target. Without it, once a stroke segment View sits under the finger,
+            locationX/Y become relative to that segment (not the canvas), fall
+            outside the bounds and end the stroke — leaving only dots. */}
+        <View
+          style={StyleSheet.absoluteFill}
+          onStartShouldSetResponder={shouldBecomeResponder}
+          onMoveShouldSetResponder={shouldBecomeResponder}
+          onResponderGrant={onResponderGrant}
+          onResponderMove={onResponderMove}
+          onResponderTerminationRequest={refuseTermination}
+          onResponderRelease={endGesture}
+          // Terminate fires when the gesture is stolen — commit what was drawn.
+          onResponderTerminate={endGesture}
         />
       </View>
 
@@ -463,7 +516,6 @@ const styles = StyleSheet.create({
   },
   segment: {
     position: 'absolute',
-    borderRadius: 999,
   },
   dot: {
     position: 'absolute',
