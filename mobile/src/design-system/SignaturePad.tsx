@@ -332,13 +332,6 @@ export function SignaturePad({
           },
         ]}
         onLayout={onLayout}
-        onStartShouldSetResponder={shouldBecomeResponder}
-        onMoveShouldSetResponder={shouldBecomeResponder}
-        onResponderGrant={onResponderGrant}
-        onResponderMove={onResponderMove}
-        onResponderRelease={commitCurrentStroke}
-        // Terminate fires when the gesture is stolen — commit what was drawn.
-        onResponderTerminate={commitCurrentStroke}
       >
         {/* Placeholder */}
         {isEmpty && (
@@ -362,6 +355,21 @@ export function SignaturePad({
           stroke={liveStroke}
           strokeColor={strokeColor}
           strokeWidth={strokeWidth}
+        />
+
+        {/* Touch layer: transparent and rendered last so it is always the touch
+            target. Without it, once a stroke segment View sits under the finger,
+            locationX/Y become relative to that segment (not the canvas), fall
+            outside the bounds and end the stroke — leaving only dots. */}
+        <View
+          style={StyleSheet.absoluteFill}
+          onStartShouldSetResponder={shouldBecomeResponder}
+          onMoveShouldSetResponder={shouldBecomeResponder}
+          onResponderGrant={onResponderGrant}
+          onResponderMove={onResponderMove}
+          onResponderRelease={commitCurrentStroke}
+          // Terminate fires when the gesture is stolen — commit what was drawn.
+          onResponderTerminate={commitCurrentStroke}
         />
       </View>
 
