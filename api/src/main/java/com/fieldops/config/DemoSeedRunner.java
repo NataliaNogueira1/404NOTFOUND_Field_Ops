@@ -208,6 +208,7 @@ public class DemoSeedRunner implements ApplicationRunner {
         Long templateVersion3 = seedElectricalPanelTemplate(supervisor.getId());
         Long templateVersion4 = seedHydraulicPumpTemplate(supervisor.getId());
         Long templateVersion5 = seedElectricalSafetyTemplate(supervisor.getId());
+        Long templateVersionKeyboard = seedKeyboardTestTemplate(supervisor.getId());
 
         // Resolve the full user roster for the inspection plan.
         User[] supervisors = {supervisor, supervisor2, supervisor3};
@@ -218,14 +219,14 @@ public class DemoSeedRunner implements ApplicationRunner {
                 List.of(client1, client2, client3),
                 List.of(site1, site2, site3),
                 List.of(equipment1, equipment2, equipment3, equipment4, equipment5),
-                supervisors, technicians);
+                supervisors, technicians, templateVersionKeyboard);
 
         // Seed a detailed answer history (PBI-088) on the first inspection so the admin can see a
         // realistic timeline, including an item answered more than once over time.
         seedAnswerHistory(firstInspectionId, technicians[0].getId());
 
-        log.info("Demo seed created: 3 clients, 3 sites, 5 equipment, 5 published models, "
-                + "14 inspections (2 per status) distributed across {} technicians and {} supervisors.",
+        log.info("Demo seed created: 3 clients, 3 sites, 5 equipment, 6 published models (5 domain + 1 keyboard test), "
+                + "15 inspections distributed across {} technicians and {} supervisors.",
                 technicians.length, supervisors.length);
     }
 
@@ -331,7 +332,7 @@ public class DemoSeedRunner implements ApplicationRunner {
      */
     private Long seedInspections(List<Long> templateVersionIds, List<ClientResponse> clients,
             List<SiteResponse> sites, List<EquipmentResponse> equipment,
-            User[] supervisors, User[] technicians) {
+            User[] supervisors, User[] technicians, Long keyboardTemplateVersionId) {
         // Distribute references across models/clients/sites/equipment/technicians/supervisors.
         Long tpl1 = templateVersionIds.get(0), tpl2 = templateVersionIds.get(1),
                 tpl3 = templateVersionIds.get(2), tpl4 = templateVersionIds.get(3),
@@ -346,6 +347,12 @@ public class DemoSeedRunner implements ApplicationRunner {
                 sup3 = supervisors[2].getId();
 
         List<PlannedInspection> plan = List.of(
+                // KEYBOARD TEST — atribuída ao técnico principal para testar todos os tipos de input.
+                new PlannedInspection(InspectionStatus.ASSIGNED,
+                        "[TESTE] Todos os tipos de resposta e teclado",
+                        keyboardTemplateVersionId, c1, s1, eq1, tec1, sup1, Priority.LOW, 30,
+                        "Inspecao de teste para validar todos os tipos de campo (NUMBER, TEXT_SHORT, TEXT_LONG, CONFORMITY, BOOLEAN, SINGLE_CHOICE, DATE). Tocar em cada campo e verificar que o teclado nao cobre o input."),
+
                 // ASSIGNED (2) — fresh, no transition.
                 new PlannedInspection(InspectionStatus.ASSIGNED,
                         "Inspecao Preventiva - Compressor de Ar XPTO 500",
@@ -599,6 +606,55 @@ public class DemoSeedRunner implements ApplicationRunner {
         itemService.create(templateId, signId, new TemplateItemRequest(
                 "EPI necessario disponivel?", null,
                 ResponseType.CONFORMITY, true, true, false, null, 2));
+        return versionService.publish(templateId, publisherId).id();
+    }
+
+    /**
+     * Template dedicado a testar todos os tipos de resposta e teclado no mobile (#333).
+     * Duas seções com itens no meio e no fim para validar scroll com teclado aberto:
+     * - Seção 1: CONFORMITY, BOOLEAN, SINGLE_CHOICE, DATE (sem teclado de texto)
+     * - Seção 2: NUMBER, TEXT_SHORT, TEXT_LONG (todos os teclados de texto, no fim da lista)
+     */
+    private Long seedKeyboardTestTemplate(Long publisherId) {
+        InspectionTemplateResponse template = templateService.createDraft(new InspectionTemplateRequest(
+                "[TESTE] Todos os Tipos de Resposta",
+                "Template para testar todos os tipos de campo e comportamento do teclado no mobile",
+                "Teste"), publisherId);
+        Long templateId = template.id();
+        sectionService.create(templateId, new TemplateSectionRequest(
+                "Secao 1 — Selecao e Data", "Campos sem teclado de texto", 1));
+        sectionService.create(templateId, new TemplateSectionRequest(
+                "Secao 2 — Campos de Texto e Numero", "Campos que abrem teclado (testar scroll)", 2));
+        List<TemplateSectionResponse> sections = templateService.getById(templateId).sections();
+        Long sec1Id = sectionByOrder(sections, 1);
+        Long sec2Id = sectionByOrder(sections, 2);
+
+        // Seção 1 — sem teclado de texto
+        itemService.create(templateId, sec1Id, new TemplateItemRequest(
+                "Item 1 — Conformidade (CONFORMITY)", "Selecionar Conforme / Nao conforme / N/A",
+                ResponseType.CONFORMITY, true, true, true, null, 1));
+        itemService.create(templateId, sec1Id, new TemplateItemRequest(
+                "Item 2 — Booleano (BOOLEAN)", "Selecionar Sim ou Nao",
+                ResponseType.BOOLEAN, true, false, false, null, 2));
+        itemService.create(templateId, sec1Id, new TemplateItemRequest(
+                "Item 3 — Escolha unica (SINGLE_CHOICE)", "Selecionar uma opcao da lista",
+                ResponseType.SINGLE_CHOICE, true, false, false,
+                List.of("Opcao A", "Opcao B", "Opcao C", "Opcao D"), 3));
+        itemService.create(templateId, sec1Id, new TemplateItemRequest(
+                "Item 4 — Data (DATE)", "Selecionar uma data no calendario",
+                ResponseType.DATE, false, false, false, null, 4));
+
+        // Seção 2 — todos abrem teclado (testar scroll com teclado aberto)
+        itemService.create(templateId, sec2Id, new TemplateItemRequest(
+                "Item 5 — Numero (NUMBER)", "Digitar um valor numerico — teclado numerico",
+                ResponseType.NUMBER, true, false, false, null, 1));
+        itemService.create(templateId, sec2Id, new TemplateItemRequest(
+                "Item 6 — Texto curto (TEXT_SHORT)", "Digitar texto curto — teclado alfanumerico",
+                ResponseType.TEXT_SHORT, true, false, false, null, 2));
+        itemService.create(templateId, sec2Id, new TemplateItemRequest(
+                "Item 7 — Texto longo (TEXT_LONG)", "Digitar texto longo multiline — teclado alfanumerico",
+                ResponseType.TEXT_LONG, false, false, false, null, 3));
+
         return versionService.publish(templateId, publisherId).id();
     }
 
